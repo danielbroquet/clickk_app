@@ -5,6 +5,8 @@ import { callEdgeFunction } from './edgeFunction'
 
 export const useStoryPurchase = () => {
   const [purchasing, setPurchasing] = useState(false)
+  const [purchaseError, setPurchaseError] = useState<string | null>(null)
+  const [purchased, setPurchased] = useState(false)
 
   const handlePurchase = async (
     storyId: string,
@@ -13,6 +15,8 @@ export const useStoryPurchase = () => {
   ) => {
     if (purchasing) return
     setPurchasing(true)
+    setPurchaseError(null)
+    setPurchased(false)
 
     try {
       const { checkoutUrl } = await callEdgeFunction<{ checkoutUrl: string; sessionId: string }>(
@@ -28,15 +32,17 @@ export const useStoryPurchase = () => {
       )
 
       if (result.type === 'success') {
+        setPurchased(true)
         onSuccess?.()
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur paiement'
+      setPurchaseError(message)
       Alert.alert('Error', message)
     } finally {
       setPurchasing(false)
     }
   }
 
-  return { handlePurchase, purchasing }
+  return { handlePurchase, purchasing, purchaseError, purchased }
 }
