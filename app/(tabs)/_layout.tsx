@@ -10,11 +10,17 @@ import {
 } from 'react-native'
 import { Tabs, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import { useAuth } from '../../lib/auth'
 
 function SellButton({ onPress }: { onPress: () => void }) {
+  const insets = useSafeAreaInsets()
   return (
-    <TouchableOpacity style={styles.sellBtn} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.sellBtn, { marginBottom: insets.bottom }]}
+      onPress={onPress}
+    >
       <Ionicons name="add" size={28} color="#FFFFFF" />
     </TouchableOpacity>
   )
@@ -34,6 +40,8 @@ const SELL_OPTIONS: SellOption[] = [
 
 export default function TabLayout() {
   const [showSellModal, setShowSellModal] = useState(false)
+  const { profile } = useAuth()
+  const isSeller = profile?.role === 'seller'
 
   return (
     <>
@@ -65,9 +73,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="sell"
           options={{
-            tabBarButton: () => (
-              <SellButton onPress={() => setShowSellModal(true)} />
-            ),
+            tabBarButton: isSeller
+              ? () => <SellButton onPress={() => router.push('/story/create')} />
+              : () => null,
           }}
         />
         <Tabs.Screen
@@ -152,8 +160,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     alignSelf: 'center',
+    transform: [{ translateY: -16 }],
   },
   overlay: {
     flex: 1,
