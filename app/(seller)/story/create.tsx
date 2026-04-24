@@ -116,6 +116,8 @@ export default function CreateStoryScreen() {
           start_price_chf: parseFloat(startPrice),
           floor_price_chf: parseFloat(floorPrice),
           current_price_chf: parseFloat(startPrice),
+          price_drop_seconds: 0,
+          last_drop_at: new Date().toISOString(),
           speed_preset: selectedPreset,
           duration_hours: durationHours,
           expires_at: new Date(Date.now() + durationMs).toISOString(),
