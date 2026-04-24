@@ -152,7 +152,7 @@ export default function CreateStoryScreen() {
 
       if (insertError) throw insertError
 
-      router.replace('/(tabs)')
+      router.replace('/(tabs)/index')
     } catch (err: any) {
       setPublishing(false)
       setErrors(e => ({ ...e, publish: err.message ?? i18n.t('story.create.error_upload') }))
