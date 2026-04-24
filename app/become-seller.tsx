@@ -89,12 +89,16 @@ export default function BecomeSellerScreen() {
           const newUrl = await fetchOnboardingUrl()
           if (newUrl) {
             setStatus('redirecting')
-            await WebBrowser.openAuthSessionAsync(
+            const refreshResult = await WebBrowser.openAuthSessionAsync(
               newUrl,
               'clickk://onboarding-complete',
               { preferEphemeralSession: false }
             )
-            await checkOnboardingStatus()
+            if (refreshResult.type === 'success') {
+              await checkOnboardingStatus()
+            } else {
+              setStatus('idle')
+            }
           }
         }
       } else {
