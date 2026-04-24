@@ -11,7 +11,7 @@ export const useStoryPurchase = () => {
     storyId: string,
     amountChf: number,
     _buyerName: string,
-    onSuccess: () => void
+    onSuccess?: () => void
   ) => {
     if (purchasing) return
     setPurchasing(true)
@@ -43,7 +43,7 @@ export const useStoryPurchase = () => {
 
       if (result.type === 'success') {
         setPurchased(true)
-        onSuccess()
+        if (typeof onSuccess === 'function') onSuccess()
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Erreur paiement'
