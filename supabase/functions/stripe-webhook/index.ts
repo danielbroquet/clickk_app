@@ -41,7 +41,9 @@ interface StripeEventMetadata {
 }
 
 interface StripeObject {
+  id?: string;
   metadata?: StripeEventMetadata;
+  details_submitted?: boolean;
 }
 
 interface StripeEvent {
@@ -184,6 +186,45 @@ Deno.serve(async (req: Request) => {
       }
 
       await processPurchase(supabase, story_id.trim(), buyer_id.trim(), parseFloat(amount_chf));
+    } else if (event.type === "account.updated") {
+      const account = event.data.object;
+      const accountId = account.id;
+      if (accountId && account.details_submitted === true) {
+        const { data: onboarding, error: obErr } = await supabase
+          .from("seller_onboarding")
+          .select("user_id")
+          .eq("stripe_account_id", accountId)
+          .maybeSingle();
+
+        if (obErr) {
+          console.error("[stripe-webhook] seller_onboarding select failed:", obErr.message);
+        } else if (!onboarding) {
+          console.warn(`[stripe-webhook] No seller_onboarding row for account ${accountId}`);
+        } else {
+          const { error: updOnbErr } = await supabase
+            .from("seller_onboarding")
+            .update({ status: "complete", updated_at: new Date().toISOString() })
+            .eq("stripe_account_id", accountId);
+
+          if (updOnbErr) {
+            console.error("[stripe-webhook] seller_onboarding update failed:", updOnbErr.message);
+          }
+
+          const userId = onboarding.user_id as string;
+          const { error: updProfErr } = await supabase
+            .from("profiles")
+            .update({ role: "seller" })
+            .eq("id", userId);
+
+          if (updProfErr) {
+            console.error("[stripe-webhook] profiles update failed:", updProfErr.message);
+          } else {
+            console.log(`[stripe-webhook] User ${userId} promoted to seller`);
+          }
+        }
+      } else {
+        console.log(`[stripe-webhook] account.updated for ${accountId ?? "unknown"} — details_submitted=${account.details_submitted}`);
+      }
     } else if (event.type === "checkout.session.expired") {
       const story_id = event.data.object.metadata?.story_id;
       console.log(`[stripe-webhook] Checkout expired for story ${story_id ?? "unknown"} — no DB change needed`);
