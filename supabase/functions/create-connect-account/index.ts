@@ -7,8 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const REFRESH_URL = "clickk://onboarding-refresh";
-const RETURN_URL = "clickk://onboarding-complete";
+const REFRESH_URL = "https://ckrttngnwoslypyulwuf.supabase.co/onboarding-refresh";
+const RETURN_URL = "https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete";
 
 async function stripeRequest(path: string, key: string, body?: URLSearchParams) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
