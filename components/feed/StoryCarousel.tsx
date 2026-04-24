@@ -10,16 +10,16 @@ import {
 import { router } from 'expo-router'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import i18n from '../../lib/i18n'
-import { AuctionType, Story } from '../../types'
+import { SpeedPreset, Story } from '../../types'
 
-const INTERVAL_SECONDS: Record<AuctionType, number> = {
+const INTERVAL_SECONDS: Record<SpeedPreset, number> = {
   SLOW: 300,
   STANDARD: 180,
   FAST: 60,
 }
 
-function getSecondsRemaining(lastDropAt: string, auctionType: AuctionType): number {
-  const interval = INTERVAL_SECONDS[auctionType]
+function getSecondsRemaining(lastDropAt: string, speedPreset: SpeedPreset): number {
+  const interval = INTERVAL_SECONDS[speedPreset]
   const lastDrop = new Date(lastDropAt).getTime()
   const nextDrop = lastDrop + interval * 1000
   const remaining = Math.max(0, Math.floor((nextDrop - Date.now()) / 1000))
@@ -34,15 +34,15 @@ function formatMMSS(seconds: number): string {
 
 function StoryCard({ story }: { story: Story }) {
   const [remaining, setRemaining] = useState(() =>
-    getSecondsRemaining(story.last_drop_at, story.auction_type)
+    getSecondsRemaining(story.last_drop_at, story.speed_preset)
   )
 
   useEffect(() => {
     const id = setInterval(() => {
-      setRemaining(getSecondsRemaining(story.last_drop_at, story.auction_type))
+      setRemaining(getSecondsRemaining(story.last_drop_at, story.speed_preset))
     }, 1000)
     return () => clearInterval(id)
-  }, [story.last_drop_at, story.auction_type])
+  }, [story.last_drop_at, story.speed_preset])
 
   const isUrgent = remaining < 10
   const username = story.seller?.username ?? ''

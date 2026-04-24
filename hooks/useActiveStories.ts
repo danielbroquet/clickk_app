@@ -1,43 +1,53 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { AuctionType, Story } from '../types'
+import { SpeedPreset, Story } from '../types'
 
 interface RawStory {
   id: string
   seller_id: string
-  current_price_chf: number
-  floor_price_chf: number
+  title: string
+  description: string | null
+  video_url: string
   start_price_chf: number
-  last_drop_at: string
-  auction_type: AuctionType
-  thumbnail_url: string | null
-  buyer_id: string | null
+  floor_price_chf: number
+  current_price_chf: number
+  price_drop_seconds: number
+  speed_preset: SpeedPreset
   status: 'active' | 'sold' | 'expired'
-  profiles: { avatar_url: string | null; username: string } | null
+  buyer_id: string | null
+  final_price_chf: number | null
+  expires_at: string
+  last_drop_at: string
+  video_duration_seconds: number | null
+  duration_hours: number | null
+  created_at: string
+  updated_at: string
+  profiles: { id: string; username: string; avatar_url: string | null } | null
 }
 
 function rawToStory(r: RawStory): Story {
   return {
     id: r.id,
     seller_id: r.seller_id,
-    title: '',
-    description: null,
-    image_url: r.thumbnail_url ?? '',
-    thumbnail_url: r.thumbnail_url,
+    title: r.title,
+    description: r.description,
+    video_url: r.video_url,
     start_price_chf: r.start_price_chf,
     floor_price_chf: r.floor_price_chf,
     current_price_chf: r.current_price_chf,
-    price_drop_seconds: 0,
-    auction_type: r.auction_type,
+    price_drop_seconds: r.price_drop_seconds,
+    speed_preset: r.speed_preset,
     status: r.status,
     buyer_id: r.buyer_id,
-    final_price_chf: null,
-    expires_at: '',
+    final_price_chf: r.final_price_chf,
+    expires_at: r.expires_at,
     last_drop_at: r.last_drop_at,
-    created_at: '',
+    video_duration_seconds: r.video_duration_seconds ?? undefined,
+    duration_hours: r.duration_hours ?? undefined,
+    created_at: r.created_at,
     seller: r.profiles
       ? {
-          id: r.seller_id,
+          id: r.profiles.id,
           username: r.profiles.username,
           display_name: null,
           role: 'seller',
@@ -64,11 +74,18 @@ export function useActiveStories(): { stories: Story[]; loading: boolean } {
     async function fetchStories() {
       const { data, error } = await supabase
         .from('stories')
-        .select(
-          'id, seller_id, current_price_chf, floor_price_chf, start_price_chf, last_drop_at, auction_type, thumbnail_url, buyer_id, status, profiles:seller_id(avatar_url, username)'
-        )
+        .select(`
+          id, seller_id, title, description,
+          video_url, start_price_chf, floor_price_chf,
+          current_price_chf, price_drop_seconds,
+          status, expires_at, speed_preset,
+          buyer_id, final_price_chf, last_drop_at,
+          video_duration_seconds, duration_hours,
+          created_at, updated_at,
+          profiles:seller_id (id, username, avatar_url)
+        `)
         .eq('status', 'active')
-        .is('buyer_id', null)
+        .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
       if (!mounted) return
