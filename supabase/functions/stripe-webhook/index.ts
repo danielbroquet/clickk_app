@@ -140,6 +140,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+    const connectWebhookSecret = Deno.env.get("STRIPE_CONNECT_WEBHOOK_SECRET");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -163,7 +164,14 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const valid = await verifyStripeSignature(body, sig, webhookSecret);
+    const secrets = [webhookSecret, ...(connectWebhookSecret ? [connectWebhookSecret] : [])];
+    let valid = false;
+    for (const secret of secrets) {
+      if (await verifyStripeSignature(body, sig, secret)) {
+        valid = true;
+        break;
+      }
+    }
     if (!valid) {
       return new Response(JSON.stringify({ error: "invalid_signature" }), {
         status: 400,
