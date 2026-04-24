@@ -55,9 +55,18 @@ export default function BecomeSellerScreen() {
   }
 
   const fetchOnboardingUrl = async (): Promise<string | null> => {
-    const data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
-      'create-connect-account'
-    )
+    let data: { status?: string; onboarding_url?: string }
+    try {
+      data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
+        'create-connect-account'
+      )
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'already_onboarded') {
+        await checkOnboardingStatus()
+        return null
+      }
+      throw err
+    }
     if (data.status === 'complete') {
       setStatus('complete')
       return null
