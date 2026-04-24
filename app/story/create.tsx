@@ -36,6 +36,12 @@ type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
 type DropInterval = 30 | 60 | 120
 type DurationHours = 24 | 72 | 168
 
+const SPEED_TO_DROP_SECONDS: Record<SpeedPreset, number> = {
+  FLASH:    30,
+  STANDARD: 120,
+  RELAX:    300,
+}
+
 export default function CreateStoryScreen() {
   const [step, setStep] = useState<Step>(1)
   const [videoUri, setVideoUri] = useState<string | null>(null)
@@ -142,7 +148,7 @@ export default function CreateStoryScreen() {
         start_price_chf: parseFloat(startPrice),
         floor_price_chf: parseFloat(floorPrice),
         current_price_chf: parseFloat(startPrice),
-        price_drop_seconds: 1,
+        price_drop_seconds: SPEED_TO_DROP_SECONDS[speedPreset],
         last_drop_at: new Date().toISOString(),
         speed_preset: speedPreset,
         duration_hours: durationHours,
