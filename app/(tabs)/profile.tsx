@@ -65,7 +65,7 @@ export default function ProfileScreen() {
           {profile?.role !== 'seller' && (
             <TouchableOpacity
               style={styles.becomeSellerBtn}
-              onPress={() => router.push('/become-seller/index')}
+              onPress={() => router.push('/become-seller')}
             >
               <Text style={styles.becomeSellerText}>Devenir vendeur</Text>
             </TouchableOpacity>

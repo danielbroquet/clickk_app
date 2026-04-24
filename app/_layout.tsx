@@ -39,7 +39,7 @@ function RootRedirector() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(auth)" />
-      <Stack.Screen name="become-seller/index" />
+      <Stack.Screen name="become-seller" />
       <Stack.Screen name="wallet/index" />
       <Stack.Screen name="story/create" />
       <Stack.Screen name="listing/create" />

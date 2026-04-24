@@ -6,14 +6,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
-  Alert,
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { supabase } from '../../lib/supabase'
-import { colors, fontFamily, spacing } from '../../lib/theme'
+import { supabase } from '../lib/supabase'
+import { colors, fontFamily, spacing } from '../lib/theme'
 
 type Status = 'idle' | 'loading' | 'redirecting' | 'complete' | 'error'
 
@@ -178,7 +177,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.lg },
 
-  // Success
   successContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
   successCircle: {
     width: 96,
@@ -208,7 +206,6 @@ const styles = StyleSheet.create({
   },
   startBtnText: { fontFamily: fontFamily.bold, fontSize: 15, color: colors.bg },
 
-  // Main
   backBtn: { marginBottom: 32 },
   title: { fontFamily: fontFamily.bold, fontSize: 28, color: colors.text, marginBottom: 8 },
   subtitle: { fontFamily: fontFamily.regular, fontSize: 15, color: colors.textSecondary, marginBottom: 40, lineHeight: 22 },
