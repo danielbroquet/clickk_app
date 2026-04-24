@@ -9,6 +9,7 @@ import {
   Montserrat_600SemiBold,
   Montserrat_700Bold,
 } from '@expo-google-fonts/montserrat'
+import { StripeProvider } from '@stripe/stripe-react-native'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 
@@ -66,9 +67,11 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <AuthProvider>
-      <StatusBar style="light" backgroundColor="#0F0F0F" />
-      <RootRedirector />
-    </AuthProvider>
+    <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY!}>
+      <AuthProvider>
+        <StatusBar style="light" backgroundColor="#0F0F0F" />
+        <RootRedirector />
+      </AuthProvider>
+    </StripeProvider>
   )
 }
