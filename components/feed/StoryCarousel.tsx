@@ -2,52 +2,48 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Animated,
   FlatList,
-  Image,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useActiveStories } from '../../hooks/useActiveStories'
 import i18n from '../../lib/i18n'
 import { SpeedPreset, Story } from '../../types'
 
-const INTERVAL_SECONDS: Record<SpeedPreset, number> = {
-  SLOW: 300,
-  STANDARD: 180,
-  FAST: 60,
+const PRESET_COLOR: Record<SpeedPreset, string> = {
+  FAST: '#FF6B6B',
+  STANDARD: '#00D2B8',
+  SLOW: '#A9F7E1',
 }
 
-function getSecondsRemaining(lastDropAt: string, speedPreset: SpeedPreset): number {
-  const interval = INTERVAL_SECONDS[speedPreset]
-  const lastDrop = new Date(lastDropAt).getTime()
-  const nextDrop = lastDrop + interval * 1000
-  const remaining = Math.max(0, Math.floor((nextDrop - Date.now()) / 1000))
-  return remaining
-}
-
-function formatMMSS(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+function formatExpiry(expiresAt: string | null | undefined): string {
+  if (!expiresAt) return '--:--'
+  const t = new Date(expiresAt).getTime()
+  if (isNaN(t)) return '--:--'
+  const diff = t - Date.now()
+  if (diff <= 0) return '00:00'
+  const hours = Math.floor(diff / 3_600_000)
+  const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  const seconds = Math.floor((diff % 60_000) / 1_000)
+  return hours > 0
+    ? `${hours}h${String(minutes).padStart(2, '0')}`
+    : `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 function StoryCard({ story }: { story: Story }) {
-  const [remaining, setRemaining] = useState(() =>
-    getSecondsRemaining(story.last_drop_at, story.speed_preset)
-  )
+  const [label, setLabel] = useState(() => formatExpiry(story.expires_at))
 
   useEffect(() => {
-    const id = setInterval(() => {
-      setRemaining(getSecondsRemaining(story.last_drop_at, story.speed_preset))
-    }, 1000)
+    setLabel(formatExpiry(story.expires_at))
+    const id = setInterval(() => setLabel(formatExpiry(story.expires_at)), 1000)
     return () => clearInterval(id)
-  }, [story.last_drop_at, story.speed_preset])
+  }, [story.expires_at])
 
-  const isUrgent = remaining < 10
-  const username = story.seller?.username ?? ''
-  const avatarUrl = story.seller?.avatar_url ?? null
-  const initial = username.charAt(0).toUpperCase()
+  const isUrgent = label !== '--:--' && !label.includes('h') && parseInt(label) < 1
+  const accentColor = PRESET_COLOR[story.speed_preset] ?? '#00D2B8'
+  const initial = (story.seller?.username ?? '?').charAt(0).toUpperCase()
 
   return (
     <TouchableOpacity
@@ -63,34 +59,30 @@ function StoryCard({ story }: { story: Story }) {
         justifyContent: 'space-between',
         paddingVertical: 10,
         paddingHorizontal: 6,
+        overflow: 'hidden',
       }}
     >
-      {/* Avatar */}
+      {/* Thumbnail bubble */}
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          borderWidth: 1.5,
-          borderColor: '#00D2B8',
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          borderWidth: 2,
+          borderColor: accentColor,
           overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#00D2B8',
         }}
       >
-        {avatarUrl ? (
-          <Image
-            source={{ uri: avatarUrl }}
-            style={{ width: 40, height: 40, borderRadius: 20 }}
-          />
-        ) : (
-          <Text
-            style={{ color: '#0F0F0F', fontWeight: '700', fontSize: 16 }}
-          >
+        <LinearGradient
+          colors={[accentColor, '#0F0F0F']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#0F0F0F', fontWeight: '800', fontSize: 18 }}>
             {initial}
           </Text>
-        )}
+        </LinearGradient>
       </View>
 
       {/* Price */}
@@ -115,7 +107,7 @@ function StoryCard({ story }: { story: Story }) {
           textAlign: 'center',
         }}
       >
-        {formatMMSS(remaining)}
+        {label}
       </Text>
     </TouchableOpacity>
   )
@@ -153,9 +145,7 @@ export default function StoryCarousel() {
   if (loading) {
     return (
       <View style={{ flexDirection: 'row', paddingHorizontal: 16 }}>
-        {[0, 1, 2, 3].map((k) => (
-          <SkeletonCard key={k} />
-        ))}
+        {[0, 1, 2, 3].map((k) => <SkeletonCard key={k} />)}
       </View>
     )
   }
@@ -171,5 +161,8 @@ export default function StoryCarousel() {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 16 }}
     />
+  )
+}
+
   )
 }
