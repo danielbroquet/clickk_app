@@ -111,7 +111,13 @@ export default function CreateStoryScreen() {
 
     try {
       const path = `${userId}/${Date.now()}.mp4`
-      const base64 = await FileSystem.readAsStringAsync(videoUri, {
+      let localUri = videoUri
+      if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
+        const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
+        await FileSystem.copyAsync({ from: localUri, to: cacheUri })
+        localUri = cacheUri
+      }
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
         encoding: FileSystem.EncodingType.Base64,
       })
       const { error: uploadError } = await supabase.storage
