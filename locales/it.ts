@@ -11,6 +11,7 @@ export default {
     chf: 'CHF',
   },
   story: {
+    chf: 'CHF %{price}',
     create: {
       title: 'Crea una story',
       step_video: 'Scegli un video',
@@ -59,6 +60,9 @@ export default {
       confirm_warning: 'Questo prezzo è valido solo per pochi secondi. L\'importo addebitato sarà quello al momento della conferma.',
       purchase_success: 'Acquisto confermato! 🎉',
     },
+  },
+  feed: {
+    activeAuctions: 'Aste in corso',
   },
   auth: {
     sign_in: 'Accedi',

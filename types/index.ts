@@ -13,16 +13,20 @@ export interface Profile {
   created_at: string
 }
 
+export type AuctionType = 'SLOW' | 'STANDARD' | 'FAST'
+
 export interface Story {
   id: string
   seller_id: string
   title: string
   description: string | null
   image_url: string
+  thumbnail_url: string | null
   start_price_chf: number
   floor_price_chf: number
   current_price_chf: number
   price_drop_seconds: number
+  auction_type: AuctionType
   status: 'active' | 'sold' | 'expired'
   buyer_id: string | null
   final_price_chf: number | null
