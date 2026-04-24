@@ -77,16 +77,20 @@ export interface Notification {
   id: string
   user_id: string
   type:
+    | 'sale'
+    | 'price_drop'
+    | 'follow'
+    | 'like'
+    | 'purchase'
+    | 'story_sold'
     | 'outbid'
     | 'auction_won'
     | 'top_up'
     | 'auction_ending'
     | 'new_follower'
-    | 'sale'
-    | 'purchase'
-    | 'story_sold'
   title: string
   message: string
+  payload: Record<string, unknown>
   is_read: boolean
   created_at: string
 }
