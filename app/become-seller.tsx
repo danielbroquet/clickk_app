@@ -5,12 +5,12 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Linking,
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import * as WebBrowser from 'expo-web-browser'
 import { supabase } from '../lib/supabase'
 import { callEdgeFunction } from '../lib/edgeFunction'
 import { colors, fontFamily, spacing } from '../lib/theme'
@@ -54,23 +54,51 @@ export default function BecomeSellerScreen() {
     }
   }
 
+  const fetchOnboardingUrl = async (): Promise<string | null> => {
+    const data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
+      'create-connect-account'
+    )
+    if (data.status === 'complete') {
+      setStatus('complete')
+      return null
+    }
+    return data.onboarding_url ?? null
+  }
+
   const startOnboarding = async () => {
     setStatus('loading')
     setErrorMsg(null)
 
     try {
-      const data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
-        'create-connect-account'
+      const url = await fetchOnboardingUrl()
+      if (!url) return
+
+      setStatus('redirecting')
+      const result = await WebBrowser.openAuthSessionAsync(
+        url,
+        'clickk://onboarding-complete',
+        { preferEphemeralSession: false }
       )
 
-      if (data.status === 'complete') {
-        setStatus('complete')
-        return
-      }
-
-      if (data.onboarding_url) {
-        setStatus('redirecting')
-        await Linking.openURL(data.onboarding_url)
+      if (result.type === 'success') {
+        const redirectUrl = (result as WebBrowser.WebBrowserAuthSessionResult & { url?: string }).url ?? ''
+        if (redirectUrl.startsWith('clickk://onboarding-complete')) {
+          await checkOnboardingStatus()
+        } else if (redirectUrl.startsWith('clickk://onboarding-refresh')) {
+          setStatus('loading')
+          const newUrl = await fetchOnboardingUrl()
+          if (newUrl) {
+            setStatus('redirecting')
+            await WebBrowser.openAuthSessionAsync(
+              newUrl,
+              'clickk://onboarding-complete',
+              { preferEphemeralSession: false }
+            )
+            await checkOnboardingStatus()
+          }
+        }
+      } else {
+        setStatus('idle')
       }
     } catch (err: unknown) {
       setStatus('error')
