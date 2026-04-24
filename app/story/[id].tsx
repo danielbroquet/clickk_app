@@ -197,6 +197,7 @@ export default function StoryViewerScreen() {
     setPurchaseError(null)
 
     try {
+      console.log('story_id:', story.id)
       const { error } = await supabase.functions.invoke('create-payment-intent', {
         body: { story_id: story.id, amount_chf: snapshotPrice },
       })
