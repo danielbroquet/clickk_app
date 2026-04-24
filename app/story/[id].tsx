@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Animated,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -15,11 +16,6 @@ import { Video, ResizeMode } from 'expo-av'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
 import i18n from '../../lib/i18n'
 
@@ -88,7 +84,7 @@ export default function StoryViewerScreen() {
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState<string | null>(null)
 
-  const progressAnim = useSharedValue(0)
+  const progressAnim = useRef(new Animated.Value(0)).current
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
@@ -167,16 +163,21 @@ export default function StoryViewerScreen() {
     if (!status.isLoaded) return
     if (status.durationMillis && status.durationMillis > 0) {
       const p = status.positionMillis / status.durationMillis
-      progressAnim.value = withTiming(p, { duration: 250 })
+      Animated.timing(progressAnim, {
+        toValue: p,
+        duration: 250,
+        useNativeDriver: false,
+      }).start()
     }
     if (status.didJustFinish) {
       router.back()
     }
-  }, [])
+  }, [progressAnim])
 
-  const progressStyle = useAnimatedStyle(() => ({
-    width: `${progressAnim.value * 100}%`,
-  }))
+  const progressWidth = progressAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  })
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -282,7 +283,7 @@ export default function StoryViewerScreen() {
       >
         {/* Progress bar */}
         <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, progressStyle]} />
+          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
         </View>
 
         {/* Seller row */}
