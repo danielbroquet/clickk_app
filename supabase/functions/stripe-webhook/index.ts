@@ -24,6 +24,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    console.log("[stripe-webhook] Service role key present:", !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+
     const stripe = new Stripe(stripeSecretKey, { apiVersion: "2023-10-16" });
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -66,69 +68,75 @@ Deno.serve(async (req: Request) => {
       }
 
       const parsedAmount = parseFloat(amount_chf);
-      console.log(`[stripe-webhook] Processing purchase: story=${story_id} buyer=${buyer_id} amount=${parsedAmount}`);
+      const trimmedStoryId = story_id.trim();
+      const trimmedBuyerId = buyer_id.trim();
+      console.log(`[stripe-webhook] Processing purchase: story=${trimmedStoryId} buyer=${trimmedBuyerId} amount=${parsedAmount}`);
+      console.log("[stripe-webhook] Attempting SELECT for story:", trimmedStoryId);
 
       // Check story is still available (idempotency guard)
       const { data: story, error: fetchError } = await supabase
         .from("stories")
         .select("id, seller_id, status, buyer_id")
-        .eq("id", story_id)
+        .eq("id", trimmedStoryId)
         .eq("status", "active")
         .is("buyer_id", null)
         .maybeSingle();
 
+      console.log("[stripe-webhook] SELECT result - data:", JSON.stringify(story));
+      console.log("[stripe-webhook] SELECT result - error:", JSON.stringify(fetchError));
+
       if (fetchError) {
         console.error("[stripe-webhook] Error fetching story:", fetchError.message);
-        return new Response(JSON.stringify({ error: "db_error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw new Error(`DB select failed: ${fetchError.message}`);
       }
 
       if (!story) {
-        console.log(`[stripe-webhook] Story ${story_id} already processed or not active — skipping (idempotent)`);
+        console.log(`[stripe-webhook] Story ${trimmedStoryId} already processed or not active — skipping (idempotent)`);
         return new Response(JSON.stringify({ received: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
 
+      console.log("[stripe-webhook] Attempting UPDATE for story:", trimmedStoryId);
+
       // Mark story as sold — conditional update prevents race condition
-      const { error: updateError, count } = await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from("stories")
         .update({
           status: "sold",
-          buyer_id: buyer_id,
+          buyer_id: trimmedBuyerId,
           final_price_chf: parsedAmount,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", story_id)
+        .eq("id", trimmedStoryId)
         .eq("status", "active")
         .is("buyer_id", null)
-        .select("id", { count: "exact", head: true });
+        .select();
+
+      console.log("[stripe-webhook] UPDATE result - data:", JSON.stringify(updatedRows));
+      console.log("[stripe-webhook] UPDATE result - error:", JSON.stringify(updateError));
+      console.log("[stripe-webhook] UPDATE result - rows affected:", updatedRows?.length ?? 0);
 
       if (updateError) {
         console.error("[stripe-webhook] Error updating story:", updateError.message);
-        return new Response(JSON.stringify({ error: "db_update_error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw new Error(`DB update failed: ${updateError.message}`);
       }
 
-      if (!count || count === 0) {
-        console.log(`[stripe-webhook] Story ${story_id} was claimed by another buyer — skipping notifications`);
+      if (!updatedRows || updatedRows.length === 0) {
+        console.log(`[stripe-webhook] WARNING: UPDATE matched 0 rows — story ${trimmedStoryId} may already be sold or UUID mismatch`);
         return new Response(JSON.stringify({ received: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
 
-      console.log(`[stripe-webhook] Story ${story_id} marked as sold`);
+      console.log(`[stripe-webhook] Story ${trimmedStoryId} marked as sold`);
 
       // Insert notifications for buyer and seller in parallel
       const notifications = [
         {
-          user_id: buyer_id,
+          user_id: trimmedBuyerId,
           type: "purchase",
           title: "Achat confirmé",
           message: `Votre achat a été confirmé pour CHF ${parsedAmount.toFixed(2)}.`,
@@ -149,7 +157,7 @@ Deno.serve(async (req: Request) => {
         // Non-fatal: story is already sold, notifications are best-effort
         console.error("[stripe-webhook] Error inserting notifications:", notifError.message);
       } else {
-        console.log(`[stripe-webhook] Notifications sent to buyer ${buyer_id} and seller ${story.seller_id}`);
+        console.log(`[stripe-webhook] Notifications sent to buyer ${trimmedBuyerId} and seller ${story.seller_id}`);
       }
 
       return new Response(JSON.stringify({ received: true }), {
@@ -179,66 +187,72 @@ Deno.serve(async (req: Request) => {
       }
 
       const parsedAmount = parseFloat(amount_chf);
-      console.log(`[stripe-webhook] payment_intent.succeeded: story=${story_id} buyer=${buyer_id} amount=${parsedAmount}`);
+      const trimmedStoryId = story_id.trim();
+      const trimmedBuyerId = buyer_id.trim();
+      console.log(`[stripe-webhook] payment_intent.succeeded: story=${trimmedStoryId} buyer=${trimmedBuyerId} amount=${parsedAmount}`);
+      console.log("[stripe-webhook] payment_intent.succeeded: Attempting SELECT for story:", trimmedStoryId);
 
       const { data: story, error: fetchError } = await supabase
         .from("stories")
         .select("id, seller_id, status, buyer_id")
-        .eq("id", story_id)
+        .eq("id", trimmedStoryId)
         .eq("status", "active")
         .is("buyer_id", null)
         .maybeSingle();
 
+      console.log("[stripe-webhook] payment_intent.succeeded: SELECT result - data:", JSON.stringify(story));
+      console.log("[stripe-webhook] payment_intent.succeeded: SELECT result - error:", JSON.stringify(fetchError));
+
       if (fetchError) {
         console.error("[stripe-webhook] payment_intent.succeeded: error fetching story:", fetchError.message);
-        return new Response(JSON.stringify({ error: "db_error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw new Error(`DB select failed: ${fetchError.message}`);
       }
 
       if (!story) {
-        console.log(`[stripe-webhook] payment_intent.succeeded: story ${story_id} already processed — skipping (idempotent)`);
+        console.log(`[stripe-webhook] payment_intent.succeeded: story ${trimmedStoryId} already processed — skipping (idempotent)`);
         return new Response(JSON.stringify({ received: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
 
-      const { error: updateError, count } = await supabase
+      console.log("[stripe-webhook] payment_intent.succeeded: Attempting UPDATE for story:", trimmedStoryId);
+
+      const { data: updatedRows, error: updateError } = await supabase
         .from("stories")
         .update({
           status: "sold",
-          buyer_id: buyer_id,
+          buyer_id: trimmedBuyerId,
           final_price_chf: parsedAmount,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", story_id)
+        .eq("id", trimmedStoryId)
         .eq("status", "active")
         .is("buyer_id", null)
-        .select("id", { count: "exact", head: true });
+        .select();
+
+      console.log("[stripe-webhook] payment_intent.succeeded: UPDATE result - data:", JSON.stringify(updatedRows));
+      console.log("[stripe-webhook] payment_intent.succeeded: UPDATE result - error:", JSON.stringify(updateError));
+      console.log("[stripe-webhook] payment_intent.succeeded: UPDATE result - rows affected:", updatedRows?.length ?? 0);
 
       if (updateError) {
         console.error("[stripe-webhook] payment_intent.succeeded: error updating story:", updateError.message);
-        return new Response(JSON.stringify({ error: "db_update_error" }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw new Error(`DB update failed: ${updateError.message}`);
       }
 
-      if (!count || count === 0) {
-        console.log(`[stripe-webhook] payment_intent.succeeded: story ${story_id} claimed by another buyer — skipping notifications`);
+      if (!updatedRows || updatedRows.length === 0) {
+        console.log(`[stripe-webhook] payment_intent.succeeded: WARNING — UPDATE matched 0 rows for story ${trimmedStoryId}`);
         return new Response(JSON.stringify({ received: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
 
-      console.log(`[stripe-webhook] payment_intent.succeeded: story ${story_id} marked as sold`);
+      console.log(`[stripe-webhook] payment_intent.succeeded: story ${trimmedStoryId} marked as sold`);
 
       const notifications = [
         {
-          user_id: buyer_id,
+          user_id: trimmedBuyerId,
           type: "purchase",
           title: "Achat confirmé",
           message: `Votre achat a été confirmé pour CHF ${parsedAmount.toFixed(2)}.`,
@@ -258,7 +272,7 @@ Deno.serve(async (req: Request) => {
       if (notifError) {
         console.error("[stripe-webhook] payment_intent.succeeded: error inserting notifications:", notifError.message);
       } else {
-        console.log(`[stripe-webhook] payment_intent.succeeded: notifications sent to buyer ${buyer_id} and seller ${story.seller_id}`);
+        console.log(`[stripe-webhook] payment_intent.succeeded: notifications sent to buyer ${trimmedBuyerId} and seller ${story.seller_id}`);
       }
 
       return new Response(JSON.stringify({ received: true }), {
