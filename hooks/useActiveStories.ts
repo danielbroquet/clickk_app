@@ -19,7 +19,7 @@ interface RawStory {
   expires_at: string
   last_drop_at: string
   video_duration_seconds: number | null
-  duration_hours: number | null
+  duration_hours: 24 | 72 | 168 | null
   created_at: string
   updated_at: string
   profiles: { id: string; username: string; avatar_url: string | null } | null

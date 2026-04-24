@@ -13,9 +13,9 @@ import i18n from '../../lib/i18n'
 import { SpeedPreset, Story } from '../../types'
 
 const PRESET_COLOR: Record<SpeedPreset, string> = {
-  FAST: '#FF6B6B',
+  FLASH: '#FF6B6B',
   STANDARD: '#00D2B8',
-  SLOW: '#A9F7E1',
+  RELAX: '#A9F7E1',
 }
 
 function formatExpiry(expiresAt: string | null | undefined): string {
@@ -163,6 +163,5 @@ export default function StoryCarousel() {
     />
   )
 }
-
   )
 }

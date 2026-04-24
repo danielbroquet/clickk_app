@@ -13,7 +13,7 @@ export interface Profile {
   created_at: string
 }
 
-export type SpeedPreset = 'SLOW' | 'STANDARD' | 'FAST'
+export type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
 
 export interface Story {
   id: string
@@ -32,7 +32,7 @@ export interface Story {
   expires_at: string
   last_drop_at: string
   video_duration_seconds?: number
-  duration_hours?: number
+  duration_hours?: 24 | 72 | 168
   created_at: string
   seller?: Profile
 }
