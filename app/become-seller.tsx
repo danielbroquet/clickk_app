@@ -114,6 +114,10 @@ export default function BecomeSellerScreen() {
         setStatus('idle')
       }
     } catch (err: unknown) {
+      if (err instanceof Error && err.message === 'already_onboarded') {
+        await checkOnboardingStatus()
+        return
+      }
       setStatus('error')
       setErrorMsg(err instanceof Error ? err.message : 'Erreur inconnue')
     }
