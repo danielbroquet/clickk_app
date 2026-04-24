@@ -32,9 +32,9 @@ const C = {
 }
 
 type Step = 1 | 2 | 3
-type SpeedPreset = 'SLOW' | 'STANDARD' | 'FAST'
+type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
 type DropInterval = 30 | 60 | 120
-type DurationHours = 24 | 48 | 72
+type DurationHours = 24 | 72 | 168
 
 export default function CreateStoryScreen() {
   const [step, setStep] = useState<Step>(1)
@@ -145,16 +145,17 @@ export default function CreateStoryScreen() {
         price_drop_seconds: 1,
         last_drop_at: new Date().toISOString(),
         speed_preset: speedPreset,
+        duration_hours: durationHours,
         expires_at: expiresAt,
         status: 'active',
       })
 
       if (insertError) throw insertError
 
-      router.replace('/(tabs)/')
-    } catch {
+      router.replace('/(tabs)')
+    } catch (err: any) {
       setPublishing(false)
-      setErrors(e => ({ ...e, publish: i18n.t('story.create.error_upload') }))
+      setErrors(e => ({ ...e, publish: err.message ?? i18n.t('story.create.error_upload') }))
     }
   }
 
@@ -436,12 +437,12 @@ function Step3({
   onPublish: () => void
 }) {
   const intervals: DropInterval[] = [30, 60, 120]
-  const durations: DurationHours[] = [24, 48, 72]
+  const durations: DurationHours[] = [24, 72, 168]
 
   const speeds: { key: SpeedPreset; icon: string; label: string; sub: string }[] = [
-    { key: 'SLOW', icon: 'leaf-outline', label: i18n.t('story.create.speed_slow'), sub: '−5% / palier' },
-    { key: 'STANDARD', icon: 'flash-outline', label: i18n.t('story.create.speed_standard'), sub: '−10% / palier' },
-    { key: 'FAST', icon: 'rocket-outline', label: i18n.t('story.create.speed_fast'), sub: '−20% / palier' },
+    { key: 'FLASH',    icon: 'flash-outline', label: 'Flash',    sub: '−20% / drop' },
+    { key: 'STANDARD', icon: 'time-outline',  label: 'Standard', sub: '−10% / drop' },
+    { key: 'RELAX',    icon: 'leaf-outline',  label: 'Relax',    sub: '−5% / drop'  },
   ]
 
   return (
@@ -498,7 +499,7 @@ function Step3({
               onPress={() => setDurationHours(d)}
             >
               <Text style={[styles.segmentText, durationHours === d && styles.segmentTextActive]}>
-                {d}h
+                {d === 168 ? '7j' : `${d}h`}
               </Text>
             </TouchableOpacity>
           ))}
