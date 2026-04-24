@@ -113,12 +113,15 @@ Deno.serve(async (req: Request) => {
 
     const { error: insertErr } = await supabase
       .from("seller_onboarding")
-      .insert({
-        user_id: userId,
-        stripe_account_id: accountId,
-        onboarding_url: onboardingUrl,
-        status: "pending",
-      });
+      .upsert(
+        {
+          user_id: userId,
+          stripe_account_id: accountId,
+          onboarding_url: onboardingUrl,
+          status: "pending",
+        },
+        { onConflict: "user_id" }
+      );
 
     if (insertErr) throw new Error(insertErr.message);
 
