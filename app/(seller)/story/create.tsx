@@ -104,7 +104,7 @@ export default function CreateStoryScreen() {
         localUri = cacheUri
       }
       const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       })
       const { error: uploadError } = await supabase.storage
         .from('story-videos')
