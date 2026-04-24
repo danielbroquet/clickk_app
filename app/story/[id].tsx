@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useStoryPurchase } from '../../lib/stripe'
 import i18n from '../../lib/i18n'
 
 const C = {
@@ -81,8 +82,7 @@ export default function StoryViewerScreen() {
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
-  const [purchasing, setPurchasing] = useState(false)
-  const [purchaseError, setPurchaseError] = useState<string | null>(null)
+  const { handlePurchase, purchasing } = useStoryPurchase()
 
   const progressAnim = useRef(new Animated.Value(0)).current
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -193,27 +193,16 @@ export default function StoryViewerScreen() {
 
   const onConfirmPurchase = async () => {
     if (!story) return
-    setPurchasing(true)
-    setPurchaseError(null)
-
-    try {
-      console.log('story_id:', story.id)
-      const { error } = await supabase.functions.invoke('create-payment-intent', {
-        body: { story_id: story.id, amount_chf: snapshotPrice },
-      })
-      if (error) throw error
-
+    const { data: { user } } = await supabase.auth.getUser()
+    const buyerName = (user?.user_metadata?.full_name as string | undefined) ?? ''
+    await handlePurchase(story.id, snapshotPrice, buyerName, () => {
       setModalVisible(false)
       Alert.alert(
-        '🎉',
         i18n.t('story.viewer.purchase_success'),
+        '',
         [{ text: 'OK', onPress: () => router.back() }]
       )
-    } catch {
-      setPurchaseError(i18n.t('common.error'))
-    } finally {
-      setPurchasing(false)
-    }
+    })
   }
 
   // ── Loading / Error ────────────────────────────────────────────────────────
@@ -434,11 +423,6 @@ export default function StoryViewerScreen() {
             <Ionicons name="information-circle-outline" size={18} color={C.warn} />
             <Text style={styles.warningText}>{i18n.t('story.viewer.confirm_warning')}</Text>
           </View>
-
-          {/* Error */}
-          {!!purchaseError && (
-            <Text style={styles.purchaseError}>{purchaseError}</Text>
-          )}
 
           {/* Confirm */}
           <TouchableOpacity
