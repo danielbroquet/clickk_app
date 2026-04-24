@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Video, ResizeMode } from 'expo-av'
 import { useState, useEffect } from 'react'
+import * as FileSystem from 'expo-file-system'
+import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
 import i18n from '../../lib/i18n'
 
@@ -109,12 +111,12 @@ export default function CreateStoryScreen() {
 
     try {
       const path = `${userId}/${Date.now()}.mp4`
-      const response = await fetch(videoUri)
-      const videoBlob = await response.blob()
-
+      const base64 = await FileSystem.readAsStringAsync(videoUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      })
       const { error: uploadError } = await supabase.storage
         .from('stories')
-        .upload(path, videoBlob, { contentType: 'video/mp4' })
+        .upload(path, decode(base64), { contentType: 'video/mp4' })
 
       if (uploadError) throw uploadError
 

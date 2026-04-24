@@ -15,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { ChevronLeft, Video, X } from 'lucide-react-native'
 import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
+import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../../lib/supabase'
 
 type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
@@ -94,12 +96,13 @@ export default function CreateStoryScreen() {
 
     setLoading(true)
     try {
-      const blob = await fetch(videoUri!).then(r => r.blob())
-
       const path = `${user.id}/${Date.now()}.mp4`
+      const base64 = await FileSystem.readAsStringAsync(videoUri!, {
+        encoding: FileSystem.EncodingType.Base64,
+      })
       const { error: uploadError } = await supabase.storage
         .from('story-videos')
-        .upload(path, blob, { contentType: 'video/mp4' })
+        .upload(path, decode(base64), { contentType: 'video/mp4' })
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
