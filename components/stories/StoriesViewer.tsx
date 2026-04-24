@@ -74,11 +74,15 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        <Image
-          source={{ uri: story.image_url }}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-        />
+        {story.video_url ? (
+          <Image
+            source={{ uri: story.video_url }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1A1A1A' }]} />
+        )}
 
         <LinearGradient
           colors={['rgba(0,0,0,0.6)', 'transparent']}
@@ -93,7 +97,11 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View style={styles.sellerRow}>
             <View style={styles.avatarWrap}>
-              <Image source={{ uri: story.image_url }} style={styles.avatar} />
+              {story.video_url ? (
+              <Image source={{ uri: story.video_url }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: '#2A2A2A' }]} />
+            )}
             </View>
             <View style={{ marginLeft: 10 }}>
               <View style={styles.nameRow}>

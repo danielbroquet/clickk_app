@@ -20,7 +20,11 @@ export default function StoryCircle({ story, onPress }: StoryCircleProps) {
           style={styles.gradient}
         >
           <View style={styles.inner}>
-            <Image source={{ uri: story.image_url }} style={styles.image} />
+            {story.video_url ? (
+              <Image source={{ uri: story.video_url }} style={styles.image} />
+            ) : (
+              <View style={[styles.image, styles.placeholder]} />
+            )}
           </View>
         </LinearGradient>
         <View style={styles.priceBadge}>
@@ -53,6 +57,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   image: { width: 58, height: 58, borderRadius: 29 },
+  placeholder: { backgroundColor: '#2A2A2A' },
   priceBadge: {
     position: 'absolute',
     bottom: 2,

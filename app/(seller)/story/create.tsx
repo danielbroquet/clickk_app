@@ -121,7 +121,6 @@ export default function CreateStoryScreen() {
         .from('story-videos')
         .getPublicUrl(path)
 
-      console.log("DEBUG price_drop_seconds:", SPEED_TO_SECONDS[selectedPreset])
       const { error: insertError } = await supabase
         .from('stories')
         .insert({
