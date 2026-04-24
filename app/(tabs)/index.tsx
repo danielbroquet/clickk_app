@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Story, SpeedPreset } from '../../types'
+import StoriesBar from '../../components/feed/StoriesBar'
+import StoriesViewer from '../../components/stories/StoriesViewer'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
@@ -91,7 +93,7 @@ const STORY_SELECT = `
   profiles:seller_id (id, username, avatar_url)
 `
 
-function FeedHeader() {
+function FeedHeader({ stories, onStoryPress }: { stories: Story[]; onStoryPress: (s: Story) => void }) {
   return (
     <>
       <View style={styles.header}>
@@ -108,6 +110,8 @@ function FeedHeader() {
           </TouchableOpacity>
         </View>
       </View>
+      <StoriesBar stories={stories} onStoryPress={onStoryPress} />
+      <View style={styles.divider} />
       <View style={styles.carouselSection}>
         <Text style={styles.carouselTitle}>{i18n.t('feed.activeAuctions')}</Text>
         <StoryCarousel />
@@ -139,8 +143,11 @@ const keyExtractor = (item: Story) => item.id
 
 export default function FeedScreen() {
   const [stories, setStories] = useState<Story[]>([])
+  const [barStories, setBarStories] = useState<Story[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const [viewerVisible, setViewerVisible] = useState(false)
   const pageRef = useRef(0)
 
   const fetchPage = useCallback(async (page: number, replace: boolean) => {
@@ -158,6 +165,7 @@ export default function FeedScreen() {
     setHasMore(rows.length === PAGE_SIZE)
     if (replace) {
       setStories(rows)
+      setBarStories(rows)
     } else {
       setStories(prev => [...prev, ...rows])
     }
@@ -180,6 +188,7 @@ export default function FeedScreen() {
           const r = payload.new as RawStory
           const story = rawToStory(r)
           setStories(prev => [story, ...prev])
+          setBarStories(prev => [story, ...prev])
         }
       )
       .subscribe()
@@ -196,13 +205,20 @@ export default function FeedScreen() {
     setLoadingMore(false)
   }, [loadingMore, hasMore, fetchPage])
 
+  const handleStoryPress = useCallback((story: Story) => {
+    setSelectedStory(story)
+    setViewerVisible(true)
+  }, [])
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FlatList
         data={stories}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListHeaderComponent={<FeedHeader />}
+        ListHeaderComponent={
+          <FeedHeader stories={barStories} onStoryPress={handleStoryPress} />
+        }
         ListFooterComponent={loadingMore ? (
           <View style={styles.footer}>
             <ActivityIndicator size="small" color={colors.primary} />
@@ -211,6 +227,11 @@ export default function FeedScreen() {
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
+      />
+      <StoriesViewer
+        visible={viewerVisible}
+        story={selectedStory}
+        onClose={() => setViewerVisible(false)}
       />
     </SafeAreaView>
   )
@@ -229,6 +250,7 @@ const styles = StyleSheet.create({
   logoBlack: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
   logoTeal: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.primary },
   headerIcons: { flexDirection: 'row', gap: 16 },
+  divider: { height: 1, backgroundColor: colors.border },
   carouselSection: { paddingTop: 16, paddingBottom: 16 },
   carouselTitle: {
     fontFamily: fontFamily.bold,
