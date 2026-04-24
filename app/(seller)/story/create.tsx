@@ -28,6 +28,12 @@ const DURATION: Record<SpeedPreset, { hours: number; ms: number }> = {
   RELAX:    { hours: 168, ms: 168 * 60 * 60 * 1000 },
 }
 
+const SPEED_TO_SECONDS: Record<SpeedPreset, number> = {
+  FLASH:    30,
+  STANDARD: 120,
+  RELAX:    300,
+}
+
 const PRESETS: { key: SpeedPreset; emoji: string; label: string; sub: string }[] = [
   { key: 'FLASH',    emoji: '⚡', label: 'Flash',    sub: '24h'    },
   { key: 'STANDARD', emoji: '🕐', label: 'Standard', sub: '72h'    },
@@ -115,6 +121,7 @@ export default function CreateStoryScreen() {
         .from('story-videos')
         .getPublicUrl(path)
 
+      console.log("DEBUG price_drop_seconds:", SPEED_TO_SECONDS[selectedPreset])
       const { error: insertError } = await supabase
         .from('stories')
         .insert({
@@ -125,7 +132,7 @@ export default function CreateStoryScreen() {
           start_price_chf: parseFloat(startPrice),
           floor_price_chf: parseFloat(floorPrice),
           current_price_chf: parseFloat(startPrice),
-          price_drop_seconds: 1,
+          price_drop_seconds: SPEED_TO_SECONDS[selectedPreset],
           last_drop_at: new Date().toISOString(),
           speed_preset: selectedPreset,
           duration_hours: durationHours,
