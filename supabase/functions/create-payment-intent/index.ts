@@ -39,26 +39,45 @@ Deno.serve(async (req: Request) => {
     }
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const publishableKey = Deno.env.get("STRIPE_PUBLISHABLE_KEY");
     if (!stripeKey) throw new Error("stripe_not_configured");
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!supabaseUrl || !serviceRoleKey) throw new Error("server_misconfigured");
+
+    // Buyer role check via service role
+    const profileRes = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?id=eq.${buyer_id}&select=id,role`,
+      {
+        headers: {
+          "apikey": serviceRoleKey,
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+      }
+    );
+    const profiles = await profileRes.json() as Array<{ id: string; role?: string }>;
+    if (!Array.isArray(profiles) || profiles.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "forbidden" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Amount in Rappen (CHF cents)
     const amountRappen = Math.round(amount_chf * 100);
 
     const params = new URLSearchParams({
+      "amount": String(amountRappen),
+      "currency": "chf",
       "payment_method_types[]": "card",
-      "line_items[0][price_data][currency]": "chf",
-      "line_items[0][price_data][unit_amount]": String(amountRappen),
-      "line_items[0][price_data][product_data][name]": `clickk — Story ${story_id}`,
-      "line_items[0][quantity]": "1",
-      "mode": "payment",
-      "success_url": `${req.headers.get("origin") ?? "https://clickk.ch"}/?payment=success&story=${story_id}`,
-      "cancel_url": `${req.headers.get("origin") ?? "https://clickk.ch"}/?payment=canceled`,
+      "capture_method": "automatic",
       "metadata[story_id]": story_id,
       "metadata[buyer_id]": buyer_id,
       "metadata[amount_chf]": String(amount_chf),
     });
 
-    const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    const stripeRes = await fetch("https://api.stripe.com/v1/payment_intents", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${stripeKey}`,
@@ -67,14 +86,17 @@ Deno.serve(async (req: Request) => {
       body: params.toString(),
     });
 
-    const session = await stripeRes.json();
+    const paymentIntent = await stripeRes.json();
 
-    if (session.error) {
-      throw new Error(session.error.message ?? "stripe_error");
+    if (paymentIntent.error) {
+      throw new Error(paymentIntent.error.message ?? "stripe_error");
     }
 
     return new Response(
-      JSON.stringify({ checkoutUrl: session.url, sessionId: session.id }),
+      JSON.stringify({
+        clientSecret: paymentIntent.client_secret,
+        publishableKey,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: unknown) {
