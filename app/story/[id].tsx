@@ -193,9 +193,7 @@ export default function StoryViewerScreen() {
 
   const onConfirmPurchase = async () => {
     if (!story) return
-    const { data: { user } } = await supabase.auth.getUser()
-    const buyerName = (user?.user_metadata?.full_name as string | undefined) ?? ''
-    await handlePurchase(story.id, snapshotPrice, buyerName, () => {
+    await handlePurchase(story.id, snapshotPrice, () => {
       setModalVisible(false)
       Alert.alert(
         i18n.t('story.viewer.purchase_success'),

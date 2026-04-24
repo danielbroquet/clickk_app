@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
+import { callEdgeFunction } from '../lib/edgeFunction'
 import { colors, fontFamily, spacing } from '../lib/theme'
 
 type Status = 'idle' | 'loading' | 'redirecting' | 'complete' | 'error'
@@ -58,22 +59,9 @@ export default function BecomeSellerScreen() {
     setErrorMsg(null)
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('not_authenticated')
-
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-connect-account`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
+      const data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
+        'create-connect-account'
       )
-
-      const data = await response.json()
-      if (data.error) throw new Error(data.error)
 
       if (data.status === 'complete') {
         setStatus('complete')
