@@ -9,7 +9,6 @@ import {
   Montserrat_600SemiBold,
   Montserrat_700Bold,
 } from '@expo-google-fonts/montserrat'
-import { StripeWrapper } from '../lib/StripeWrapper'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 
@@ -67,11 +66,9 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <StripeWrapper>
-      <AuthProvider>
-        <StatusBar style="light" backgroundColor="#0F0F0F" />
-        <RootRedirector />
-      </AuthProvider>
-    </StripeWrapper>
+    <AuthProvider>
+      <StatusBar style="light" backgroundColor="#0F0F0F" />
+      <RootRedirector />
+    </AuthProvider>
   )
 }
