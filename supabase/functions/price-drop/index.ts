@@ -19,11 +19,13 @@ interface StoryRow {
 function computeDropAmount(startPrice: number, speedPreset: string): number {
   const rates: Record<string, number> = {
     SLOW: 0.05,
-    STANDARD: 0.1,
-    FAST: 0.2,
+    STANDARD: 0.10,
+    FAST: 0.20,
   }
-  const rate = rates[speedPreset] ?? 0.1
-  return Math.round(startPrice * rate * 100) / 100
+  const rate = rates[speedPreset] ?? 0.10
+  const drop = Math.round(startPrice * rate * 100) / 100
+  console.log('[price-drop] preset:', speedPreset, 'rate:', rate, 'startPrice:', startPrice, 'drop:', drop)
+  return drop
 }
 
 Deno.serve(async (req: Request) => {
@@ -81,10 +83,13 @@ Deno.serve(async (req: Request) => {
 
     await Promise.all(
       due.map(async (story) => {
-        const dropAmount = computeDropAmount(story.start_price_chf, story.speed_preset)
+        const startPrice = parseFloat(String(story.start_price_chf))
+        const dropAmount = computeDropAmount(startPrice, story.speed_preset)
         const rawNewPrice = story.current_price_chf - dropAmount
         const newPrice = Math.max(rawNewPrice, story.floor_price_chf)
         const roundedPrice = Math.round(newPrice * 100) / 100
+
+        console.log('[price-drop] story:', story.id, 'current:', story.current_price_chf, 'start:', startPrice, 'drop:', dropAmount, 'new:', roundedPrice)
 
         computedNewPrices[story.id] = roundedPrice
 
