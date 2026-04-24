@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -7,49 +7,146 @@ import {
   Image,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
   ListRenderItem,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import type { Story, Profile } from '../../types'
 
-interface DiscoverItem {
-  id: string
-  title: string
-  price: number
-  image: string
-}
+const PAGE_SIZE = 10
 
-const MOCK_DISCOVER: DiscoverItem[] = [
-  { id: '1', title: 'Air Jordan 1', price: 180, image: 'https://picsum.photos/300/300?random=10' },
-  { id: '2', title: 'Vintage Jacket', price: 65, image: 'https://picsum.photos/300/300?random=11' },
-  { id: '3', title: 'Canon EOS', price: 320, image: 'https://picsum.photos/300/300?random=12' },
-  { id: '4', title: 'Guitar Fender', price: 450, image: 'https://picsum.photos/300/300?random=13' },
-  { id: '5', title: 'MacBook Sleeve', price: 35, image: 'https://picsum.photos/300/300?random=14' },
-  { id: '6', title: 'Levi\'s 501', price: 55, image: 'https://picsum.photos/300/300?random=15' },
-]
+type StoryWithSeller = Story & { seller?: Pick<Profile, 'id' | 'username' | 'avatar_url'> }
 
-function DiscoverCard({ item }: { item: DiscoverItem }) {
+function DiscoverCard({ item }: { item: StoryWithSeller }) {
+  const imageUri = item.video_url
+  const sellerName = item.seller?.username ?? 'vendeur'
+
   return (
-    <TouchableOpacity style={styles.card}>
-      <Image source={{ uri: item.image }} style={styles.cardImage} />
+    <TouchableOpacity style={styles.card} activeOpacity={0.85}>
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.cardImage}
+        resizeMode="cover"
+      />
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.cardPrice}>CHF {item.price}</Text>
+        <Text style={styles.cardPrice}>CHF {item.current_price_chf.toFixed(2)}</Text>
+        <Text style={styles.cardSeller} numberOfLines={1}>@{sellerName}</Text>
       </View>
     </TouchableOpacity>
   )
 }
 
-const renderItem: ListRenderItem<DiscoverItem> = ({ item }) => <DiscoverCard item={item} />
+function EmptyState() {
+  return (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
+      <Text style={styles.emptyTitle}>Aucun résultat</Text>
+      <Text style={styles.emptySubtitle}>Aucune story active pour le moment.</Text>
+    </View>
+  )
+}
+
+function FooterLoader() {
+  return (
+    <View style={styles.footer}>
+      <ActivityIndicator size="small" color={colors.primary} />
+    </View>
+  )
+}
+
+const renderItem: ListRenderItem<StoryWithSeller> = ({ item }) => (
+  <DiscoverCard item={item} />
+)
+
+const keyExtractor = (item: StoryWithSeller) => item.id
 
 export default function DiscoverScreen() {
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
+  const [stories, setStories] = useState<StoryWithSeller[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const pageRef = useRef(0)
+  const activeQueryRef = useRef('')
 
-  const filtered = MOCK_DISCOVER.filter(i =>
-    i.title.toLowerCase().includes(query.toLowerCase())
-  )
+  const fetchPage = useCallback(async (page: number, search: string, replace: boolean) => {
+    const from = page * PAGE_SIZE
+    const to = from + PAGE_SIZE - 1
+
+    let q = supabase
+      .from('stories')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (search.trim()) {
+      q = q.ilike('title', `%${search.trim()}%`)
+    }
+
+    const { data, error } = await q
+
+    if (error) {
+      console.error('[Discover] fetch error:', error.message)
+      return
+    }
+
+    const rows = (data ?? []) as Story[]
+
+    // Fetch seller profiles in a separate query
+    let rowsWithSellers: StoryWithSeller[] = rows
+    if (rows.length > 0) {
+      const sellerIds = [...new Set(rows.map(r => r.seller_id))]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .in('id', sellerIds)
+
+      const profileMap = new Map<string, Pick<Profile, 'id' | 'username' | 'avatar_url'>>()
+      for (const p of profiles ?? []) {
+        profileMap.set(p.id, p)
+      }
+
+      rowsWithSellers = rows.map(r => ({ ...r, seller: profileMap.get(r.seller_id) }))
+    }
+
+    setHasMore(rows.length === PAGE_SIZE)
+
+    if (replace) {
+      setStories(rowsWithSellers)
+    } else {
+      setStories(prev => [...prev, ...rowsWithSellers])
+    }
+  }, [])
+
+  // Initial load and search
+  useEffect(() => {
+    let cancelled = false
+    activeQueryRef.current = query
+    pageRef.current = 0
+    setLoading(true)
+    setHasMore(true)
+
+    fetchPage(0, query, true).then(() => {
+      if (!cancelled) setLoading(false)
+    })
+
+    return () => { cancelled = true }
+  }, [query, fetchPage])
+
+  const handleEndReached = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return
+    setLoadingMore(true)
+    const nextPage = pageRef.current + 1
+    pageRef.current = nextPage
+    await fetchPage(nextPage, activeQueryRef.current, false)
+    setLoadingMore(false)
+  }, [loadingMore, hasMore, loading, fetchPage])
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -66,17 +163,35 @@ export default function DiscoverScreen() {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
+        {query.length > 0 && (
+          <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
+            <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={stories}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={[
+            styles.listContent,
+            stories.length === 0 && styles.listContentEmpty,
+          ]}
+          showsVerticalScrollIndicator={false}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.4}
+          ListEmptyComponent={<EmptyState />}
+          ListFooterComponent={loadingMore ? <FooterLoader /> : null}
+        />
+      )}
     </SafeAreaView>
   )
 }
@@ -108,16 +223,34 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     fontSize: 15,
   },
-  listContent: { paddingHorizontal: spacing.md },
-  row: { gap: 2, marginBottom: 2 },
+  clearBtn: { paddingHorizontal: 10 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
+  listContentEmpty: { flex: 1 },
+  row: { gap: 8, marginBottom: 8 },
   card: {
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
   },
-  cardImage: { width: '100%', aspectRatio: 1 },
+  cardImage: { width: '100%', aspectRatio: 1, backgroundColor: colors.surfaceHigh },
   cardBody: { padding: spacing.sm },
   cardTitle: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
   cardPrice: { fontFamily: fontFamily.bold, fontSize: 14, color: colors.primary, marginTop: 2 },
+  cardSeller: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 80,
+    gap: spacing.sm,
+  },
+  emptyTitle: { fontFamily: fontFamily.semiBold, fontSize: 17, color: colors.text },
+  emptySubtitle: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
+  footer: { paddingVertical: spacing.md, alignItems: 'center' },
 })
