@@ -85,22 +85,22 @@ export default function BecomeSellerScreen() {
       setStatus('redirecting')
       const result = await WebBrowser.openAuthSessionAsync(
         url,
-        'clickk://onboarding-complete',
+        'https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete',
         { preferEphemeralSession: false }
       )
 
       if (result.type === 'success') {
         const redirectUrl = (result as WebBrowser.WebBrowserAuthSessionResult & { url?: string }).url ?? ''
-        if (redirectUrl.startsWith('clickk://onboarding-complete')) {
+        if (redirectUrl.startsWith('https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete')) {
           await checkOnboardingStatus()
-        } else if (redirectUrl.startsWith('clickk://onboarding-refresh')) {
+        } else if (redirectUrl.startsWith('https://ckrttngnwoslypyulwuf.supabase.co/onboarding-refresh')) {
           setStatus('loading')
           const newUrl = await fetchOnboardingUrl()
           if (newUrl) {
             setStatus('redirecting')
             const refreshResult = await WebBrowser.openAuthSessionAsync(
               newUrl,
-              'clickk://onboarding-complete',
+              'https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete',
               { preferEphemeralSession: false }
             )
             if (refreshResult.type === 'success') {
