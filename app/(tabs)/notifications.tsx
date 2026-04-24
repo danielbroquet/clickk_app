@@ -6,10 +6,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   ListRenderItem,
+  TouchableOpacity,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
@@ -37,8 +38,10 @@ const UNREAD_BG = 'rgba(0,210,184,0.08)'
 
 function NotifItem({ item }: { item: Notification }) {
   const cfg = ICON_CONFIG[item.type] ?? ICON_CONFIG.sale
+  const router = useRouter()
+  const storyId = (item as any).story_id as string | null | undefined
 
-  return (
+  const inner = (
     <View style={[styles.item, !item.is_read && styles.itemUnread]}>
       <View style={[styles.iconCircle, { backgroundColor: cfg.bg }]}>
         <Ionicons name={cfg.name} size={22} color={cfg.color} />
@@ -51,6 +54,16 @@ function NotifItem({ item }: { item: Notification }) {
       {!item.is_read && <View style={styles.dot} />}
     </View>
   )
+
+  if (storyId) {
+    return (
+      <TouchableOpacity activeOpacity={0.75} onPress={() => router.push(`/story/${storyId}`)}>
+        {inner}
+      </TouchableOpacity>
+    )
+  }
+
+  return inner
 }
 
 function EmptyState() {

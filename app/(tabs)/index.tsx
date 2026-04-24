@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
 import { Story, SpeedPreset } from '../../types'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
@@ -118,8 +119,9 @@ function FeedHeader() {
 
 function FeedCard({ story }: { story: Story }) {
   const seller = story.seller?.username ?? 'vendeur'
+  const router = useRouter()
   return (
-    <TouchableOpacity style={styles.feedCard} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.feedCard} activeOpacity={0.85} onPress={() => router.push(`/story/${story.id}`)}>
       <View style={styles.feedCardHeader}>
         <View style={styles.feedAvatar}>
           <Text style={styles.feedAvatarText}>{seller.charAt(0).toUpperCase()}</Text>
