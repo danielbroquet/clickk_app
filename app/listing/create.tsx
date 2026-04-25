@@ -76,19 +76,18 @@ export default function CreateListingScreen() {
     })
 
     try {
-      const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg'
-      const path = `${userId}/${uuidv4()}.${ext}`
+      const uriParts = uri.split('.')
+      const ext = uriParts[uriParts.length - 1].split('?')[0].toLowerCase()
+      const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg'
+      const path = `${userId}/${uuidv4()}.${safeExt}`
+      const mimeType = safeExt === 'jpg' || safeExt === 'jpeg' ? 'image/jpeg' : `image/${safeExt}`
 
-      const formData = new FormData()
-      formData.append('file', {
-        uri,
-        name: `photo.${ext}`,
-        type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
-      } as any)
+      const response = await fetch(uri)
+      const arrayBuffer = await response.arrayBuffer()
 
       const { error: uploadError } = await supabase.storage
         .from('listing-images')
-        .upload(path, formData, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`, upsert: true })
+        .upload(path, arrayBuffer, { contentType: mimeType, upsert: true })
 
       if (uploadError) throw uploadError
 
