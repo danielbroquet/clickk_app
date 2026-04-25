@@ -177,6 +177,7 @@ export default function CreateStoryScreen() {
     } finally {
       setLoading(false)
     }
+  }
 
   return (
     <SafeAreaView style={s.safe}>
