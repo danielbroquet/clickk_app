@@ -9,12 +9,20 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Story } from '../../types'
 import { fontFamily } from '../../lib/theme'
 import { useStoryPurchase } from '../../lib/stripe'
+import { useStoryPrice } from '../../hooks/useStoryPrice'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -26,30 +34,38 @@ interface StoriesViewerProps {
 
 export default function StoriesViewer({ story, visible, onClose }: StoriesViewerProps) {
   const insets = useSafeAreaInsets()
-  const [currentPrice, setCurrentPrice] = useState(0)
   const [countdown, setCountdown] = useState(10)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const { handlePurchase, purchasing, purchaseError, purchased } = useStoryPurchase()
 
+  const currentPrice = useStoryPrice(
+    story?.id ?? '',
+    story?.current_price_chf ?? 0
+  )
+
+  const pulseOpacity = useSharedValue(1)
+
+  useEffect(() => {
+    if (story?.status === 'active' && visible) {
+      pulseOpacity.value = withRepeat(
+        withTiming(0.4, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      )
+    } else {
+      pulseOpacity.value = 1
+    }
+  }, [story?.status, visible])
+
+  const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }))
+
   useEffect(() => {
     if (!story || !visible) return
-    setCurrentPrice(story.current_price_chf)
     setCountdown(story.price_drop_seconds)
 
     intervalRef.current = setInterval(() => {
       setCountdown(prev => {
-        if (prev <= 1) {
-          setCurrentPrice(p => {
-            const floor = story.floor_price_chf ?? 0
-            const next = p - 9
-            if (next <= floor) {
-              if (intervalRef.current) clearInterval(intervalRef.current)
-              return floor
-            }
-            return next
-          })
-          return story.price_drop_seconds
-        }
+        if (prev <= 1) return story.price_drop_seconds
         return prev - 1
       })
     }, 1000)
@@ -125,7 +141,9 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
 
         {/* Central price */}
         <View style={styles.priceCenter}>
-          <Text style={styles.priceText}>CHF {Math.round(currentPrice)}</Text>
+          <Animated.Text style={[styles.priceText, pulseStyle]}>
+            CHF {Math.round(currentPrice)}
+          </Animated.Text>
           <View style={styles.progressWrap}>
             <View style={styles.progressBg}>
               <View
