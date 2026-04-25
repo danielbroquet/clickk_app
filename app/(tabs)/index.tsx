@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useRouter } from 'expo-router'
+import { useRouter, router } from 'expo-router'
 import { Story, SpeedPreset } from '../../types'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
@@ -101,10 +101,10 @@ function FeedHeader() {
           <Text style={styles.logoTeal}>«</Text>
         </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')}>
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>

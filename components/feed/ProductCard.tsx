@@ -1,8 +1,11 @@
-import React from 'react'
-import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
+import React, { useState } from 'react'
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
 import Avatar from '../ui/Avatar'
 import { colors, fontFamily } from '../../lib/theme'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 
 interface FeedEntry {
   id: string
@@ -14,12 +17,44 @@ interface FeedEntry {
   image: string
 }
 
+interface StoryRef {
+  id: string
+  seller_id: string
+}
+
 interface ProductCardProps {
   item: FeedEntry
   onBuyPress: () => void
+  story?: StoryRef
 }
 
-export default function ProductCard({ item, onBuyPress }: ProductCardProps) {
+export default function ProductCard({ item, onBuyPress, story }: ProductCardProps) {
+  const { session } = useAuth()
+  const currentUserId = session?.user?.id ?? ''
+  const [chatLoading, setChatLoading] = useState(false)
+
+  const handleChatPress = async () => {
+    if (!story) return
+    if (currentUserId === story.seller_id) return
+    if (chatLoading) return
+    setChatLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .upsert(
+          { buyer_id: currentUserId, seller_id: story.seller_id, story_id: story.id },
+          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
+        )
+        .select('id')
+        .single()
+      if (!error && data) {
+        router.push(`/conversation/${data.id}`)
+      }
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -39,7 +74,22 @@ export default function ProductCard({ item, onBuyPress }: ProductCardProps) {
 
       <View style={styles.actionsRow}>
         <Ionicons name="heart-outline" size={26} color={colors.text} style={styles.actionIcon} />
-        <Ionicons name="chatbubble-outline" size={24} color={colors.text} style={styles.actionIcon} />
+        <TouchableOpacity
+          style={styles.actionIcon}
+          onPress={handleChatPress}
+          disabled={!story || currentUserId === story?.seller_id || chatLoading}
+          activeOpacity={0.7}
+        >
+          {chatLoading ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Ionicons
+              name="chatbubble-outline"
+              size={24}
+              color={story && currentUserId !== story.seller_id ? colors.text : colors.textSecondary}
+            />
+          )}
+        </TouchableOpacity>
         <Ionicons name="arrow-redo-outline" size={24} color={colors.text} />
         <View style={styles.flex} />
         <Ionicons name="bookmark-outline" size={24} color={colors.text} />
