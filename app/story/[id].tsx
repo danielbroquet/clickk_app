@@ -16,10 +16,106 @@ import { Video, ResizeMode } from 'expo-av'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Svg, { Circle } from 'react-native-svg'
+import Reanimated, {
+  useSharedValue,
+  withTiming,
+  Easing,
+  useAnimatedProps,
+  cancelAnimation,
+} from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import i18n from '../../lib/i18n'
+
+const AnimatedCircle = Reanimated.createAnimatedComponent(Circle)
+
+const RING_RADIUS = 58
+const RING_STROKE = 8
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+interface DropRingProps {
+  remaining: number
+  total: number
+}
+
+function DropRing({ remaining, total }: DropRingProps) {
+  const ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
+  const offset = useSharedValue(RING_CIRCUMFERENCE * (1 - ratio))
+
+  useEffect(() => {
+    cancelAnimation(offset)
+    const target = RING_CIRCUMFERENCE * (1 - ratio)
+    offset.value = withTiming(target, { duration: 1000, easing: Easing.linear })
+  }, [remaining])
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: offset.value,
+  }))
+
+  const strokeColor = ratio > 0.6 ? '#00D2B8' : ratio > 0.3 ? '#F59E0B' : '#EF4444'
+  const seconds = Math.ceil(remaining)
+
+  return (
+    <View style={ringStyles.container}>
+      <Svg width={140} height={140}>
+        {/* Background track */}
+        <Circle
+          cx={70}
+          cy={70}
+          r={RING_RADIUS}
+          stroke="#222222"
+          strokeWidth={RING_STROKE}
+          fill="none"
+        />
+        {/* Foreground arc — rotated so it starts at top */}
+        <AnimatedCircle
+          cx={70}
+          cy={70}
+          r={RING_RADIUS}
+          stroke={strokeColor}
+          strokeWidth={RING_STROKE}
+          fill="none"
+          strokeDasharray={RING_CIRCUMFERENCE}
+          strokeLinecap="round"
+          animatedProps={animatedProps}
+          rotation="-90"
+          origin="70, 70"
+        />
+      </Svg>
+      <View style={ringStyles.center}>
+        <Text style={ringStyles.seconds}>{seconds}</Text>
+        <Text style={ringStyles.label}>AVANT DROP</Text>
+      </View>
+    </View>
+  )
+}
+
+const ringStyles = StyleSheet.create({
+  container: {
+    width: 140,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  center: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  seconds: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    fontWeight: '700',
+    lineHeight: 36,
+  },
+  label: {
+    color: '#666666',
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+})
 
 const C = {
   bg: '#0F0F0F',
@@ -410,16 +506,7 @@ export default function StoryViewerScreen() {
         {/* Timers */}
         <View style={styles.timersRow}>
           {story.price_drop_seconds > 0 && !isSold && (
-            <View style={styles.timerItem}>
-              <Ionicons
-                name="trending-down-outline"
-                size={13}
-                color={dropRemaining < 30 ? C.warn : C.muted}
-              />
-              <Text style={[styles.timerText, dropRemaining < 30 && { color: C.warn }]}>
-                {i18n.t('story.viewer.drop_in')} {formatMMSS(dropRemaining)}
-              </Text>
-            </View>
+            <DropRing remaining={dropRemaining} total={story.price_drop_seconds} />
           )}
           <View style={styles.timerItem}>
             <Ionicons
@@ -590,7 +677,7 @@ const styles = StyleSheet.create({
   priceValueMuted: { color: C.muted, fontSize: 13 },
 
   // Timers
-  timersRow: { flexDirection: 'row', gap: 16, marginBottom: 14 },
+  timersRow: { flexDirection: 'row', gap: 16, marginBottom: 14, alignItems: 'flex-end' },
   timerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   timerText: { color: C.muted, fontSize: 12 },
 
