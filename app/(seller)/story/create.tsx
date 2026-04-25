@@ -171,15 +171,12 @@ export default function CreateStoryScreen() {
         })
       if (insertError) throw insertError
 
-      router.replace('/(tabs)')         // tab home
-      router.replace('/(tabs)/sell')    // tab vendeur
-      router.replace('/(tabs)/profile') // tab profil
+      router.replace('/(tabs)/sell')  // ← une seule ligne
     } catch (err: any) {
       Alert.alert('Error', err.message ?? 'Something went wrong')
     } finally {
       setLoading(false)
     }
-  }
 
   return (
     <SafeAreaView style={s.safe}>
