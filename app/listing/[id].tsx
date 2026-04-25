@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
 import { Ionicons } from '@expo/vector-icons'
 import Avatar from '../../components/ui/Avatar'
 import { supabase } from '../../lib/supabase'
@@ -99,41 +100,35 @@ export default function ListingDetailScreen() {
     }
   }
 
-  const handleBuy = () => {
-    if (!listing) return
-    Alert.alert(
-      "Confirmer l'achat",
-      `Acheter ${listing.title} pour CHF ${listing.price_chf.toFixed(2)} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Confirmer', style: 'default', onPress: confirmBuy },
-      ]
-    )
-  }
-
-  const confirmBuy = async () => {
-    if (!listing) return
+  const handleBuy = async () => {
+    if (!listing || !session) return
     setOrderError(null)
     setBuying(true)
     try {
-      const { error: orderError } = await supabase.from('shop_orders').insert({
-        listing_id: listing.id,
-        buyer_id: currentUserId,
-        seller_id: listing.seller_id,
-        quantity: 1,
-        total_chf: listing.price_chf,
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+      const res = await fetch(`${supabaseUrl}/functions/v1/create-listing-payment-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ listing_id: listing.id }),
       })
-      if (orderError) throw orderError
+      const json = await res.json()
+      if (!res.ok || !json.checkoutUrl) {
+        throw new Error(json.error ?? 'Impossible de créer la session de paiement.')
+      }
 
-      const { error: stockError } = await supabase
-        .from('shop_listings')
-        .update({ stock: listing.stock - 1 })
-        .eq('id', listing.id)
-      if (stockError) throw stockError
+      const result = await WebBrowser.openAuthSessionAsync(
+        json.checkoutUrl,
+        'clickk://payment-success'
+      )
 
-      Alert.alert('Commande passée !', undefined, [
-        { text: 'OK', onPress: () => router.back() },
-      ])
+      if (result.type === 'success') {
+        Alert.alert('Commande confirmée !', undefined, [
+          { text: 'OK', onPress: () => router.back() },
+        ])
+      }
     } catch (e: unknown) {
       setOrderError(e instanceof Error ? e.message : 'Une erreur est survenue.')
     } finally {
