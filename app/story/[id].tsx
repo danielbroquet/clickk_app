@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Svg, { Circle } from 'react-native-svg'
+import { Platform } from 'react-native'
+import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
@@ -191,6 +193,8 @@ export default function StoryViewerScreen() {
 
   const progressAnim = useRef(new Animated.Value(0)).current
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pulseAnim = useRef(new Animated.Value(1)).current
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null)
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -298,6 +302,42 @@ export default function StoryViewerScreen() {
     currentUserId &&
     story.buyer_id === currentUserId
   )
+
+  // ── Price ratio & dynamic feedback ────────────────────────────────────────
+
+  const priceRatio = story
+    ? (story.start_price_chf - story.floor_price_chf) > 0
+      ? Math.max(0, Math.min(1, (story.current_price_chf - story.floor_price_chf) / (story.start_price_chf - story.floor_price_chf)))
+      : 1
+    : 1
+
+  const prevPriceRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!story) return
+    const prev = prevPriceRef.current
+    if (prev !== null && prev !== story.current_price_chf) {
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      }
+    }
+    prevPriceRef.current = story.current_price_chf
+  }, [story?.current_price_chf])
+
+  useEffect(() => {
+    if (priceRatio < 0.3 && !isSold) {
+      pulseLoopRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.03, duration: 400, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.0, duration: 400, useNativeDriver: true }),
+        ])
+      )
+      pulseLoopRef.current.start()
+    } else {
+      pulseLoopRef.current?.stop()
+      pulseAnim.setValue(1)
+    }
+    return () => { pulseLoopRef.current?.stop() }
+  }, [priceRatio < 0.3, isSold])
 
   // ── Confirm delivery ───────────────────────────────────────────────────────
 
@@ -485,8 +525,18 @@ export default function StoryViewerScreen() {
       {/* ── Mid-screen ring overlay ── */}
       {story.price_drop_seconds > 0 && !isSold && (
         <View style={styles.ringOverlay} pointerEvents="none">
-          <View style={styles.pricePill}>
-            <Text style={styles.pricePillText}>CHF {currentFmt}</Text>
+          <View style={[
+            styles.pricePill,
+            priceRatio > 0.6
+              ? { backgroundColor: 'rgba(0,0,0,0.6)' }
+              : priceRatio > 0.3
+              ? { backgroundColor: 'rgba(245,158,11,0.85)' }
+              : { backgroundColor: 'rgba(239,68,68,0.85)' },
+          ]}>
+            <Text style={[
+              styles.pricePillText,
+              priceRatio > 0.3 ? { color: priceRatio > 0.6 ? '#FFFFFF' : '#0a0a0a' } : { color: '#FFFFFF' },
+            ]}>CHF {currentFmt}</Text>
           </View>
           <DropRing
             remaining={dropRemaining}
@@ -533,17 +583,19 @@ export default function StoryViewerScreen() {
             <Text style={styles.ctaBtnSoldText}>{i18n.t('story.viewer.sold')}</Text>
           </View>
         ) : (
-          <TouchableOpacity
-            style={styles.ctaBtn}
-            onPress={() => {
-              setSnapshotPrice(story.current_price_chf)
-              setModalVisible(true)
-            }}
-          >
-            <Text style={styles.ctaBtnText}>
-              {i18n.t('story.viewer.buy_now')} — CHF {currentFmt}
-            </Text>
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+            <TouchableOpacity
+              style={[styles.ctaBtn, priceRatio < 0.3 && { backgroundColor: '#EF4444' }]}
+              onPress={() => {
+                setSnapshotPrice(story.current_price_chf)
+                setModalVisible(true)
+              }}
+            >
+              <Text style={styles.ctaBtnText}>
+                {i18n.t('story.viewer.buy_now')} — CHF {currentFmt}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         )}
       </LinearGradient>
 
