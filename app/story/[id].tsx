@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import i18n from '../../lib/i18n'
 
@@ -71,6 +72,7 @@ function formatHHMMSS(seconds: number): string {
 export default function StoryViewerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
+  const { session } = useAuth()
 
   const [story, setStory] = useState<StoryData | null>(null)
   const [seller, setSeller] = useState<SellerProfile | null>(null)
@@ -83,6 +85,9 @@ export default function StoryViewerScreen() {
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
   const { handlePurchase, purchasing } = useStoryPurchase()
+
+  const [confirmDelivering, setConfirmDelivering] = useState(false)
+  const [deliveryError, setDeliveryError] = useState<string | null>(null)
 
   const progressAnim = useRef(new Animated.Value(0)).current
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -188,6 +193,57 @@ export default function StoryViewerScreen() {
       story.buyer_id !== null
     )
   )
+
+  const currentUserId = session?.user?.id ?? null
+  const showConfirmDelivery = !!(
+    story &&
+    story.status === 'sold' &&
+    currentUserId &&
+    story.buyer_id === currentUserId
+  )
+
+  // ── Confirm delivery ───────────────────────────────────────────────────────
+
+  const handleConfirmDelivery = () => {
+    Alert.alert(
+      'Confirmer la réception',
+      'Confirmez-vous avoir bien reçu cet article ? Les fonds seront transférés au vendeur.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Confirmer',
+          style: 'destructive',
+          onPress: async () => {
+            setConfirmDelivering(true)
+            setDeliveryError(null)
+            try {
+              const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+              const token = session?.access_token
+              const res = await fetch(`${supabaseUrl}/functions/v1/confirm-delivery`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ story_id: id }),
+              })
+              const json = await res.json()
+              if (!res.ok) {
+                throw new Error(json?.error ?? 'Erreur inconnue')
+              }
+              setStory(prev => prev ? { ...prev, status: 'delivered' } : prev)
+              Alert.alert('Fonds transférés au vendeur avec succès')
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+              setDeliveryError(msg)
+            } finally {
+              setConfirmDelivering(false)
+            }
+          },
+        },
+      ]
+    )
+  }
 
   // ── Purchase ───────────────────────────────────────────────────────────────
 
@@ -306,6 +362,26 @@ export default function StoryViewerScreen() {
           <TouchableOpacity style={styles.soldBackBtn} onPress={() => router.back()}>
             <Text style={styles.soldBackBtnText}>← {i18n.t('common.back')}</Text>
           </TouchableOpacity>
+
+          {showConfirmDelivery && (
+            <View style={styles.deliveryWrap}>
+              <TouchableOpacity
+                style={[styles.deliveryBtn, confirmDelivering && { opacity: 0.6 }]}
+                onPress={handleConfirmDelivery}
+                disabled={confirmDelivering}
+                activeOpacity={0.8}
+              >
+                {confirmDelivering ? (
+                  <ActivityIndicator color="#0F0F0F" />
+                ) : (
+                  <Text style={styles.deliveryBtnText}>Confirmer la réception</Text>
+                )}
+              </TouchableOpacity>
+              {!!deliveryError && (
+                <Text style={styles.deliveryError}>{deliveryError}</Text>
+              )}
+            </View>
+          )}
         </View>
       )}
 
@@ -552,6 +628,18 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   soldBackBtnText: { color: C.primary, fontSize: 14, fontWeight: '600' },
+  deliveryWrap: { marginTop: 16, width: '80%', alignItems: 'center' },
+  deliveryBtn: {
+    backgroundColor: C.primary,
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  deliveryBtnText: { color: '#0F0F0F', fontSize: 15, fontWeight: '700' },
+  deliveryError: { color: C.danger, fontSize: 12, marginTop: 8, textAlign: 'center' },
 
   // Error state
   errorStateText: { color: C.text, fontSize: 16, marginTop: 12 },
