@@ -321,6 +321,15 @@ Deno.serve(async (req: Request) => {
           } else {
             console.log(`[stripe-webhook] User ${userId} promoted to seller`);
           }
+
+          const stripeAccountId = accountId as string;
+          const { error: spErr } = await supabase
+            .from("seller_profiles")
+            .upsert({ user_id: userId, stripe_account_id: stripeAccountId }, { onConflict: "user_id" });
+
+          if (spErr) {
+            console.error("[stripe-webhook] seller_profiles upsert failed:", spErr.message);
+          }
         }
       } else {
         console.log(`[stripe-webhook] account.updated for ${accountId ?? "unknown"} — details_submitted=${account.details_submitted}`);
