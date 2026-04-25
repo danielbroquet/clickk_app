@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
+import { useFollow } from '../../hooks/useFollow'
 
 const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3)
 
@@ -409,7 +410,18 @@ export default function ProfileScreen() {
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
   const username = profile?.username ?? 'username'
   const initial = displayName.charAt(0).toUpperCase()
-  const userId = session?.user?.id ?? ''
+  const currentUserId = session?.user?.id ?? ''
+  // Profile screen always shows the logged-in user's own profile
+  const profileUserId = currentUserId
+  const userId = currentUserId
+  const isOwnProfile = profileUserId === currentUserId
+
+  const {
+    isFollowing,
+    followersCount,
+    toggleFollow,
+    loading: followLoading,
+  } = useFollow(profileUserId)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -427,7 +439,7 @@ export default function ProfileScreen() {
             <View style={styles.statsRow}>
               {[
                 { value: articlesCount, label: 'Articles' },
-                { value: profile?.followers_count ?? 0, label: 'Abonnés' },
+                { value: followLoading ? null : followersCount, label: 'Abonnés' },
                 { value: ventesCount, label: 'Ventes' },
               ].map(stat => (
                 <View key={stat.label} style={styles.stat}>
@@ -445,12 +457,27 @@ export default function ProfileScreen() {
 
           {/* Buttons */}
           <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
-              <Text style={styles.editBtnText}>Modifier le profil</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addBtn}>
-              <Ionicons name="person-add-outline" size={18} color={colors.text} />
-            </TouchableOpacity>
+            {isOwnProfile ? (
+              <>
+                <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
+                  <Text style={styles.editBtnText}>Modifier le profil</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.addBtn}>
+                  <Ionicons name="person-add-outline" size={18} color={colors.text} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={[styles.followBtn, isFollowing && styles.followBtnActive]}
+                onPress={toggleFollow}
+                disabled={followLoading}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}>
+                  {isFollowing ? 'Abonné' : 'Suivre'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {profile?.role !== 'seller' && (
@@ -568,6 +595,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  followBtn: {
+    flex: 1,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followBtnActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  followBtnText: { fontFamily: fontFamily.semiBold, fontSize: 13, color: '#000' },
+  followBtnTextActive: { color: colors.primary },
   storiesWrap: { marginTop: 16 },
   storiesRow: { paddingHorizontal: 16, gap: 16 },
   storyItem: { alignItems: 'center', gap: 6 },
