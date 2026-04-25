@@ -14,6 +14,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { supabase } from '../lib/supabase'
 import { callEdgeFunction } from '../lib/edgeFunction'
 import { colors, fontFamily, spacing } from '../lib/theme'
+import { useAuth } from '../lib/auth'
 
 type Status = 'idle' | 'loading' | 'redirecting' | 'complete' | 'error'
 
@@ -26,6 +27,7 @@ const BENEFITS = [
 
 export default function BecomeSellerScreen() {
   const params = useLocalSearchParams()
+  const { refreshProfile } = useAuth()
   const [status, setStatus] = useState<Status>('idle')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -50,6 +52,7 @@ export default function BecomeSellerScreen() {
         .from('profiles')
         .update({ role: 'seller' })
         .eq('id', session.user.id)
+      await refreshProfile()
       setStatus('complete')
     }
   }
@@ -85,22 +88,22 @@ export default function BecomeSellerScreen() {
       setStatus('redirecting')
       const result = await WebBrowser.openAuthSessionAsync(
         url,
-        'https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete',
+        'clickk://onboarding-complete',
         { preferEphemeralSession: false }
       )
 
       if (result.type === 'success') {
         const redirectUrl = (result as WebBrowser.WebBrowserAuthSessionResult & { url?: string }).url ?? ''
-        if (redirectUrl.startsWith('https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete')) {
+        if (redirectUrl.startsWith('clickk://onboarding-complete')) {
           await checkOnboardingStatus()
-        } else if (redirectUrl.startsWith('https://ckrttngnwoslypyulwuf.supabase.co/onboarding-refresh')) {
+        } else if (redirectUrl.startsWith('clickk://onboarding-refresh')) {
           setStatus('loading')
           const newUrl = await fetchOnboardingUrl()
           if (newUrl) {
             setStatus('redirecting')
             const refreshResult = await WebBrowser.openAuthSessionAsync(
               newUrl,
-              'https://ckrttngnwoslypyulwuf.supabase.co/onboarding-complete',
+              'clickk://onboarding-complete',
               { preferEphemeralSession: false }
             )
             if (refreshResult.type === 'success') {
