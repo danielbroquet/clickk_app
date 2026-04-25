@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Video, ResizeMode } from 'expo-av'
 import {
   View,
   Text,
@@ -67,15 +68,21 @@ function FeedHeader() {
   )
 }
 
+const isVideo = (url: string) =>
+  ['mp4', 'mov', 'avi', 'webm'].includes(url.split('.').pop()?.toLowerCase() ?? '')
+
 function ListingCard({
   listing,
   currentUserId,
+  isCardVisible,
 }: {
   listing: RawListing
   currentUserId: string
+  isCardVisible: boolean
 }) {
   const [chatLoading, setChatLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const videoRef = useRef<any>(null)
   const username = listing.seller?.username ?? 'vendeur'
   const avatar = listing.seller?.avatar_url
   const isSeller = currentUserId === listing.seller_id
@@ -122,25 +129,27 @@ function ListingCard({
               )
               setActiveIndex(index)
             }}
-            renderItem={({ item: url }) => {
-              const ext = url.split('.').pop()?.toLowerCase()
-              const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(ext ?? '')
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.92}
-                  onPress={() => router.push(`/listing/${listing.id}`)}
-                >
-                  {isVideo ? (
-                    <View style={[styles.cardImage, styles.videoPlaceholder]}>
-                      <Ionicons name="play-circle-outline" size={48} color="#FFFFFF" />
-                      <Text style={styles.videoLabel}>Vidéo</Text>
-                    </View>
-                  ) : (
-                    <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
-                  )}
-                </TouchableOpacity>
-              )
-            }}
+            renderItem={({ item: url, index: itemIndex }) => (
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => router.push(`/listing/${listing.id}`)}
+              >
+                {isVideo(url) ? (
+                  <Video
+                    ref={itemIndex === activeIndex ? videoRef : undefined}
+                    source={{ uri: url }}
+                    style={styles.cardImage}
+                    resizeMode={ResizeMode.COVER}
+                    shouldPlay={isCardVisible && activeIndex === itemIndex}
+                    isLooping={true}
+                    isMuted={true}
+                    useNativeControls={false}
+                  />
+                ) : (
+                  <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+                )}
+              </TouchableOpacity>
+            )}
           />
           {multiImage && (
             <View style={styles.dotsRow}>
@@ -226,7 +235,9 @@ export default function FeedScreen() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [hasMore, setHasMore] = useState(true)
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set())
   const pageRef = useRef(0)
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 })
 
   const fetchPage = useCallback(async (page: number, replace: boolean) => {
     const from = page * PAGE_SIZE
@@ -267,9 +278,20 @@ export default function FeedScreen() {
     setLoadingMore(false)
   }, [loadingMore, hasMore, fetchPage])
 
+  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
+    const ids = new Set<string>(viewableItems.map((v: any) => v.item.id))
+    setVisibleIds(ids)
+  }, [])
+
   const renderItem: ListRenderItem<RawListing> = useCallback(
-    ({ item }) => <ListingCard listing={item} currentUserId={currentUserId} />,
-    [currentUserId]
+    ({ item }) => (
+      <ListingCard
+        listing={item}
+        currentUserId={currentUserId}
+        isCardVisible={visibleIds.has(item.id)}
+      />
+    ),
+    [currentUserId, visibleIds]
   )
 
   return (
@@ -305,6 +327,8 @@ export default function FeedScreen() {
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig.current}
       />
     </SafeAreaView>
   )
@@ -339,18 +363,6 @@ const styles = StyleSheet.create({
   cardImage: {
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH,
-  },
-  videoPlaceholder: {
-    backgroundColor: '#1A1A1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  videoLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: 13,
-    color: '#FFFFFF',
-    opacity: 0.7,
   },
   cardImagePlaceholder: {
     width: SCREEN_WIDTH,
