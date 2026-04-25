@@ -16,6 +16,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated'
+import { Video, ResizeMode } from 'expo-av'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -105,10 +106,13 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
     >
       <View style={styles.container}>
         {story.video_url ? (
-          <Image
+          <Video
             source={{ uri: story.video_url }}
             style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={visible}
+            isLooping={true}
+            isMuted={false}
           />
         ) : (
           <View style={[StyleSheet.absoluteFillObject, { backgroundColor: '#1A1A1A' }]} />
@@ -127,11 +131,11 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View style={styles.sellerRow}>
             <View style={styles.avatarWrap}>
-              {story.video_url ? (
-                <Image source={{ uri: story.video_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: '#2A2A2A' }]} />
-              )}
+              <View style={[styles.avatar, { backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ fontFamily: fontFamily.bold, fontSize: 18, color: '#00D2B8' }}>
+                  {(story.seller?.username ?? '?')[0].toUpperCase()}
+                </Text>
+              </View>
             </View>
             <View style={{ marginLeft: 10 }}>
               <View style={styles.nameRow}>
