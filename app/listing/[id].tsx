@@ -160,7 +160,13 @@ export default function ListingDetailScreen() {
       })
       const json = await res.json()
       if (!res.ok || !json.checkoutUrl) {
-        throw new Error(json.error ?? 'Impossible de créer la session de paiement.')
+        const errorMap: Record<string, string> = {
+          listing_not_active: 'Cet article n\'est plus disponible.',
+          out_of_stock: 'Cet article est en rupture de stock.',
+          cannot_buy_own_listing: 'Vous ne pouvez pas acheter votre propre article.',
+          listing_not_found: 'Article introuvable.',
+        }
+        throw new Error(errorMap[json.error] ?? json.error ?? 'Impossible de créer la session de paiement.')
       }
 
       const result = await WebBrowser.openAuthSessionAsync(
@@ -169,12 +175,21 @@ export default function ListingDetailScreen() {
       )
 
       if (result.type === 'success') {
-        Alert.alert('Commande confirmée !', undefined, [
-          { text: 'OK', onPress: () => router.back() },
-        ])
+        const redirectUrl = (result as { url?: string }).url ?? ''
+        const sessionId = new URL(redirectUrl.replace('clickk://', 'https://placeholder/')).searchParams.get('session_id') ?? json.sessionId
+        router.replace({
+          pathname: '/listing/order-confirmation',
+          params: {
+            sessionId,
+            title: listing.title,
+            price: listing.price_chf.toFixed(2),
+          },
+        })
       }
     } catch (e: unknown) {
-      setOrderError(e instanceof Error ? e.message : 'Une erreur est survenue.')
+      const msg = e instanceof Error ? e.message : 'Une erreur est survenue.'
+      setOrderError(msg)
+      Alert.alert('Erreur de paiement', msg)
     } finally {
       setBuying(false)
     }
@@ -207,6 +222,7 @@ export default function ListingDetailScreen() {
   }
 
   const isSeller = currentUserId === listing.seller_id
+  const unavailable = !listing.is_active || listing.stock === 0
   const outOfStock = listing.stock === 0
   const images = listing.images ?? []
   const sellerName = listing.seller?.display_name ?? listing.seller?.username ?? 'Vendeur'
@@ -341,16 +357,16 @@ export default function ListingDetailScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            style={[styles.buyBtn, (outOfStock || buying) && styles.buyBtnDisabled]}
+            style={[styles.buyBtn, (unavailable || buying) && styles.buyBtnDisabled]}
             onPress={handleBuy}
-            disabled={outOfStock || buying}
+            disabled={unavailable || buying}
             activeOpacity={0.85}
           >
             {buying ? (
               <ActivityIndicator size="small" color="#0F0F0F" />
             ) : (
               <Text style={styles.buyBtnText}>
-                {outOfStock ? 'Rupture de stock' : `Acheter — CHF ${listing.price_chf.toFixed(2)}`}
+                {outOfStock ? 'Rupture de stock' : !listing.is_active ? 'Article indisponible' : `Acheter — CHF ${listing.price_chf.toFixed(2)}`}
               </Text>
             )}
           </TouchableOpacity>
