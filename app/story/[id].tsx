@@ -174,9 +174,6 @@ export default function StoryViewerScreen() {
         useNativeDriver: false,
       }).start()
     }
-    if (status.didJustFinish) {
-      router.back()
-    }
   }, [progressAnim])
 
   const progressWidth = progressAnim.interpolate({
@@ -298,7 +295,7 @@ export default function StoryViewerScreen() {
         style={StyleSheet.absoluteFill}
         resizeMode={ResizeMode.COVER}
         shouldPlay={!modalVisible}
-        isLooping={false}
+        isLooping={true}
         isMuted={false}
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
       />
