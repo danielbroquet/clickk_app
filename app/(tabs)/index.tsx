@@ -122,14 +122,25 @@ function ListingCard({
               )
               setActiveIndex(index)
             }}
-            renderItem={({ item: url }) => (
-              <TouchableOpacity
-                activeOpacity={0.92}
-                onPress={() => router.push(`/listing/${listing.id}`)}
-              >
-                <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
-              </TouchableOpacity>
-            )}
+            renderItem={({ item: url }) => {
+              const ext = url.split('.').pop()?.toLowerCase()
+              const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(ext ?? '')
+              return (
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  onPress={() => router.push(`/listing/${listing.id}`)}
+                >
+                  {isVideo ? (
+                    <View style={[styles.cardImage, styles.videoPlaceholder]}>
+                      <Ionicons name="play-circle-outline" size={48} color="#FFFFFF" />
+                      <Text style={styles.videoLabel}>Vidéo</Text>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+                  )}
+                </TouchableOpacity>
+              )
+            }}
           />
           {multiImage && (
             <View style={styles.dotsRow}>
@@ -328,6 +339,18 @@ const styles = StyleSheet.create({
   cardImage: {
     width: SCREEN_WIDTH,
     height: SCREEN_WIDTH,
+  },
+  videoPlaceholder: {
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  videoLabel: {
+    fontFamily: fontFamily.medium,
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.7,
   },
   cardImagePlaceholder: {
     width: SCREEN_WIDTH,

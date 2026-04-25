@@ -192,13 +192,22 @@ export default function ListingDetailScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleScroll}
               scrollEventThrottle={16}
-              renderItem={({ item }) => (
-                <Image
-                  source={{ uri: item }}
-                  style={styles.carouselImage}
-                  resizeMode="cover"
-                />
-              )}
+              renderItem={({ item }) => {
+                const ext = item.split('.').pop()?.toLowerCase()
+                const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(ext ?? '')
+                return isVideo ? (
+                  <View style={[styles.carouselImage, styles.videoPlaceholder]}>
+                    <Ionicons name="play-circle-outline" size={48} color="#FFFFFF" />
+                    <Text style={styles.videoLabel}>Vidéo</Text>
+                  </View>
+                ) : (
+                  <Image
+                    source={{ uri: item }}
+                    style={styles.carouselImage}
+                    resizeMode="cover"
+                  />
+                )
+              }}
             />
             {images.length > 1 && (
               <View style={styles.dots}>
@@ -337,6 +346,18 @@ const styles = StyleSheet.create({
   carouselImage: {
     width: SCREEN_WIDTH,
     height: CAROUSEL_HEIGHT,
+  },
+  videoPlaceholder: {
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  videoLabel: {
+    fontFamily: fontFamily.medium,
+    fontSize: 13,
+    color: '#FFFFFF',
+    opacity: 0.7,
   },
   imagePlaceholder: {
     width: SCREEN_WIDTH,
