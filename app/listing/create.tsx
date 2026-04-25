@@ -96,11 +96,11 @@ export default function CreateListingScreen() {
       const mimeType = safeExt === 'jpg' || safeExt === 'jpeg' ? 'image/jpeg' : `image/${safeExt}`
 
       const response = await fetch(uri)
-      const arrayBuffer = await response.arrayBuffer()
+      const blob = await response.blob()
 
       const { error: uploadError } = await supabase.storage
         .from('listing-images')
-        .upload(path, arrayBuffer, { contentType: mimeType, upsert: true })
+        .upload(path, blob, { contentType: mimeType, upsert: true })
 
       if (uploadError) throw uploadError
 
