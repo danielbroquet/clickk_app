@@ -31,11 +31,21 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 interface DropRingProps {
   remaining: number
   total: number
+  lastDropAt: string
 }
 
-function DropRing({ remaining, total }: DropRingProps) {
-  const ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
-  const animRef = useRef(new Animated.Value(1 - ratio)).current
+function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
+  const initialRatio = () => {
+    const elapsed = (Date.now() - new Date(lastDropAt).getTime()) / 1000
+    const initial = Math.max(1, Math.ceil(total - elapsed))
+    return total > 0 ? Math.max(0, Math.min(1, initial / total)) : 1
+  }
+
+  const animRef = useRef(new Animated.Value(1 - initialRatio())).current
+
+  useEffect(() => {
+    animRef.setValue(1 - initialRatio())
+  }, [lastDropAt])
 
   useEffect(() => {
     Animated.timing(animRef, {
@@ -50,13 +60,13 @@ function DropRing({ remaining, total }: DropRingProps) {
     outputRange: [0, RING_CIRCUMFERENCE],
   })
 
+  const ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
   const strokeColor = ratio > 0.6 ? '#00D2B8' : ratio > 0.3 ? '#F59E0B' : '#EF4444'
   const seconds = Math.ceil(remaining)
 
   return (
     <View style={ringStyles.container}>
       <Svg width={140} height={140}>
-        {/* Background track */}
         <Circle
           cx={70}
           cy={70}
@@ -65,7 +75,6 @@ function DropRing({ remaining, total }: DropRingProps) {
           strokeWidth={RING_STROKE}
           fill="none"
         />
-        {/* Foreground arc — rotated so it starts at top */}
         <AnimatedCircle
           cx={70}
           cy={70}
@@ -81,8 +90,8 @@ function DropRing({ remaining, total }: DropRingProps) {
         />
       </Svg>
       <View style={ringStyles.center}>
-        <Text style={ringStyles.seconds}>{seconds}</Text>
-        <Text style={ringStyles.label}>AVANT DROP</Text>
+        <Text style={ringStyles.seconds}>{seconds}s</Text>
+        <Text style={ringStyles.label}>avant drop</Text>
       </View>
     </View>
   )
@@ -107,9 +116,8 @@ const ringStyles = StyleSheet.create({
     lineHeight: 36,
   },
   label: {
-    color: '#666666',
+    color: '#888888',
     fontSize: 10,
-    letterSpacing: 0.5,
   },
 })
 
@@ -474,6 +482,30 @@ export default function StoryViewerScreen() {
         </View>
       )}
 
+      {/* ── Mid-screen ring overlay ── */}
+      {story.price_drop_seconds > 0 && !isSold && (
+        <View style={styles.ringOverlay} pointerEvents="none">
+          <View style={styles.pricePill}>
+            <Text style={styles.pricePillText}>CHF {currentFmt}</Text>
+          </View>
+          <DropRing
+            remaining={dropRemaining}
+            total={story.price_drop_seconds}
+            lastDropAt={story.last_drop_at}
+          />
+          <View style={styles.expiryRow}>
+            <Ionicons
+              name="time-outline"
+              size={12}
+              color={expiresRemaining < 3600 ? C.danger : C.muted}
+            />
+            <Text style={[styles.expiryText, { color: expiresRemaining < 3600 ? C.danger : C.muted }]}>
+              {i18n.t('story.viewer.expires_in')} {formatHHMMSS(expiresRemaining)}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* ── Bottom overlay ── */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.9)']}
@@ -496,23 +528,6 @@ export default function StoryViewerScreen() {
           <View style={styles.priceCol}>
             <Text style={styles.priceLabel}>{i18n.t('story.viewer.floor')}</Text>
             <Text style={styles.priceValueMuted}>CHF {floorFmt}</Text>
-          </View>
-        </View>
-
-        {/* Timers */}
-        <View style={styles.timersRow}>
-          {story.price_drop_seconds > 0 && !isSold && (
-            <DropRing remaining={dropRemaining} total={story.price_drop_seconds} />
-          )}
-          <View style={styles.timerItem}>
-            <Ionicons
-              name="time-outline"
-              size={13}
-              color={expiresRemaining < 3600 ? C.danger : C.text}
-            />
-            <Text style={[styles.timerText, { color: expiresRemaining < 3600 ? C.danger : C.text }]}>
-              {i18n.t('story.viewer.expires_in')} {formatHHMMSS(expiresRemaining)}
-            </Text>
           </View>
         </View>
 
@@ -672,10 +687,25 @@ const styles = StyleSheet.create({
   priceValueStrike: { color: C.muted, fontSize: 13, textDecorationLine: 'line-through' },
   priceValueMuted: { color: C.muted, fontSize: 13 },
 
-  // Timers
-  timersRow: { flexDirection: 'row', gap: 16, marginBottom: 14, alignItems: 'flex-end' },
-  timerItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  timerText: { color: C.muted, fontSize: 12 },
+  // Ring overlay
+  ringOverlay: {
+    position: 'absolute',
+    top: '38%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  pricePill: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    marginBottom: 10,
+  },
+  pricePillText: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
+  expiryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
+  expiryText: { fontSize: 12 },
 
   // CTA
   ctaBtn: {
