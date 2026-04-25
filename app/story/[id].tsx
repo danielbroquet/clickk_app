@@ -17,19 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Svg, { Circle } from 'react-native-svg'
-import Reanimated, {
-  useSharedValue,
-  withTiming,
-  Easing,
-  useAnimatedProps,
-  cancelAnimation,
-} from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import i18n from '../../lib/i18n'
 
-const AnimatedCircle = Reanimated.createAnimatedComponent(Circle)
+const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
 const RING_RADIUS = 58
 const RING_STROKE = 8
@@ -42,17 +35,20 @@ interface DropRingProps {
 
 function DropRing({ remaining, total }: DropRingProps) {
   const ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
-  const offset = useSharedValue(RING_CIRCUMFERENCE * (1 - ratio))
+  const animRef = useRef(new Animated.Value(1 - ratio)).current
 
   useEffect(() => {
-    cancelAnimation(offset)
-    const target = RING_CIRCUMFERENCE * (1 - ratio)
-    offset.value = withTiming(target, { duration: 1000, easing: Easing.linear })
+    Animated.timing(animRef, {
+      toValue: 1 - (remaining / (total || 1)),
+      duration: 950,
+      useNativeDriver: false,
+    }).start()
   }, [remaining])
 
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: offset.value,
-  }))
+  const strokeDashoffset = animRef.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, RING_CIRCUMFERENCE],
+  })
 
   const strokeColor = ratio > 0.6 ? '#00D2B8' : ratio > 0.3 ? '#F59E0B' : '#EF4444'
   const seconds = Math.ceil(remaining)
@@ -79,7 +75,7 @@ function DropRing({ remaining, total }: DropRingProps) {
           fill="none"
           strokeDasharray={RING_CIRCUMFERENCE}
           strokeLinecap="round"
-          animatedProps={animatedProps}
+          strokeDashoffset={strokeDashoffset}
           rotation="-90"
           origin="70, 70"
         />
