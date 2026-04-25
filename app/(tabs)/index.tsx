@@ -3,93 +3,43 @@ import {
   View,
   Text,
   FlatList,
+  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   ListRenderItem,
+  Dimensions,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useRouter, router } from 'expo-router'
-import { Story, SpeedPreset } from '../../types'
+import { router } from 'expo-router'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
 import i18n from '../../lib/i18n'
 
 const PAGE_SIZE = 8
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-interface RawStory {
+interface RawListing {
   id: string
-  seller_id: string
   title: string
-  description: string | null
-  video_url: string
-  start_price_chf: number
-  floor_price_chf: number
-  current_price_chf: number
-  price_drop_seconds: number
-  speed_preset: SpeedPreset
-  status: 'active' | 'sold' | 'expired'
-  buyer_id: string | null
-  final_price_chf: number | null
-  expires_at: string
-  last_drop_at: string
-  video_duration_seconds: number | null
-  duration_hours: 24 | 72 | 168 | null
+  price_chf: number
+  images: string[]
+  category: string | null
+  condition: string | null
+  stock: number
   created_at: string
-  updated_at: string
-  profiles: { id: string; username: string; avatar_url: string | null } | null
+  seller_id: string
+  seller: { id: string; username: string; avatar_url: string | null } | null
 }
 
-function rawToStory(r: RawStory): Story {
-  return {
-    id: r.id,
-    seller_id: r.seller_id,
-    title: r.title,
-    description: r.description,
-    video_url: r.video_url,
-    start_price_chf: r.start_price_chf,
-    floor_price_chf: r.floor_price_chf,
-    current_price_chf: r.current_price_chf,
-    price_drop_seconds: r.price_drop_seconds,
-    speed_preset: r.speed_preset,
-    status: r.status,
-    buyer_id: r.buyer_id,
-    final_price_chf: r.final_price_chf,
-    expires_at: r.expires_at,
-    last_drop_at: r.last_drop_at,
-    video_duration_seconds: r.video_duration_seconds ?? undefined,
-    duration_hours: r.duration_hours ?? undefined,
-    created_at: r.created_at,
-    seller: r.profiles
-      ? {
-          id: r.profiles.id,
-          username: r.profiles.username,
-          display_name: null,
-          role: 'seller',
-          avatar_url: r.profiles.avatar_url,
-          bio: null,
-          preferred_language: 'fr',
-          followers_count: 0,
-          following_count: 0,
-          stripe_customer_id: null,
-          is_verified: false,
-          created_at: '',
-        }
-      : undefined,
-  }
-}
-
-const STORY_SELECT = `
-  id, seller_id, title, description,
-  video_url, start_price_chf, floor_price_chf,
-  current_price_chf, price_drop_seconds,
-  status, expires_at, speed_preset,
-  buyer_id, final_price_chf, last_drop_at,
-  video_duration_seconds, duration_hours,
-  created_at, updated_at,
-  profiles:seller_id (id, username, avatar_url)
+const LISTING_SELECT = `
+  id, title, price_chf, images, category,
+  condition, stock, created_at, seller_id,
+  seller:seller_id ( id, username, avatar_url )
 `
 
 function FeedHeader() {
@@ -117,31 +67,113 @@ function FeedHeader() {
   )
 }
 
-function FeedCard({ story }: { story: Story }) {
-  const seller = story.seller?.username ?? 'vendeur'
-  const router = useRouter()
+function ListingCard({
+  listing,
+  currentUserId,
+}: {
+  listing: RawListing
+  currentUserId: string
+}) {
+  const [chatLoading, setChatLoading] = useState(false)
+  const username = listing.seller?.username ?? 'vendeur'
+  const avatar = listing.seller?.avatar_url
+  const isSeller = currentUserId === listing.seller_id
+  const image = listing.images?.[0] ?? null
+
+  const handleChat = async () => {
+    if (isSeller || chatLoading) return
+    setChatLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .upsert(
+          { buyer_id: currentUserId, seller_id: listing.seller_id, story_id: listing.id },
+          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
+        )
+        .select('id')
+        .single()
+      if (!error && data) router.push(`/conversation/${data.id}`)
+    } finally {
+      setChatLoading(false)
+    }
+  }
+
   return (
-    <TouchableOpacity style={styles.feedCard} activeOpacity={0.85} onPress={() => router.push(`/story/${story.id}`)}>
-      <View style={styles.feedCardHeader}>
-        <View style={styles.feedAvatar}>
-          <Text style={styles.feedAvatarText}>{seller.charAt(0).toUpperCase()}</Text>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.92}
+      onPress={() => router.push(`/listing/${listing.id}`)}
+    >
+      {/* Square image */}
+      {image ? (
+        <Image source={{ uri: image }} style={styles.cardImage} resizeMode="cover" />
+      ) : (
+        <View style={styles.cardImagePlaceholder}>
+          <Ionicons name="image-outline" size={36} color={colors.border} />
         </View>
-        <Text style={styles.feedUsername}>@{seller}</Text>
-      </View>
-      <View style={styles.feedBody}>
-        <Text style={styles.feedTitle} numberOfLines={2}>{story.title}</Text>
-        <Text style={styles.feedPrice}>CHF {story.current_price_chf.toFixed(2)}</Text>
+      )}
+
+      {/* Info block */}
+      <View style={styles.cardBody}>
+        {/* Seller row */}
+        <View style={styles.sellerRow}>
+          <View style={styles.sellerLeft}>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>{username.charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <Text style={styles.username}>@{username}</Text>
+          </View>
+          <View style={styles.rowRight}>
+            {listing.category ? (
+              <View style={styles.categoryPill}>
+                <Text style={styles.categoryText}>{listing.category}</Text>
+              </View>
+            ) : null}
+            {!isSeller && (
+              <TouchableOpacity
+                onPress={handleChat}
+                disabled={chatLoading}
+                hitSlop={8}
+                activeOpacity={0.7}
+              >
+                {chatLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="chatbubble-outline" size={22} color={colors.textSecondary} />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={styles.cardTitle} numberOfLines={2}>{listing.title}</Text>
+
+        {/* Price */}
+        <Text style={styles.cardPrice}>CHF {listing.price_chf.toFixed(2)}</Text>
+
+        {/* Condition */}
+        {listing.condition ? (
+          <Text style={styles.cardCondition}>{listing.condition}</Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   )
 }
 
-const renderItem: ListRenderItem<Story> = ({ item }) => <FeedCard story={item} />
-const keyExtractor = (item: Story) => item.id
+const keyExtractor = (item: RawListing) => item.id
 
 export default function FeedScreen() {
-  const [stories, setStories] = useState<Story[]>([])
+  const { session } = useAuth()
+  const currentUserId = session?.user?.id ?? ''
+
+  const [listings, setListings] = useState<RawListing[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const pageRef = useRef(0)
 
@@ -149,45 +181,31 @@ export default function FeedScreen() {
     const from = page * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
     const { data, error } = await supabase
-      .from('stories')
-      .select(STORY_SELECT)
-      .eq('status', 'active')
+      .from('shop_listings')
+      .select(LISTING_SELECT)
+      .eq('is_active', true)
+      .gt('stock', 0)
       .order('created_at', { ascending: false })
       .range(from, to)
 
     if (error) return
-    const rows = (data as unknown as RawStory[]).map(rawToStory)
+    const rows = (data as unknown as RawListing[]) ?? []
     setHasMore(rows.length === PAGE_SIZE)
-    if (replace) {
-      setStories(rows)
-    } else {
-      setStories(prev => [...prev, ...rows])
-    }
+    if (replace) setListings(rows)
+    else setListings(prev => [...prev, ...rows])
   }, [])
 
-  // Initial load
   useEffect(() => {
     pageRef.current = 0
     fetchPage(0, true)
   }, [fetchPage])
 
-  // Realtime INSERT subscription
-  useEffect(() => {
-    const channel = supabase
-      .channel('feed-stories-insert')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'stories', filter: 'status=eq.active' },
-        (payload) => {
-          const r = payload.new as RawStory
-          const story = rawToStory(r)
-          setStories(prev => [story, ...prev])
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [])
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    pageRef.current = 0
+    await fetchPage(0, true)
+    setRefreshing(false)
+  }, [fetchPage])
 
   const handleEndReached = useCallback(async () => {
     if (loadingMore || !hasMore) return
@@ -198,18 +216,41 @@ export default function FeedScreen() {
     setLoadingMore(false)
   }, [loadingMore, hasMore, fetchPage])
 
+  const renderItem: ListRenderItem<RawListing> = useCallback(
+    ({ item }) => <ListingCard listing={item} currentUserId={currentUserId} />,
+    [currentUserId]
+  )
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FlatList
-        data={stories}
+        data={listings}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListHeaderComponent={<FeedHeader />}
-        ListFooterComponent={loadingMore ? (
-          <View style={styles.footer}>
-            <ActivityIndicator size="small" color={colors.primary} />
-          </View>
-        ) : null}
+        ListEmptyComponent={
+          !loadingMore ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="bag-outline" size={40} color={colors.border} />
+              <Text style={styles.emptyText}>Aucun article disponible</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
@@ -231,7 +272,7 @@ const styles = StyleSheet.create({
   logoBlack: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
   logoTeal: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.primary },
   headerIcons: { flexDirection: 'row', gap: 16 },
-  carouselSection: { paddingTop: 16, paddingBottom: 16 },
+  carouselSection: { paddingTop: 16, paddingBottom: 8 },
   carouselTitle: {
     fontFamily: fontFamily.bold,
     fontSize: 15,
@@ -239,28 +280,103 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  feedCard: {
+  card: {
     backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+    marginBottom: 1,
     overflow: 'hidden',
+  },
+  cardImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+  },
+  cardImagePlaceholder: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_WIDTH,
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardBody: {
     padding: 14,
   },
-  feedCardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  feedAvatar: {
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sellerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+  },
+  avatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
   },
-  feedAvatarText: { fontFamily: fontFamily.bold, fontSize: 14, color: '#0F0F0F' },
-  feedUsername: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.textSecondary },
-  feedBody: {},
-  feedTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text, marginBottom: 4 },
-  feedPrice: { fontFamily: fontFamily.bold, fontSize: 18, color: colors.primary },
+  avatarInitial: {
+    fontFamily: fontFamily.bold,
+    fontSize: 13,
+    color: colors.primary,
+  },
+  username: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  categoryPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceHigh,
+  },
+  categoryText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  cardTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
+    color: colors.text,
+    marginBottom: 4,
+    lineHeight: 21,
+  },
+  cardPrice: {
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  cardCondition: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  emptyState: {
+    paddingTop: 60,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 15,
+    color: colors.textSecondary,
+  },
   footer: { paddingVertical: 16, alignItems: 'center' },
 })
