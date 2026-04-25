@@ -20,8 +20,21 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 
-const CATEGORIES = ['Électronique', 'Mode', 'Maison', 'Sport', 'Livres', 'Jeux vidéo', 'Autres']
-const CONDITIONS = ['Neuf', 'Très bon état', 'Bon état', 'État correct']
+const CATEGORIES = [
+  { label: 'Électronique', value: 'electronics' },
+  { label: 'Mode', value: 'fashion' },
+  { label: 'Maison', value: 'home' },
+  { label: 'Sport', value: 'sports' },
+  { label: 'Livres', value: 'books' },
+  { label: 'Jeux vidéo', value: 'gaming' },
+  { label: 'Autres', value: 'other' },
+]
+const CONDITIONS = [
+  { label: 'Neuf', value: 'new' },
+  { label: 'Très bon état', value: 'like_new' },
+  { label: 'Bon état', value: 'good' },
+  { label: 'État correct', value: 'fair' },
+]
 const MAX_PHOTOS = 4
 
 interface PhotoSlot {
@@ -48,8 +61,8 @@ export default function CreateListingScreen() {
   const [slots, setSlots] = useState<PhotoSlot[]>(makeSlots())
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [category, setCategory] = useState<string | null>(null)
-  const [condition, setCondition] = useState<string | null>(null)
+  const [category, setCategory] = useState<string>('')
+  const [condition, setCondition] = useState<string>('')
   const [price, setPrice] = useState('')
   const [stock, setStock] = useState('1')
   const [submitting, setSubmitting] = useState(false)
@@ -141,8 +154,8 @@ export default function CreateListingScreen() {
         description: description.trim() || null,
         price_chf: parseFloat(price),
         images: imageUrls,
-        category: category ?? null,
-        condition: condition ?? null,
+        category: category || null,
+        condition: condition || null,
         stock: parseInt(stock, 10),
         is_active: true,
       })
@@ -256,12 +269,12 @@ export default function CreateListingScreen() {
           <View style={styles.chipGroup}>
             {CATEGORIES.map((c) => (
               <TouchableOpacity
-                key={c}
-                style={[styles.chip, category === c && styles.chipActive]}
-                onPress={() => setCategory(category === c ? null : c)}
+                key={c.value}
+                style={[styles.chip, category === c.value && styles.chipActive]}
+                onPress={() => setCategory(category === c.value ? '' : c.value)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, category === c && styles.chipTextActive]}>{c}</Text>
+                <Text style={[styles.chipText, category === c.value && styles.chipTextActive]}>{c.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -271,12 +284,12 @@ export default function CreateListingScreen() {
           <View style={styles.chipGroup}>
             {CONDITIONS.map((c) => (
               <TouchableOpacity
-                key={c}
-                style={[styles.chip, condition === c && styles.chipActive]}
-                onPress={() => setCondition(condition === c ? null : c)}
+                key={c.value}
+                style={[styles.chip, condition === c.value && styles.chipActive]}
+                onPress={() => setCondition(condition === c.value ? '' : c.value)}
                 activeOpacity={0.75}
               >
-                <Text style={[styles.chipText, condition === c && styles.chipTextActive]}>{c}</Text>
+                <Text style={[styles.chipText, condition === c.value && styles.chipTextActive]}>{c.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
