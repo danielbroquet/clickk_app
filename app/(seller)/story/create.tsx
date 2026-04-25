@@ -171,7 +171,7 @@ export default function CreateStoryScreen() {
         })
       if (insertError) throw insertError
 
-      router.replace('/(tabs)/sell')  // ← une seule ligne
+      router.replace('/(tabs)')  // ← une seule ligne
     } catch (err: any) {
       Alert.alert('Error', err.message ?? 'Something went wrong')
     } finally {
