@@ -38,6 +38,9 @@ interface StripeEventMetadata {
   story_id?: string;
   buyer_id?: string;
   amount_chf?: string;
+  listing_id?: string;
+  seller_id?: string;
+  type?: string;
 }
 
 interface StripeObject {
@@ -183,10 +186,99 @@ Deno.serve(async (req: Request) => {
     console.log(`[stripe-webhook] Received event: ${event.type} (${event.id})`);
 
     if (event.type === "checkout.session.completed") {
-      const { story_id, buyer_id, amount_chf } = event.data.object.metadata ?? {};
+      const metadata = event.data.object.metadata ?? {};
+
+      if (metadata.type === "listing") {
+        const { listing_id, buyer_id, seller_id, amount_chf } = metadata;
+
+        if (
+          !listing_id || !buyer_id || !seller_id || !amount_chf ||
+          !UUID_RE.test(listing_id) || !UUID_RE.test(buyer_id) || !UUID_RE.test(seller_id)
+        ) {
+          console.error("[stripe-webhook] Missing or invalid listing metadata:", metadata);
+          return new Response(JSON.stringify({ received: true, warning: "missing_listing_metadata" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const amountChf = parseFloat(amount_chf);
+
+        // Fetch current stock then decrement only if > 0 (idempotency via .eq("stock", current))
+        const { data: listingRow, error: fetchErr } = await supabase
+          .from("shop_listings")
+          .select("stock")
+          .eq("id", listing_id)
+          .maybeSingle();
+
+        if (!fetchErr && listingRow && listingRow.stock > 0) {
+          const { error: updateErr } = await supabase
+            .from("shop_listings")
+            .update({ stock: listingRow.stock - 1 })
+            .eq("id", listing_id)
+            .eq("stock", listingRow.stock);
+
+          if (updateErr) {
+            console.error("[stripe-webhook] stock decrement failed:", updateErr.message);
+          }
+        } else if (fetchErr) {
+          console.error("[stripe-webhook] stock fetch failed:", fetchErr.message);
+        }
+
+        const sessionId = event.data.object.id ?? "";
+        const { error: orderError } = await supabase
+          .from("shop_orders")
+          .upsert(
+            {
+              session_id: sessionId,
+              listing_id,
+              buyer_id,
+              seller_id,
+              quantity: 1,
+              total_chf: amountChf,
+              status: "paid",
+            },
+            { onConflict: "session_id", ignoreDuplicates: true }
+          );
+
+        if (orderError) {
+          console.error("[stripe-webhook] shop_orders insert failed:", orderError.message);
+          throw new Error(`shop_orders insert failed: ${orderError.message}`);
+        }
+
+        const { error: notifError } = await supabase.from("notifications").insert([
+          {
+            user_id: buyer_id,
+            type: "purchase",
+            story_id: null,
+            message: "Votre commande a été confirmée",
+            is_read: false,
+          },
+          {
+            user_id: seller_id,
+            type: "story_sold",
+            story_id: null,
+            message: "Vous avez vendu un article",
+            is_read: false,
+          },
+        ]);
+
+        if (notifError) {
+          console.error("[stripe-webhook] listing notifications failed:", notifError.message);
+        }
+
+        console.log(`[stripe-webhook] Listing order created: listing=${listing_id} buyer=${buyer_id}`);
+
+        return new Response(JSON.stringify({ received: true, listing_id }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const { story_id, buyer_id, amount_chf } = metadata;
 
       if (!story_id || !buyer_id || !amount_chf) {
-        console.error("[stripe-webhook] Missing metadata fields:", event.data.object.metadata);
+        console.error("[stripe-webhook] Missing metadata fields:", metadata);
         return new Response(JSON.stringify({ received: true, warning: "missing_metadata" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
