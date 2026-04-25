@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   View,
   Text,
@@ -7,9 +7,14 @@ import {
   ScrollView,
   FlatList,
   Dimensions,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
   StyleSheet,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
@@ -73,11 +78,195 @@ const gridStyles = StyleSheet.create({
   priceText: { color: '#fff', fontSize: 11, fontWeight: '600' },
 })
 
+function EditProfileSheet({
+  visible,
+  onClose,
+  onSaved,
+  userId,
+  initialDisplayName,
+  initialBio,
+  initialUsername,
+}: {
+  visible: boolean
+  onClose: () => void
+  onSaved: () => void
+  userId: string
+  initialDisplayName: string
+  initialBio: string
+  initialUsername: string
+}) {
+  const insets = useSafeAreaInsets()
+  const slideAnim = useRef(new Animated.Value(400)).current
+  const [displayName, setDisplayName] = useState(initialDisplayName)
+  const [bio, setBio] = useState(initialBio)
+  const [username, setUsername] = useState(initialUsername)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (visible) {
+      setDisplayName(initialDisplayName)
+      setBio(initialBio)
+      setUsername(initialUsername)
+      setError(null)
+      Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start()
+    } else {
+      Animated.timing(slideAnim, { toValue: 400, duration: 220, useNativeDriver: true }).start()
+    }
+  }, [visible])
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    const { error: dbErr } = await supabase
+      .from('profiles')
+      .update({ display_name: displayName.trim(), bio: bio.trim(), username: username.trim() })
+      .eq('id', userId)
+    setSaving(false)
+    if (dbErr) {
+      setError(dbErr.message)
+      return
+    }
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={sheetStyles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableOpacity style={sheetStyles.backdrop} activeOpacity={1} onPress={onClose} />
+        <Animated.View
+          style={[
+            sheetStyles.sheet,
+            { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          {/* Handle */}
+          <View style={sheetStyles.handle} />
+
+          {/* Header row */}
+          <View style={sheetStyles.sheetHeader}>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={sheetStyles.cancelText}>Annuler</Text>
+            </TouchableOpacity>
+            <Text style={sheetStyles.sheetTitle}>Modifier le profil</Text>
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              <Text style={[sheetStyles.saveText, saving && sheetStyles.savingText]}>
+                {saving ? '...' : 'Enregistrer'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {!!error && <Text style={sheetStyles.errorText}>{error}</Text>}
+
+          {/* Fields */}
+          <View style={sheetStyles.fieldGroup}>
+            <Text style={sheetStyles.fieldLabel}>Nom affiché</Text>
+            <TextInput
+              style={sheetStyles.input}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Nom affiché"
+              placeholderTextColor={colors.textSecondary}
+              returnKeyType="next"
+            />
+          </View>
+
+          <View style={sheetStyles.fieldGroup}>
+            <Text style={sheetStyles.fieldLabel}>Nom d'utilisateur</Text>
+            <TextInput
+              style={sheetStyles.input}
+              value={username}
+              onChangeText={setUsername}
+              placeholder="username"
+              placeholderTextColor={colors.textSecondary}
+              autoCapitalize="none"
+              returnKeyType="next"
+            />
+          </View>
+
+          <View style={sheetStyles.fieldGroup}>
+            <View style={sheetStyles.bioLabelRow}>
+              <Text style={sheetStyles.fieldLabel}>Bio</Text>
+              <Text style={sheetStyles.charCount}>{bio.length}/150</Text>
+            </View>
+            <TextInput
+              style={[sheetStyles.input, sheetStyles.bioInput]}
+              value={bio}
+              onChangeText={t => setBio(t.slice(0, 150))}
+              placeholder="Parlez-nous de vous…"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              maxLength={150}
+              returnKeyType="done"
+            />
+          </View>
+        </Animated.View>
+      </KeyboardAvoidingView>
+    </Modal>
+  )
+}
+
+const sheetStyles = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  sheetTitle: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.text },
+  cancelText: { fontSize: 15, color: colors.textSecondary },
+  saveText: { fontSize: 15, fontFamily: fontFamily.semiBold, color: colors.primary },
+  savingText: { opacity: 0.5 },
+  errorText: {
+    fontSize: 13,
+    color: colors.error,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  fieldGroup: { marginBottom: 16 },
+  fieldLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
+  bioLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  charCount: { fontSize: 12, color: colors.textSecondary },
+  input: {
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.text,
+  },
+  bioInput: { height: 90, textAlignVertical: 'top' },
+})
+
 export default function ProfileScreen() {
-  const { profile, signOut, session } = useAuth()
+  const { profile, signOut, session, refreshProfile } = useAuth()
   const [articlesCount, setArticlesCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
   const [stories, setStories] = useState<StoryCell[]>([])
+  const [editVisible, setEditVisible] = useState(false)
 
   useEffect(() => {
     const userId = session?.user?.id
@@ -108,6 +297,7 @@ export default function ProfileScreen() {
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
   const username = profile?.username ?? 'username'
   const initial = displayName.charAt(0).toUpperCase()
+  const userId = session?.user?.id ?? ''
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -143,7 +333,7 @@ export default function ProfileScreen() {
 
           {/* Buttons */}
           <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.editBtn}>
+            <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
               <Text style={styles.editBtnText}>Modifier le profil</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.addBtn}>
@@ -160,6 +350,17 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Edit profile sheet */}
+        <EditProfileSheet
+          visible={editVisible}
+          onClose={() => setEditVisible(false)}
+          onSaved={refreshProfile}
+          userId={userId}
+          initialDisplayName={profile?.display_name ?? ''}
+          initialBio={profile?.bio ?? ''}
+          initialUsername={profile?.username ?? ''}
+        />
 
         {/* Story circles */}
         <View style={styles.storiesWrap}>
