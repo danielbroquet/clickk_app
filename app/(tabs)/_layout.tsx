@@ -83,6 +83,14 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="wallet"
+          options={{
+            tabBarIcon: ({ focused, color }) => (
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             tabBarIcon: ({ focused, color }) => (
