@@ -10,6 +10,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -41,6 +42,7 @@ interface PhotoSlot {
   uri: string | null
   uploading: boolean
   url: string | null
+  mediaType?: 'image' | 'video'
 }
 
 function makeSlots(): PhotoSlot[] {
@@ -70,30 +72,26 @@ export default function CreateListingScreen() {
 
   const anyUploading = slots.some((s) => s.uploading)
 
-  const pickImage = async (index: number) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    })
-    if (result.canceled || !result.assets[0]) return
-
-    const asset = result.assets[0]
-    const uri = asset.uri
-
+  const uploadMedia = async (index: number, uri: string, mediaType: 'image' | 'video') => {
     setSlots((prev) => {
       const next = [...prev]
-      next[index] = { uri, uploading: true, url: null }
+      next[index] = { uri, uploading: true, url: null, mediaType }
       return next
     })
 
     try {
       const uriParts = uri.split('.')
       const ext = uriParts[uriParts.length - 1].split('?')[0].toLowerCase()
-      const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg'
+      let safeExt: string
+      let mimeType: string
+      if (mediaType === 'video') {
+        safeExt = ['mp4', 'mov', 'm4v'].includes(ext) ? ext : 'mp4'
+        mimeType = 'video/mp4'
+      } else {
+        safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg'
+        mimeType = safeExt === 'jpg' || safeExt === 'jpeg' ? 'image/jpeg' : `image/${safeExt}`
+      }
       const path = `${userId}/${uuidv4()}.${safeExt}`
-      const mimeType = safeExt === 'jpg' || safeExt === 'jpeg' ? 'image/jpeg' : `image/${safeExt}`
 
       const response = await fetch(uri)
       const blob = await response.blob()
@@ -108,7 +106,7 @@ export default function CreateListingScreen() {
 
       setSlots((prev) => {
         const next = [...prev]
-        next[index] = { uri, uploading: false, url: urlData.publicUrl }
+        next[index] = { uri, uploading: false, url: urlData.publicUrl, mediaType }
         return next
       })
     } catch {
@@ -117,8 +115,70 @@ export default function CreateListingScreen() {
         next[index] = { uri: null, uploading: false, url: null }
         return next
       })
-      setError("Échec du téléchargement de l'image. Veuillez réessayer.")
+      setError("Échec du téléchargement. Veuillez réessayer.")
     }
+  }
+
+  const pickImage = async (index: number) => {
+    Alert.alert(
+      'Ajouter un média',
+      undefined,
+      [
+        {
+          text: 'Prendre une photo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync()
+            if (status !== 'granted') {
+              Alert.alert("Autorisez l'accès à la caméra dans les réglages de votre téléphone")
+              return
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            })
+            if (result.canceled || !result.assets[0]) return
+            await uploadMedia(index, result.assets[0].uri, 'image')
+          },
+        },
+        {
+          text: 'Filmer une vidéo',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync()
+            if (status !== 'granted') {
+              Alert.alert("Autorisez l'accès à la caméra dans les réglages de votre téléphone")
+              return
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+              allowsEditing: true,
+              videoMaxDuration: 60,
+              quality: 1,
+            })
+            if (result.canceled || !result.assets[0]) return
+            await uploadMedia(index, result.assets[0].uri, 'video')
+          },
+        },
+        {
+          text: 'Choisir dans la galerie',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.All,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+              videoMaxDuration: 60,
+            })
+            if (result.canceled || !result.assets[0]) return
+            const asset = result.assets[0]
+            const mediaType = asset.type === 'video' ? 'video' : 'image'
+            await uploadMedia(index, asset.uri, mediaType)
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    )
   }
 
   const removeSlot = (index: number) => {
@@ -208,7 +268,14 @@ export default function CreateListingScreen() {
               >
                 {slot.uri ? (
                   <>
-                    <Image source={{ uri: slot.uri }} style={styles.photoPreview} />
+                    {slot.mediaType === 'video' ? (
+                      <View style={styles.videoPreview}>
+                        <Ionicons name="play-circle" size={32} color="#fff" />
+                        <Text style={styles.videoLabel} numberOfLines={1}>Vidéo</Text>
+                      </View>
+                    ) : (
+                      <Image source={{ uri: slot.uri }} style={styles.photoPreview} />
+                    )}
                     {slot.uploading ? (
                       <View style={styles.photoOverlay}>
                         <ActivityIndicator size="small" color={colors.primary} />
@@ -413,6 +480,19 @@ const styles = StyleSheet.create({
   photoPreview: {
     width: '100%',
     height: '100%',
+  },
+  videoPreview: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1A1A1A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  videoLabel: {
+    fontFamily: fontFamily.medium,
+    fontSize: 10,
+    color: colors.textSecondary,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFillObject,
