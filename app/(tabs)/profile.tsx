@@ -65,7 +65,7 @@ const gridStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  soldLabel: { color: '#fff', fontFamily, fontSize: 13, fontWeight: '700' },
+  soldLabel: { color: '#fff', fontFamily: fontFamily.bold, fontSize: 13 },
   priceBadge: {
     position: 'absolute',
     bottom: 6,
