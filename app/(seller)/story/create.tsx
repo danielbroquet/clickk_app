@@ -84,16 +84,47 @@ export default function CreateStoryScreen() {
     floorPrice !== '' &&
     !floorGtStart
 
-  const pickVideo = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      videoMaxDuration: 30,
-      allowsEditing: true,
-      quality: 1,
-    })
-    if (!result.canceled && result.assets.length > 0) {
-      setVideoUri(result.assets[0].uri)
-    }
+  const pickVideo = () => {
+    Alert.alert(
+      'Ajouter une vidéo',
+      undefined,
+      [
+        {
+          text: 'Filmer',
+          onPress: async () => {
+            const { status } = await ImagePicker.requestCameraPermissionsAsync()
+            if (status !== 'granted') {
+              Alert.alert("Accès refusé", "Autorisez l'accès à la caméra dans les réglages de votre téléphone")
+              return
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+              allowsEditing: true,
+              videoMaxDuration: 60,
+              quality: 1,
+            })
+            if (!result.canceled && result.assets.length > 0) {
+              setVideoUri(result.assets[0].uri)
+            }
+          },
+        },
+        {
+          text: 'Choisir dans la galerie',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+              allowsEditing: true,
+              videoMaxDuration: 60,
+              quality: 1,
+            })
+            if (!result.canceled && result.assets.length > 0) {
+              setVideoUri(result.assets[0].uri)
+            }
+          },
+        },
+        { text: 'Annuler', style: 'cancel' },
+      ]
+    )
   }
 
   const handlePublish = async () => {
