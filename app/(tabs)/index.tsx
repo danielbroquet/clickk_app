@@ -10,8 +10,6 @@ import {
   ListRenderItem,
   Dimensions,
   RefreshControl,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -102,30 +100,35 @@ function ListingCard({
     }
   }
 
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH)
-    setActiveIndex(idx)
-  }
-
   return (
     <View style={styles.card}>
       {/* Swipeable image area */}
       {images.length > 0 ? (
-        <TouchableOpacity
-          activeOpacity={0.92}
-          onPress={() => router.push(`/listing/${listing.id}`)}
-        >
+        <View>
           <FlatList
             data={images}
             keyExtractor={(url, i) => `${listing.id}-img-${i}`}
-            horizontal
-            pagingEnabled
+            horizontal={true}
+            pagingEnabled={true}
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={multiImage}
-            onScroll={onScroll}
-            scrollEventThrottle={16}
+            scrollEnabled={true}
+            nestedScrollEnabled={true}
+            decelerationRate="fast"
+            snapToAlignment="center"
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(
+                e.nativeEvent.contentOffset.x /
+                e.nativeEvent.layoutMeasurement.width
+              )
+              setActiveIndex(index)
+            }}
             renderItem={({ item: url }) => (
-              <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => router.push(`/listing/${listing.id}`)}
+              >
+                <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+              </TouchableOpacity>
             )}
           />
           {multiImage && (
@@ -138,7 +141,7 @@ function ListingCard({
               ))}
             </View>
           )}
-        </TouchableOpacity>
+        </View>
       ) : (
         <TouchableOpacity
           activeOpacity={0.92}
