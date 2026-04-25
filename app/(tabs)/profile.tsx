@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -11,10 +11,31 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
+import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
 
 export default function ProfileScreen() {
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, session } = useAuth()
+  const [articlesCount, setArticlesCount] = useState<number | null>(null)
+  const [ventesCount, setVentesCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+
+    supabase
+      .from('stories')
+      .select('*', { count: 'exact', head: true })
+      .eq('seller_id', userId)
+      .then(({ count }) => setArticlesCount(count ?? 0))
+
+    supabase
+      .from('stories')
+      .select('*', { count: 'exact', head: true })
+      .eq('seller_id', userId)
+      .eq('status', 'sold')
+      .then(({ count }) => setVentesCount(count ?? 0))
+  }, [session?.user?.id])
 
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
   const username = profile?.username ?? 'username'
@@ -35,12 +56,12 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statsRow}>
               {[
-                { value: 0, label: 'Articles' },
+                { value: articlesCount, label: 'Articles' },
                 { value: profile?.followers_count ?? 0, label: 'Abonnés' },
-                { value: 0, label: 'Ventes' },
+                { value: ventesCount, label: 'Ventes' },
               ].map(stat => (
                 <View key={stat.label} style={styles.stat}>
-                  <Text style={styles.statNum}>{stat.value}</Text>
+                  <Text style={styles.statNum}>{stat.value === null ? '--' : stat.value}</Text>
                   <Text style={styles.statLabel}>{stat.label}</Text>
                 </View>
               ))}
