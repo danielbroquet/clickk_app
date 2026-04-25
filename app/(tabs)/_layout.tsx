@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useUnreadMessages } from '../../hooks/useUnreadMessages'
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ const SELL_OPTIONS: SellOption[] = [
 
 export default function TabLayout() {
   const [showSellModal, setShowSellModal] = useState(false)
+  const { unreadCount } = useUnreadMessages()
 
   return (
     <>
@@ -93,6 +95,12 @@ export default function TabLayout() {
                 color={color}
               />
             ),
+            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: '#00D2B8',
+              color: '#0F0F0F',
+              fontSize: 10,
+            },
           }}
         />
         <Tabs.Screen
