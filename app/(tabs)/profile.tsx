@@ -5,6 +5,8 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  FlatList,
+  Dimensions,
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -14,10 +16,68 @@ import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
 
+const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3)
+
+type StoryCell = {
+  id: string
+  video_url: string | null
+  current_price_chf: number
+  status: string
+}
+
+function GridCell({ story }: { story: StoryCell }) {
+  const sold = story.status === 'sold'
+  return (
+    <TouchableOpacity
+      style={gridStyles.cell}
+      activeOpacity={0.8}
+      onPress={() => router.push(`/story/${story.id}`)}
+    >
+      {story.video_url ? (
+        <Image source={{ uri: story.video_url }} style={gridStyles.thumb} resizeMode="cover" />
+      ) : (
+        <View style={[gridStyles.thumb, gridStyles.placeholder]} />
+      )}
+      {sold && (
+        <View style={gridStyles.soldOverlay}>
+          <Text style={gridStyles.soldLabel}>Vendu</Text>
+        </View>
+      )}
+      <View style={gridStyles.priceBadge}>
+        <Text style={gridStyles.priceText}>CHF {story.current_price_chf.toFixed(2)}</Text>
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+const gridStyles = StyleSheet.create({
+  cell: { width: CELL_SIZE, height: CELL_SIZE },
+  thumb: { width: CELL_SIZE, height: CELL_SIZE },
+  placeholder: { backgroundColor: '#2A2A2A' },
+  soldOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  soldLabel: { color: '#fff', fontFamily, fontSize: 13, fontWeight: '700' },
+  priceBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  priceText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+})
+
 export default function ProfileScreen() {
   const { profile, signOut, session } = useAuth()
   const [articlesCount, setArticlesCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
+  const [stories, setStories] = useState<StoryCell[]>([])
 
   useEffect(() => {
     const userId = session?.user?.id
@@ -35,6 +95,14 @@ export default function ProfileScreen() {
       .eq('seller_id', userId)
       .eq('status', 'sold')
       .then(({ count }) => setVentesCount(count ?? 0))
+
+    supabase
+      .from('stories')
+      .select('id, video_url, current_price_chf, status')
+      .eq('seller_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => setStories((data ?? []) as StoryCell[]))
   }, [session?.user?.id])
 
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
@@ -118,12 +186,20 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Empty grid */}
-        <View style={styles.emptyGrid}>
-          <Ionicons name="camera-outline" size={48} color={colors.border} />
-          <Text style={styles.emptyTitle}>Aucun article publié</Text>
-          <Text style={styles.emptySubtitle}>Commence à vendre dès maintenant</Text>
-        </View>
+        {/* Publications grid */}
+        {stories.length === 0 ? (
+          <View style={styles.emptyGrid}>
+            <Text style={styles.emptyTitle}>Aucune publication</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={stories}
+            keyExtractor={item => item.id}
+            numColumns={3}
+            scrollEnabled={false}
+            renderItem={({ item }) => <GridCell story={item} />}
+          />
+        )}
 
         {/* Sign out */}
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
@@ -213,7 +289,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { fontSize: 14, color: colors.textSecondary, marginTop: 12 },
-  emptySubtitle: { fontSize: 13, color: '#707070', marginTop: 4 },
   signOutBtn: { padding: 16, marginTop: 8, alignItems: 'center' },
   signOutText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.error },
   becomeSellerBtn: {
