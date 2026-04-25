@@ -15,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import * as FileSystem from 'expo-file-system'
 import 'react-native-url-polyfill/auto'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -80,14 +79,16 @@ export default function CreateListingScreen() {
       const ext = uri.split('.').pop()?.split('?')[0] ?? 'jpg'
       const path = `${userId}/${uuidv4()}.${ext}`
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      })
-      const byteArray = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+      const formData = new FormData()
+      formData.append('file', {
+        uri,
+        name: `photo.${ext}`,
+        type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+      } as any)
 
       const { error: uploadError } = await supabase.storage
         .from('listing-images')
-        .upload(path, byteArray, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`, upsert: true })
+        .upload(path, formData, { contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`, upsert: true })
 
       if (uploadError) throw uploadError
 
