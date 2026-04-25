@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -20,7 +20,41 @@ import { Ionicons } from '@expo/vector-icons'
 import Avatar from '../../components/ui/Avatar'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
+import { Video, ResizeMode } from 'expo-av'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+
+type ListingMediaItemProps = {
+  url: string
+  index: number
+  isActive: boolean
+  videoRefs: React.MutableRefObject<{ [key: number]: any }>
+}
+
+const ListingMediaItem = ({ url, index, isActive, videoRefs }: ListingMediaItemProps) => {
+  const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(url.split('.').pop()?.toLowerCase() ?? '')
+
+  if (isVideo) {
+    return (
+      <Video
+        ref={(ref) => { videoRefs.current[index] = ref }}
+        source={{ uri: url }}
+        style={styles.carouselImage}
+        resizeMode={ResizeMode.COVER}
+        shouldPlay={isActive}
+        isLooping={true}
+        isMuted={false}
+        useNativeControls={false}
+      />
+    )
+  }
+  return (
+    <Image
+      source={{ uri: url }}
+      style={styles.carouselImage}
+      resizeMode="cover"
+    />
+  )
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const CAROUSEL_HEIGHT = 300
@@ -55,6 +89,7 @@ export default function ListingDetailScreen() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState(0)
+  const videoRefs = useRef<{ [key: number]: any }>({})
   const [chatLoading, setChatLoading] = useState(false)
   const [buying, setBuying] = useState(false)
   const [orderError, setOrderError] = useState<string | null>(null)
@@ -78,8 +113,17 @@ export default function ListingDetailScreen() {
   }, [id])
 
   const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH)
-    setActiveImage(idx)
+    const newIndex = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH)
+    setActiveImage(newIndex)
+    Object.entries(videoRefs.current).forEach(([i, ref]) => {
+      if (ref) {
+        if (Number(i) === newIndex) {
+          ref.playAsync()
+        } else {
+          ref.pauseAsync()
+        }
+      }
+    })
   }, [])
 
   const handleContact = async () => {
@@ -192,22 +236,14 @@ export default function ListingDetailScreen() {
               showsHorizontalScrollIndicator={false}
               onScroll={handleScroll}
               scrollEventThrottle={16}
-              renderItem={({ item }) => {
-                const ext = item.split('.').pop()?.toLowerCase()
-                const isVideo = ['mp4', 'mov', 'avi', 'webm'].includes(ext ?? '')
-                return isVideo ? (
-                  <View style={[styles.carouselImage, styles.videoPlaceholder]}>
-                    <Ionicons name="play-circle-outline" size={48} color="#FFFFFF" />
-                    <Text style={styles.videoLabel}>Vidéo</Text>
-                  </View>
-                ) : (
-                  <Image
-                    source={{ uri: item }}
-                    style={styles.carouselImage}
-                    resizeMode="cover"
-                  />
-                )
-              }}
+              renderItem={({ item, index }) => (
+                <ListingMediaItem
+                  url={item}
+                  index={index}
+                  isActive={activeImage === index}
+                  videoRefs={videoRefs}
+                />
+              )}
             />
             {images.length > 1 && (
               <View style={styles.dots}>
@@ -346,18 +382,6 @@ const styles = StyleSheet.create({
   carouselImage: {
     width: SCREEN_WIDTH,
     height: CAROUSEL_HEIGHT,
-  },
-  videoPlaceholder: {
-    backgroundColor: '#1A1A1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  videoLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: 13,
-    color: '#FFFFFF',
-    opacity: 0.7,
   },
   imagePlaceholder: {
     width: SCREEN_WIDTH,
