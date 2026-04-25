@@ -24,7 +24,7 @@ import i18n from '../../lib/i18n'
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle)
 
-const RING_RADIUS = 58
+const RING_RADIUS = 72
 const RING_STROKE = 8
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
@@ -66,18 +66,18 @@ function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
 
   return (
     <View style={ringStyles.container}>
-      <Svg width={140} height={140}>
+      <Svg width={180} height={180}>
         <Circle
-          cx={70}
-          cy={70}
+          cx={90}
+          cy={90}
           r={RING_RADIUS}
           stroke="#222222"
           strokeWidth={RING_STROKE}
           fill="none"
         />
         <AnimatedCircle
-          cx={70}
-          cy={70}
+          cx={90}
+          cy={90}
           r={RING_RADIUS}
           stroke={strokeColor}
           strokeWidth={RING_STROKE}
@@ -86,7 +86,7 @@ function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
           strokeLinecap="round"
           strokeDashoffset={strokeDashoffset}
           rotation="-90"
-          origin="70, 70"
+          origin="90, 90"
         />
       </Svg>
       <View style={ringStyles.center}>
@@ -99,8 +99,8 @@ function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
 
 const ringStyles = StyleSheet.create({
   container: {
-    width: 140,
-    height: 140,
+    width: 180,
+    height: 180,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -517,10 +517,6 @@ export default function StoryViewerScreen() {
 
         {/* Price row */}
         <View style={styles.priceRow}>
-          <View style={styles.priceCol}>
-            <Text style={styles.priceLabel}>{i18n.t('story.viewer.current_price')}</Text>
-            <Text style={styles.priceValuePrimary}>CHF {currentFmt}</Text>
-          </View>
           <View style={styles.priceCol}>
             <Text style={styles.priceLabel}>{i18n.t('story.viewer.started_at')}</Text>
             <Text style={styles.priceValueStrike}>CHF {startFmt}</Text>
