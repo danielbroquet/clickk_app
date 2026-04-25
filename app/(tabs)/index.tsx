@@ -10,6 +10,8 @@ import {
   ListRenderItem,
   Dimensions,
   RefreshControl,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -75,10 +77,12 @@ function ListingCard({
   currentUserId: string
 }) {
   const [chatLoading, setChatLoading] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
   const username = listing.seller?.username ?? 'vendeur'
   const avatar = listing.seller?.avatar_url
   const isSeller = currentUserId === listing.seller_id
-  const image = listing.images?.[0] ?? null
+  const images = listing.images?.length > 0 ? listing.images : []
+  const multiImage = images.length > 1
 
   const handleChat = async () => {
     if (isSeller || chatLoading) return
@@ -98,19 +102,52 @@ function ListingCard({
     }
   }
 
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH)
+    setActiveIndex(idx)
+  }
+
   return (
-    <TouchableOpacity
-      style={styles.card}
-      activeOpacity={0.92}
-      onPress={() => router.push(`/listing/${listing.id}`)}
-    >
-      {/* Square image */}
-      {image ? (
-        <Image source={{ uri: image }} style={styles.cardImage} resizeMode="cover" />
+    <View style={styles.card}>
+      {/* Swipeable image area */}
+      {images.length > 0 ? (
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => router.push(`/listing/${listing.id}`)}
+        >
+          <FlatList
+            data={images}
+            keyExtractor={(url, i) => `${listing.id}-img-${i}`}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            scrollEnabled={multiImage}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            renderItem={({ item: url }) => (
+              <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
+            )}
+          />
+          {multiImage && (
+            <View style={styles.dotsRow}>
+              {images.map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+                />
+              ))}
+            </View>
+          )}
+        </TouchableOpacity>
       ) : (
-        <View style={styles.cardImagePlaceholder}>
-          <Ionicons name="image-outline" size={36} color={colors.border} />
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={() => router.push(`/listing/${listing.id}`)}
+        >
+          <View style={styles.cardImagePlaceholder}>
+            <Ionicons name="image-outline" size={36} color={colors.border} />
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* Info block */}
@@ -161,7 +198,7 @@ function ListingCard({
           <Text style={styles.cardCondition}>{listing.condition}</Text>
         ) : null}
       </View>
-    </TouchableOpacity>
+    </View>
   )
 }
 
@@ -295,6 +332,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 8,
+    backgroundColor: colors.surface,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+  },
+  dotActive: {
+    width: 12,
+    backgroundColor: '#00D2B8',
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: '#555',
   },
   cardBody: {
     padding: 14,
