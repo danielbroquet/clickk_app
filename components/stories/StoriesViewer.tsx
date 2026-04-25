@@ -59,9 +59,16 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
 
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }))
 
+  // Initialise le countdown correctement depuis last_drop_at
   useEffect(() => {
     if (!story || !visible) return
-    setCountdown(story.price_drop_seconds)
+
+    const computeInitial = () => {
+      const elapsed = (Date.now() - new Date(story.last_drop_at).getTime()) / 1000
+      return Math.max(0, Math.ceil(story.price_drop_seconds - elapsed))
+    }
+
+    setCountdown(computeInitial())
 
     intervalRef.current = setInterval(() => {
       setCountdown(prev => {
@@ -73,7 +80,14 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [story, visible])
+  }, [story?.id, visible])
+
+  // Remet le countdown à zéro quand le prix change via Realtime
+  useEffect(() => {
+    if (story?.price_drop_seconds && visible) {
+      setCountdown(story.price_drop_seconds)
+    }
+  }, [currentPrice])
 
   if (!story) return null
 
@@ -114,10 +128,10 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
           <View style={styles.sellerRow}>
             <View style={styles.avatarWrap}>
               {story.video_url ? (
-              <Image source={{ uri: story.video_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { backgroundColor: '#2A2A2A' }]} />
-            )}
+                <Image source={{ uri: story.video_url }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: '#2A2A2A' }]} />
+              )}
             </View>
             <View style={{ marginLeft: 10 }}>
               <View style={styles.nameRow}>
