@@ -12,8 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  ActivityIndicator,
   StyleSheet,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -86,6 +88,7 @@ function EditProfileSheet({
   initialDisplayName,
   initialBio,
   initialUsername,
+  initialAvatarUrl,
 }: {
   visible: boolean
   onClose: () => void
@@ -94,20 +97,26 @@ function EditProfileSheet({
   initialDisplayName: string
   initialBio: string
   initialUsername: string
+  initialAvatarUrl: string | null
 }) {
   const insets = useSafeAreaInsets()
   const slideAnim = useRef(new Animated.Value(400)).current
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const [bio, setBio] = useState(initialBio)
   const [username, setUsername] = useState(initialUsername)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatarUrl)
+  const [avatarUploading, setAvatarUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const initial = (initialDisplayName || initialUsername || 'U').charAt(0).toUpperCase()
 
   useEffect(() => {
     if (visible) {
       setDisplayName(initialDisplayName)
       setBio(initialBio)
       setUsername(initialUsername)
+      setAvatarUrl(initialAvatarUrl)
       setError(null)
       Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start()
     } else {
@@ -115,12 +124,56 @@ function EditProfileSheet({
     }
   }, [visible])
 
+  const handlePickAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+      base64: true,
+    })
+    if (result.canceled || !result.assets[0]) return
+
+    const asset = result.assets[0]
+    if (!asset.base64) {
+      setError('Impossible de lire l\'image.')
+      return
+    }
+
+    setAvatarUploading(true)
+    setError(null)
+
+    try {
+      const path = `${userId}/avatar.jpg`
+      const byteArray = Uint8Array.from(atob(asset.base64), c => c.charCodeAt(0))
+      const { error: uploadErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, byteArray, { upsert: true, contentType: 'image/jpeg' })
+
+      if (uploadErr) {
+        setError(uploadErr.message)
+        return
+      }
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+      // Bust cache by appending timestamp
+      setAvatarUrl(`${data.publicUrl}?t=${Date.now()}`)
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError(null)
     const { error: dbErr } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim(), bio: bio.trim(), username: username.trim() })
+      .update({
+        display_name: displayName.trim(),
+        bio: bio.trim(),
+        username: username.trim(),
+        avatar_url: avatarUrl,
+      })
       .eq('id', userId)
     setSaving(false)
     if (dbErr) {
@@ -153,14 +206,41 @@ function EditProfileSheet({
               <Text style={sheetStyles.cancelText}>Annuler</Text>
             </TouchableOpacity>
             <Text style={sheetStyles.sheetTitle}>Modifier le profil</Text>
-            <TouchableOpacity onPress={handleSave} disabled={saving}>
-              <Text style={[sheetStyles.saveText, saving && sheetStyles.savingText]}>
+            <TouchableOpacity onPress={handleSave} disabled={saving || avatarUploading}>
+              <Text style={[sheetStyles.saveText, (saving || avatarUploading) && sheetStyles.savingText]}>
                 {saving ? '...' : 'Enregistrer'}
               </Text>
             </TouchableOpacity>
           </View>
 
           {!!error && <Text style={sheetStyles.errorText}>{error}</Text>}
+
+          {/* Avatar picker */}
+          <View style={sheetStyles.avatarSection}>
+            <TouchableOpacity
+              style={sheetStyles.avatarCircle}
+              onPress={handlePickAvatar}
+              disabled={avatarUploading}
+              activeOpacity={0.8}
+            >
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={sheetStyles.avatarImg} />
+              ) : (
+                <Text style={sheetStyles.avatarInitial}>{initial}</Text>
+              )}
+              {avatarUploading && (
+                <View style={sheetStyles.avatarOverlay}>
+                  <ActivityIndicator color="#fff" />
+                </View>
+              )}
+              {!avatarUploading && (
+                <View style={sheetStyles.cameraIcon}>
+                  <Ionicons name="camera" size={14} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
+            <Text style={sheetStyles.avatarHint}>Modifier la photo</Text>
+          </View>
 
           {/* Fields */}
           <View style={sheetStyles.fieldGroup}>
@@ -259,6 +339,38 @@ const sheetStyles = StyleSheet.create({
     color: colors.text,
   },
   bioInput: { height: 90, textAlignVertical: 'top' },
+  avatarSection: { alignItems: 'center', marginBottom: 20 },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarImg: { width: 80, height: 80 },
+  avatarInitial: { fontFamily: fontFamily.bold, fontSize: 28, color: colors.primary },
+  avatarOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraIcon: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarHint: { fontSize: 12, color: colors.primary, marginTop: 6 },
 })
 
 export default function ProfileScreen() {
@@ -360,6 +472,7 @@ export default function ProfileScreen() {
           initialDisplayName={profile?.display_name ?? ''}
           initialBio={profile?.bio ?? ''}
           initialUsername={profile?.username ?? ''}
+          initialAvatarUrl={profile?.avatar_url ?? null}
         />
 
         {/* Story circles */}
