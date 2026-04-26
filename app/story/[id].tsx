@@ -34,9 +34,10 @@ interface DropRingProps {
   remaining: number
   total: number
   lastDropAt: string
+  resetKey: number
 }
 
-function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
+function DropRing({ remaining, total, lastDropAt, resetKey }: DropRingProps) {
   const initialRatio = () => {
     const elapsed = (Date.now() - new Date(lastDropAt).getTime()) / 1000
     const initial = Math.max(1, Math.ceil(total - elapsed))
@@ -44,6 +45,10 @@ function DropRing({ remaining, total, lastDropAt }: DropRingProps) {
   }
 
   const animRef = useRef(new Animated.Value(1 - initialRatio())).current
+
+  useEffect(() => {
+    animRef.setValue(0)
+  }, [resetKey])
 
   useEffect(() => {
     animRef.setValue(1 - initialRatio())
@@ -183,6 +188,7 @@ export default function StoryViewerScreen() {
 
   const [dropRemaining, setDropRemaining] = useState(0)
   const [expiresRemaining, setExpiresRemaining] = useState(0)
+  const [dropResetKey, setDropResetKey] = useState(0)
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -250,10 +256,21 @@ export default function StoryViewerScreen() {
   useEffect(() => {
     if (!story) return
 
+    const dropSeconds = story.price_drop_seconds
+    const localDropStart = { current: new Date(story.last_drop_at).getTime() }
+
     const tick = () => {
       const now = Date.now()
-      const sinceDrop = (now - new Date(story.last_drop_at).getTime()) / 1000
-      setDropRemaining(Math.max(0, story.price_drop_seconds - sinceDrop))
+      const sinceDrop = (now - localDropStart.current) / 1000
+      const remaining = dropSeconds - sinceDrop
+
+      if (remaining <= 0) {
+        localDropStart.current = now
+        setDropRemaining(dropSeconds)
+        setDropResetKey(k => k + 1)
+      } else {
+        setDropRemaining(remaining)
+      }
 
       const untilExpiry = (new Date(story.expires_at).getTime() - now) / 1000
       setExpiresRemaining(Math.max(0, untilExpiry))
@@ -542,6 +559,7 @@ export default function StoryViewerScreen() {
             remaining={dropRemaining}
             total={story.price_drop_seconds}
             lastDropAt={story.last_drop_at}
+            resetKey={dropResetKey}
           />
           <View style={styles.expiryRow}>
             <Ionicons
