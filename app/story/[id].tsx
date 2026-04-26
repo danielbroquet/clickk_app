@@ -41,7 +41,7 @@ function DropRing({ remaining, total }: DropRingProps) {
   useEffect(() => {
     Animated.timing(animRef, {
       toValue: 1 - (remaining / (total || 1)),
-      duration: 950,
+      duration: 450,
       useNativeDriver: false,
     }).start()
   }, [remaining])
@@ -172,6 +172,8 @@ export default function StoryViewerScreen() {
 
   const [dropRemaining, setDropRemaining] = useState(0)
   const [expiresRemaining, setExpiresRemaining] = useState(0)
+  const [currentPrice, setCurrentPrice] = useState<number>(0)
+  const [lastDropAt, setLastDropAt] = useState<string>('')
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -203,7 +205,10 @@ export default function StoryViewerScreen() {
       }
 
       const { profiles, ...storyFields } = data as any
-      setStory(storyFields as StoryData)
+      const s = storyFields as StoryData
+      setStory(s)
+      setCurrentPrice(s.current_price_chf)
+      setLastDropAt(s.last_drop_at)
       setSeller(profiles as SellerProfile)
       setLoading(false)
     })()
@@ -212,14 +217,20 @@ export default function StoryViewerScreen() {
   // ── Realtime ───────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!id) return
+    if (!story?.id) return
     const channel = supabase
-      .channel(`story-${id}`)
+      .channel(`story-viewer-${story.id}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'stories', filter: `id=eq.${id}` },
+        { event: 'UPDATE', schema: 'public', table: 'stories', filter: `id=eq.${story.id}` },
         (payload) => {
           const updated = payload.new as Partial<StoryData>
+          if (typeof updated.current_price_chf === 'number') {
+            setCurrentPrice(updated.current_price_chf)
+          }
+          if (typeof updated.last_drop_at === 'string') {
+            setLastDropAt(updated.last_drop_at)
+          }
           setStory(prev => prev ? {
             ...prev,
             current_price_chf: updated.current_price_chf ?? prev.current_price_chf,
@@ -232,15 +243,15 @@ export default function StoryViewerScreen() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [id])
+  }, [story?.id])
 
   // ── Timers ─────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!story) return
+    if (!story || !lastDropAt) return
 
     const tick = () => {
-      const elapsed = (Date.now() - new Date(story.last_drop_at).getTime()) / 1000
+      const elapsed = (Date.now() - new Date(lastDropAt).getTime()) / 1000
       setDropRemaining(Math.max(0, Math.ceil(story.price_drop_seconds - elapsed)))
 
       const untilExpiry = (new Date(story.expires_at).getTime() - Date.now()) / 1000
@@ -248,9 +259,9 @@ export default function StoryViewerScreen() {
     }
 
     tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [story?.id, story?.last_drop_at])
+    const handle = setInterval(tick, 500)
+    return () => clearInterval(handle)
+  }, [story?.id, lastDropAt, story?.price_drop_seconds, story?.expires_at])
 
   // ── Progress animation ─────────────────────────────────────────────────────
 
@@ -293,7 +304,7 @@ export default function StoryViewerScreen() {
 
   const priceRatio = story
     ? (story.start_price_chf - story.floor_price_chf) > 0
-      ? Math.max(0, Math.min(1, (story.current_price_chf - story.floor_price_chf) / (story.start_price_chf - story.floor_price_chf)))
+      ? Math.max(0, Math.min(1, (currentPrice - story.floor_price_chf) / (story.start_price_chf - story.floor_price_chf)))
       : 1
     : 1
 
@@ -301,13 +312,13 @@ export default function StoryViewerScreen() {
   useEffect(() => {
     if (!story) return
     const prev = prevPriceRef.current
-    if (prev !== null && prev !== story.current_price_chf) {
+    if (prev !== null && prev !== currentPrice) {
       if (Platform.OS !== 'web') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       }
     }
-    prevPriceRef.current = story.current_price_chf
-  }, [story?.current_price_chf])
+    prevPriceRef.current = currentPrice
+  }, [currentPrice])
 
   useEffect(() => {
     if (priceRatio < 0.3 && !isSold) {
@@ -406,7 +417,7 @@ export default function StoryViewerScreen() {
     )
   }
 
-  const currentFmt = story.current_price_chf.toLocaleString('fr-CH')
+  const currentFmt = currentPrice.toLocaleString('fr-CH')
   const startFmt = story.start_price_chf.toLocaleString('fr-CH')
   const floorFmt = story.floor_price_chf.toLocaleString('fr-CH')
   const initials = seller.username.charAt(0).toUpperCase()
@@ -572,7 +583,7 @@ export default function StoryViewerScreen() {
             <TouchableOpacity
               style={[styles.ctaBtn, priceRatio < 0.3 && { backgroundColor: '#EF4444' }]}
               onPress={() => {
-                setSnapshotPrice(story.current_price_chf)
+                setSnapshotPrice(currentPrice)
                 setModalVisible(true)
               }}
             >
