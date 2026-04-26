@@ -33,26 +33,10 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 interface DropRingProps {
   remaining: number
   total: number
-  lastDropAt: string
-  resetKey: number
 }
 
-function DropRing({ remaining, total, lastDropAt, resetKey }: DropRingProps) {
-  const initialRatio = () => {
-    const elapsed = (Date.now() - new Date(lastDropAt).getTime()) / 1000
-    const initial = Math.max(1, Math.ceil(total - elapsed))
-    return total > 0 ? Math.max(0, Math.min(1, initial / total)) : 1
-  }
-
-  const animRef = useRef(new Animated.Value(1 - initialRatio())).current
-
-  useEffect(() => {
-    animRef.setValue(0)
-  }, [resetKey])
-
-  useEffect(() => {
-    animRef.setValue(1 - initialRatio())
-  }, [lastDropAt])
+function DropRing({ remaining, total }: DropRingProps) {
+  const animRef = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Animated.timing(animRef, {
@@ -188,7 +172,6 @@ export default function StoryViewerScreen() {
 
   const [dropRemaining, setDropRemaining] = useState(0)
   const [expiresRemaining, setExpiresRemaining] = useState(0)
-  const [dropResetKey, setDropResetKey] = useState(0)
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -256,32 +239,18 @@ export default function StoryViewerScreen() {
   useEffect(() => {
     if (!story) return
 
-    const dropSeconds = story.price_drop_seconds
-    const localDropStart = { current: new Date(story.last_drop_at).getTime() }
-
     const tick = () => {
-      const now = Date.now()
-      const sinceDrop = (now - localDropStart.current) / 1000
-      const remaining = dropSeconds - sinceDrop
+      const elapsed = (Date.now() - new Date(story.last_drop_at).getTime()) / 1000
+      setDropRemaining(Math.max(0, Math.ceil(story.price_drop_seconds - elapsed)))
 
-      if (remaining <= 0) {
-        localDropStart.current = now
-        setDropRemaining(dropSeconds)
-        setDropResetKey(k => k + 1)
-      } else {
-        setDropRemaining(remaining)
-      }
-
-      const untilExpiry = (new Date(story.expires_at).getTime() - now) / 1000
+      const untilExpiry = (new Date(story.expires_at).getTime() - Date.now()) / 1000
       setExpiresRemaining(Math.max(0, untilExpiry))
     }
 
     tick()
-    intervalRef.current = setInterval(tick, 1000)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [story?.last_drop_at, story?.expires_at, story?.price_drop_seconds])
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [story?.id, story?.last_drop_at])
 
   // ── Progress animation ─────────────────────────────────────────────────────
 
@@ -558,8 +527,6 @@ export default function StoryViewerScreen() {
           <DropRing
             remaining={dropRemaining}
             total={story.price_drop_seconds}
-            lastDropAt={story.last_drop_at}
-            resetKey={dropResetKey}
           />
           <View style={styles.expiryRow}>
             <Ionicons
