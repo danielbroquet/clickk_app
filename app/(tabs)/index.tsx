@@ -177,7 +177,16 @@ function ListingCard({
       <View style={styles.cardBody}>
         {/* Seller row */}
         <View style={styles.sellerRow}>
-          <View style={styles.sellerLeft}>
+          <TouchableOpacity
+            style={styles.sellerLeft}
+            activeOpacity={0.7}
+            onPress={() => {
+              if (listing.seller?.id && listing.seller.id !== currentUserId) {
+                router.push(`/profile/${listing.seller.id}`)
+              }
+            }}
+            disabled={!listing.seller?.id || listing.seller.id === currentUserId}
+          >
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatar} />
             ) : (
@@ -186,7 +195,7 @@ function ListingCard({
               </View>
             )}
             <Text style={styles.username}>@{username}</Text>
-          </View>
+          </TouchableOpacity>
           <View style={styles.rowRight}>
             {listing.category ? (
               <View style={styles.categoryPill}>
