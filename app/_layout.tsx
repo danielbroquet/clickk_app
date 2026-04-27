@@ -44,6 +44,7 @@ function RootRedirector() {
       <Stack.Screen name="story/create" />
       <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
+      <Stack.Screen name="profile/orders" />
     </Stack>
   )
 }

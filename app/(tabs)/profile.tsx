@@ -380,6 +380,7 @@ export default function ProfileScreen() {
   const [ventesCount, setVentesCount] = useState<number | null>(null)
   const [stories, setStories] = useState<StoryCell[]>([])
   const [editVisible, setEditVisible] = useState(false)
+  const [activeOrdersCount, setActiveOrdersCount] = useState(0)
 
   useEffect(() => {
     const userId = session?.user?.id
@@ -405,6 +406,21 @@ export default function ProfileScreen() {
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => setStories((data ?? []) as StoryCell[]))
+
+    Promise.all([
+      supabase
+        .from('stories')
+        .select('*', { count: 'exact', head: true })
+        .eq('buyer_id', userId)
+        .in('status', ['sold', 'shipped']),
+      supabase
+        .from('shop_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('buyer_id', userId)
+        .in('status', ['paid', 'sold', 'shipped']),
+    ]).then(([sRes, oRes]) => {
+      setActiveOrdersCount((sRes.count ?? 0) + (oRes.count ?? 0))
+    })
   }, [session?.user?.id])
 
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
@@ -546,6 +562,27 @@ export default function ProfileScreen() {
         <View style={styles.settingsSection}>
           <TouchableOpacity
             style={styles.settingsRow}
+            onPress={() => router.push('/profile/orders')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="bag-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsRowLabel}>Mes commandes</Text>
+            </View>
+            <View style={styles.settingsRowRight}>
+              {activeOrdersCount > 0 && (
+                <View style={styles.ordersBadge}>
+                  <Text style={styles.ordersBadgeText}>{activeOrdersCount}</Text>
+                </View>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.settingsDivider} />
+
+          <TouchableOpacity
+            style={styles.settingsRow}
             onPress={() => router.push('/profile/payment-methods')}
             activeOpacity={0.7}
           >
@@ -685,6 +722,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: fontFamily.medium,
     color: colors.text,
+  },
+  settingsRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 16,
+  },
+  ordersBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+  },
+  ordersBadgeText: {
+    fontSize: 11,
+    fontFamily: fontFamily.bold,
+    color: '#0F0F0F',
   },
   signOutBtn: { padding: 16, marginTop: 8, alignItems: 'center' },
   signOutText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.error },
