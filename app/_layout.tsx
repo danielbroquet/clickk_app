@@ -43,6 +43,7 @@ function RootRedirector() {
       <Stack.Screen name="wallet/index" />
       <Stack.Screen name="story/create" />
       <Stack.Screen name="listing/create" />
+      <Stack.Screen name="profile/payment-methods" />
     </Stack>
   )
 }

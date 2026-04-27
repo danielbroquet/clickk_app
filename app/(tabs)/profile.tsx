@@ -542,6 +542,21 @@ export default function ProfileScreen() {
           />
         )}
 
+        {/* Settings */}
+        <View style={styles.settingsSection}>
+          <TouchableOpacity
+            style={styles.settingsRow}
+            onPress={() => router.push('/profile/payment-methods')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="card-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsRowLabel}>Moyens de paiement</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Sign out */}
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
           <Text style={styles.signOutText}>Se déconnecter</Text>
@@ -645,6 +660,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyTitle: { fontSize: 14, color: colors.textSecondary, marginTop: 12 },
+  settingsSection: {
+    marginTop: 16,
+    marginHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  settingsRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsRowLabel: {
+    fontSize: 14,
+    fontFamily: fontFamily.medium,
+    color: colors.text,
+  },
   signOutBtn: { padding: 16, marginTop: 8, alignItems: 'center' },
   signOutText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.error },
   becomeSellerBtn: {
