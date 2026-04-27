@@ -16,101 +16,12 @@ import { Video, ResizeMode } from 'expo-av'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Svg, { Circle } from 'react-native-svg'
 import { Platform } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import i18n from '../../lib/i18n'
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle)
-
-const RING_RADIUS = 72
-const RING_STROKE = 8
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
-
-interface DropRingProps {
-  remaining: number
-  total: number
-}
-
-function DropRing({ remaining, total }: DropRingProps) {
-  const animRef = useRef(new Animated.Value(0)).current
-
-  useEffect(() => {
-    Animated.timing(animRef, {
-      toValue: 1 - (remaining / (total || 1)),
-      duration: 450,
-      useNativeDriver: false,
-    }).start()
-  }, [remaining])
-
-  const strokeDashoffset = animRef.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, RING_CIRCUMFERENCE],
-  })
-
-  const ratio = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0
-  const strokeColor = ratio > 0.6 ? '#00D2B8' : ratio > 0.3 ? '#F59E0B' : '#EF4444'
-  const seconds = Math.ceil(remaining)
-
-  return (
-    <View style={ringStyles.container}>
-      <Svg width={180} height={180}>
-        <Circle
-          cx={90}
-          cy={90}
-          r={RING_RADIUS}
-          stroke="#222222"
-          strokeWidth={RING_STROKE}
-          fill="none"
-        />
-        <AnimatedCircle
-          cx={90}
-          cy={90}
-          r={RING_RADIUS}
-          stroke={strokeColor}
-          strokeWidth={RING_STROKE}
-          fill="none"
-          strokeDasharray={RING_CIRCUMFERENCE}
-          strokeLinecap="round"
-          strokeDashoffset={strokeDashoffset}
-          rotation="-90"
-          origin="90, 90"
-        />
-      </Svg>
-      <View style={ringStyles.center}>
-        <Text style={ringStyles.seconds}>{seconds}s</Text>
-        <Text style={ringStyles.label}>avant drop</Text>
-      </View>
-    </View>
-  )
-}
-
-const ringStyles = StyleSheet.create({
-  container: {
-    width: 180,
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  center: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  seconds: {
-    color: '#FFFFFF',
-    fontSize: 32,
-    fontWeight: '700',
-    lineHeight: 36,
-  },
-  label: {
-    color: '#888888',
-    fontSize: 10,
-  },
-})
 
 const C = {
   bg: '#0F0F0F',
@@ -137,6 +48,7 @@ interface StoryData {
   last_drop_at: string
   speed_preset: 'SLOW' | 'STANDARD' | 'FAST'
   expires_at: string
+  created_at: string
   status: string
   buyer_id: string | null
   video_duration_seconds: number | null
@@ -147,17 +59,62 @@ interface SellerProfile {
   avatar_url: string | null
 }
 
-function formatMMSS(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
 function formatHHMMSS(seconds: number): string {
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = Math.floor(seconds % 60)
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function computePrice(story: StoryData): number {
+  const totalMs = new Date(story.expires_at).getTime() - new Date(story.created_at).getTime()
+  const elapsedMs = Date.now() - new Date(story.created_at).getTime()
+  const ratio = Math.min(Math.max(elapsedMs / totalMs, 0), 1)
+  return Math.max(
+    story.start_price_chf - (story.start_price_chf - story.floor_price_chf) * ratio,
+    story.floor_price_chf
+  )
+}
+
+function computeRatio(story: StoryData): number {
+  const totalMs = new Date(story.expires_at).getTime() - new Date(story.created_at).getTime()
+  const elapsedMs = Date.now() - new Date(story.created_at).getTime()
+  return Math.min(Math.max(elapsedMs / totalMs, 0), 1)
+}
+
+// ── Price display with fade animation on integer change ────────────────────
+
+interface PriceDisplayProps {
+  price: number
+  priceRatio: number
+}
+
+function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
+  const fadeAnim = useRef(new Animated.Value(1)).current
+  const prevIntRef = useRef<number>(Math.floor(price))
+
+  useEffect(() => {
+    const intPart = Math.floor(price)
+    if (intPart !== prevIntRef.current) {
+      prevIntRef.current = intPart
+      fadeAnim.setValue(0.4)
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start()
+    }
+  }, [Math.floor(price)])
+
+  const color = priceRatio > 0.6 ? '#00D2B8' : priceRatio > 0.3 ? '#F59E0B' : '#EF4444'
+  const fmt = price.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  return (
+    <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
+      <Text style={styles.priceChfLabel}>CHF</Text>
+      <Text style={[styles.priceBig, { color }]}>{fmt}</Text>
+    </Animated.View>
+  )
 }
 
 export default function StoryViewerScreen() {
@@ -170,10 +127,10 @@ export default function StoryViewerScreen() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
 
-  const [dropRemaining, setDropRemaining] = useState(0)
-  const [expiresRemaining, setExpiresRemaining] = useState(0)
   const [currentPrice, setCurrentPrice] = useState<number>(0)
-  const [lastDropAt, setLastDropAt] = useState<string>('')
+  const [expiresRemaining, setExpiresRemaining] = useState(0)
+  // timeRatio: 0 = just started (full price), 1 = expired (floor)
+  const [timeRatio, setTimeRatio] = useState(0)
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -183,9 +140,9 @@ export default function StoryViewerScreen() {
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
 
   const progressAnim = useRef(new Animated.Value(0)).current
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pulseAnim = useRef(new Animated.Value(1)).current
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null)
+  const progressBarAnim = useRef(new Animated.Value(0)).current
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -207,14 +164,14 @@ export default function StoryViewerScreen() {
       const { profiles, ...storyFields } = data as any
       const s = storyFields as StoryData
       setStory(s)
-      setCurrentPrice(s.current_price_chf)
-      setLastDropAt(s.last_drop_at)
+      setCurrentPrice(computePrice(s))
+      setTimeRatio(computeRatio(s))
       setSeller(profiles as SellerProfile)
       setLoading(false)
     })()
   }, [id])
 
-  // ── Realtime ───────────────────────────────────────────────────────────────
+  // ── Realtime: status/sold changes only ────────────────────────────────────
 
   useEffect(() => {
     if (!story?.id) return
@@ -225,16 +182,8 @@ export default function StoryViewerScreen() {
         { event: 'UPDATE', schema: 'public', table: 'stories', filter: `id=eq.${story.id}` },
         (payload) => {
           const updated = payload.new as Partial<StoryData>
-          if (typeof updated.current_price_chf === 'number') {
-            setCurrentPrice(updated.current_price_chf)
-          }
-          if (typeof updated.last_drop_at === 'string') {
-            setLastDropAt(updated.last_drop_at)
-          }
           setStory(prev => prev ? {
             ...prev,
-            current_price_chf: updated.current_price_chf ?? prev.current_price_chf,
-            last_drop_at: updated.last_drop_at ?? prev.last_drop_at,
             buyer_id: updated.buyer_id !== undefined ? updated.buyer_id : prev.buyer_id,
             status: updated.status ?? prev.status,
           } : prev)
@@ -245,25 +194,59 @@ export default function StoryViewerScreen() {
     return () => { supabase.removeChannel(channel) }
   }, [story?.id])
 
-  // ── Timers ─────────────────────────────────────────────────────────────────
+  // ── Price ticker ───────────────────────────────────────────────────────────
+
+  const prevIntPriceRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!story || !lastDropAt) return
+    if (!story || story.status !== 'active') return
 
     const tick = () => {
-      const elapsed = (Date.now() - new Date(lastDropAt).getTime()) / 1000
-      setDropRemaining(Math.max(0, Math.ceil(story.price_drop_seconds - elapsed)))
+      const price = computePrice(story)
+      const ratio = computeRatio(story)
+      setCurrentPrice(price)
+      setTimeRatio(ratio)
 
       const untilExpiry = (new Date(story.expires_at).getTime() - Date.now()) / 1000
       setExpiresRemaining(Math.max(0, untilExpiry))
+
+      // Haptic only when integer part changes
+      const intPrice = Math.floor(price)
+      if (prevIntPriceRef.current !== null && prevIntPriceRef.current !== intPrice) {
+        if (Platform.OS !== 'web') {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        }
+      }
+      prevIntPriceRef.current = intPrice
     }
 
     tick()
-    const handle = setInterval(tick, 500)
+    const handle = setInterval(tick, 1000)
     return () => clearInterval(handle)
-  }, [story?.id, lastDropAt, story?.price_drop_seconds, story?.expires_at])
+  }, [story?.id, story?.status, story?.expires_at, story?.created_at])
 
-  // ── Progress animation ─────────────────────────────────────────────────────
+  // ── Progress bar animation ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    Animated.timing(progressBarAnim, {
+      toValue: timeRatio,
+      duration: 800,
+      useNativeDriver: false,
+    }).start()
+  }, [timeRatio])
+
+  const progressBarWidth = progressBarAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  })
+
+  const progressBarColor = timeRatio > 0.6
+    ? '#EF4444'
+    : timeRatio > 0.3
+    ? '#F59E0B'
+    : '#00D2B8'
+
+  // ── Video progress animation ───────────────────────────────────────────────
 
   const onPlaybackStatusUpdate = useCallback((status: any) => {
     if (!status.isLoaded) return
@@ -300,25 +283,14 @@ export default function StoryViewerScreen() {
     story.buyer_id === currentUserId
   )
 
-  // ── Price ratio & dynamic feedback ────────────────────────────────────────
-
+  // priceRatio: 1 = at start price (full), 0 = at floor price
   const priceRatio = story
     ? (story.start_price_chf - story.floor_price_chf) > 0
       ? Math.max(0, Math.min(1, (currentPrice - story.floor_price_chf) / (story.start_price_chf - story.floor_price_chf)))
       : 1
     : 1
 
-  const prevPriceRef = useRef<number | null>(null)
-  useEffect(() => {
-    if (!story) return
-    const prev = prevPriceRef.current
-    if (prev !== null && prev !== currentPrice) {
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
-      }
-    }
-    prevPriceRef.current = currentPrice
-  }, [currentPrice])
+  // ── Pulse when near floor ──────────────────────────────────────────────────
 
   useEffect(() => {
     if (priceRatio < 0.3 && !isSold) {
@@ -417,7 +389,7 @@ export default function StoryViewerScreen() {
     )
   }
 
-  const currentFmt = currentPrice.toLocaleString('fr-CH')
+  const currentFmt = currentPrice.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const startFmt = story.start_price_chf.toLocaleString('fr-CH')
   const floorFmt = story.floor_price_chf.toLocaleString('fr-CH')
   const initials = seller.username.charAt(0).toUpperCase()
@@ -519,26 +491,22 @@ export default function StoryViewerScreen() {
         </View>
       )}
 
-      {/* ── Mid-screen ring overlay ── */}
-      {story.price_drop_seconds > 0 && !isSold && (
-        <View style={styles.ringOverlay} pointerEvents="none">
-          <View style={[
-            styles.pricePill,
-            priceRatio > 0.6
-              ? { backgroundColor: 'rgba(0,0,0,0.6)' }
-              : priceRatio > 0.3
-              ? { backgroundColor: 'rgba(245,158,11,0.85)' }
-              : { backgroundColor: 'rgba(239,68,68,0.85)' },
-          ]}>
-            <Text style={[
-              styles.pricePillText,
-              priceRatio > 0.3 ? { color: priceRatio > 0.6 ? '#FFFFFF' : '#0a0a0a' } : { color: '#FFFFFF' },
-            ]}>CHF {currentFmt}</Text>
+      {/* ── Mid-screen price overlay ── */}
+      {!isSold && (
+        <View style={styles.priceOverlay} pointerEvents="none">
+          <PriceDisplay price={currentPrice} priceRatio={priceRatio} />
+
+          {/* Progress bar: visual of how close to floor */}
+          <View style={styles.priceProgressTrack}>
+            <Animated.View
+              style={[
+                styles.priceProgressFill,
+                { width: progressBarWidth, backgroundColor: progressBarColor },
+              ]}
+            />
           </View>
-          <DropRing
-            remaining={dropRemaining}
-            total={story.price_drop_seconds}
-          />
+
+          {/* Expiry */}
           <View style={styles.expiryRow}>
             <Ionicons
               name="time-outline"
@@ -624,7 +592,7 @@ export default function StoryViewerScreen() {
           <View style={styles.modalPriceWrap}>
             <Text style={styles.modalChf}>CHF</Text>
             <Text style={styles.modalPriceValue}>
-              {snapshotPrice.toLocaleString('fr-CH')}
+              {snapshotPrice.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
           </View>
 
@@ -647,7 +615,7 @@ export default function StoryViewerScreen() {
               <ActivityIndicator color="#0F0F0F" />
             ) : (
               <Text style={styles.confirmBtnText}>
-                CHF {snapshotPrice.toLocaleString('fr-CH')} — {i18n.t('story.viewer.confirm_purchase')}
+                CHF {snapshotPrice.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — {i18n.t('story.viewer.confirm_purchase')}
               </Text>
             )}
           </TouchableOpacity>
@@ -731,24 +699,41 @@ const styles = StyleSheet.create({
   priceValueStrike: { color: C.muted, fontSize: 13, textDecorationLine: 'line-through' },
   priceValueMuted: { color: C.muted, fontSize: 13 },
 
-  // Ring overlay
-  ringOverlay: {
+  // Mid-screen price overlay
+  priceOverlay: {
     position: 'absolute',
-    top: '38%',
+    top: '35%',
     left: 0,
     right: 0,
     alignItems: 'center',
     zIndex: 10,
+    paddingHorizontal: 32,
   },
-  pricePill: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 6,
-    marginBottom: 10,
+  priceChfLabel: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 2,
+    marginBottom: 2,
   },
-  pricePillText: { color: '#FFFFFF', fontSize: 22, fontWeight: '700' },
-  expiryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
+  priceBig: {
+    fontSize: 56,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  priceProgressTrack: {
+    width: 180,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 14,
+  },
+  priceProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  expiryRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
   expiryText: { fontSize: 12 },
 
   // CTA
