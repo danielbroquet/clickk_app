@@ -394,6 +394,10 @@ export default function StoryViewerScreen() {
   const floorFmt = story.floor_price_chf.toLocaleString('fr-CH')
   const initials = seller.username.charAt(0).toUpperCase()
 
+  const savedPct = Math.round((1 - currentPrice / story.start_price_chf) * 100)
+  const savedAmt = (story.start_price_chf - currentPrice).toFixed(2)
+  const nearFloor = currentPrice <= story.floor_price_chf * 1.15
+
   return (
     <View style={styles.container}>
       <StatusBar hidden />
@@ -496,6 +500,16 @@ export default function StoryViewerScreen() {
         <View style={styles.priceOverlay} pointerEvents="none">
           <PriceDisplay price={currentPrice} priceRatio={priceRatio} />
 
+          {/* Savings row */}
+          {savedPct > 0 && (
+            <View style={styles.savingsRow}>
+              <Text style={styles.savingsStrike}>CHF {story.start_price_chf.toLocaleString('fr-CH')}</Text>
+              <View style={styles.savingsBadge}>
+                <Text style={styles.savingsBadgeText}>-{savedPct}%</Text>
+              </View>
+            </View>
+          )}
+
           {/* Progress bar: visual of how close to floor */}
           <View style={styles.priceProgressTrack}>
             <Animated.View
@@ -541,6 +555,19 @@ export default function StoryViewerScreen() {
           </View>
         </View>
 
+        {/* Floor cliff warning */}
+        {!isSold && nearFloor && (
+          <View style={styles.floorBanner}>
+            <View style={styles.floorBannerIcon}>
+              <Text style={styles.floorBannerIconText}>!</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.floorBannerTitle}>Dernier palier de prix</Text>
+              <Text style={styles.floorBannerSub}>Le prix s'arrête à CHF {floorFmt}</Text>
+            </View>
+          </View>
+        )}
+
         {/* CTA */}
         {isSold ? (
           <View style={[styles.ctaBtn, styles.ctaBtnSold]}>
@@ -549,14 +576,16 @@ export default function StoryViewerScreen() {
         ) : (
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
             <TouchableOpacity
-              style={[styles.ctaBtn, priceRatio < 0.3 && { backgroundColor: '#EF4444' }]}
+              style={[styles.ctaBtn, nearFloor && { backgroundColor: '#EF4444' }]}
               onPress={() => {
                 setSnapshotPrice(currentPrice)
                 setModalVisible(true)
               }}
             >
               <Text style={styles.ctaBtnText}>
-                {i18n.t('story.viewer.buy_now')} — CHF {currentFmt}
+                {nearFloor
+                  ? `DERNIÈRE BAISSE — CHF ${currentFmt}`
+                  : `${i18n.t('story.viewer.buy_now')} — CHF ${currentFmt}`}
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -853,4 +882,68 @@ const styles = StyleSheet.create({
   confirmBtnText: { color: '#0F0F0F', fontSize: 16, fontWeight: '700' },
   cancelBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 8 },
   cancelBtnText: { color: C.muted, fontSize: 14 },
+
+  // Savings row
+  savingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  savingsStrike: {
+    fontSize: 13,
+    color: '#666666',
+    textDecorationLine: 'line-through',
+  },
+  savingsBadge: {
+    backgroundColor: 'rgba(245,158,11,0.18)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  savingsBadgeText: {
+    color: '#F59E0B',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+
+  // Floor cliff banner
+  floorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#1a0a0a',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.32)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  floorBannerIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floorBannerIconText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
+  floorBannerTitle: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  floorBannerSub: {
+    color: '#666666',
+    fontSize: 11,
+    marginTop: 1,
+  },
 })
