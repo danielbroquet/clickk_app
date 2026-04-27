@@ -92,6 +92,7 @@ export default function ListingDetailScreen() {
   const videoRefs = useRef<{ [key: number]: any }>({})
   const [chatLoading, setChatLoading] = useState(false)
   const [buying, setBuying] = useState(false)
+  const [instantLoading, setInstantLoading] = useState(false)
   const [orderError, setOrderError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -148,24 +149,75 @@ export default function ListingDetailScreen() {
     if (!listing || !session) return
     setOrderError(null)
     setBuying(true)
-    try {
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+
+    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
+    const errorMap: Record<string, string> = {
+      listing_not_active: "Cet article n'est plus disponible.",
+      out_of_stock: 'Cet article est en rupture de stock.',
+      cannot_buy_own_listing: 'Vous ne pouvez pas acheter votre propre article.',
+      listing_not_found: 'Article introuvable.',
+    }
+
+    const callEF = async (mode: 'instant' | 'checkout') => {
       const res = await fetch(`${supabaseUrl}/functions/v1/create-listing-payment-intent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ listing_id: listing.id }),
+        body: JSON.stringify({ listing_id: listing.id, mode }),
       })
-      const json = await res.json()
-      if (!res.ok || !json.checkoutUrl) {
-        const errorMap: Record<string, string> = {
-          listing_not_active: 'Cet article n\'est plus disponible.',
-          out_of_stock: 'Cet article est en rupture de stock.',
-          cannot_buy_own_listing: 'Vous ne pouvez pas acheter votre propre article.',
-          listing_not_found: 'Article introuvable.',
+      return res.json()
+    }
+
+    try {
+      // Check for saved payment method
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id')
+        .eq('id', currentUserId)
+        .maybeSingle()
+
+      const stripeCustomerId = profile?.stripe_customer_id ?? null
+
+      if (stripeCustomerId) {
+        setInstantLoading(true)
+        try {
+          const json = await callEF('instant')
+
+          if (json.status === 'succeeded') {
+            router.replace({
+              pathname: '/listing/order-confirmation',
+              params: {
+                sessionId: json.payment_intent_id ?? '',
+                title: listing.title,
+                price: listing.price_chf.toFixed(2),
+              },
+            })
+            return
+          }
+
+          if (json.status === 'requires_action') {
+            // TODO (EAS Build): open Stripe SDK 3DS flow with json.client_secret
+            Alert.alert(
+              'Authentification requise',
+              "La vérification 3DS sera disponible dans la version native de l'application."
+            )
+            return
+          }
+
+          // status === 'failed' or no_payment_method — fall through to checkout
+          if (json.error && json.error !== 'no_payment_method' && json.status !== 'failed') {
+            throw new Error(errorMap[json.error] ?? json.error ?? 'Erreur instant payment.')
+          }
+        } finally {
+          setInstantLoading(false)
         }
+      }
+
+      // Checkout fallback
+      const json = await callEF('checkout')
+      if (!json.checkoutUrl) {
         throw new Error(errorMap[json.error] ?? json.error ?? 'Impossible de créer la session de paiement.')
       }
 
@@ -176,7 +228,9 @@ export default function ListingDetailScreen() {
 
       if (result.type === 'success') {
         const redirectUrl = (result as { url?: string }).url ?? ''
-        const sessionId = new URL(redirectUrl.replace('clickk://', 'https://placeholder/')).searchParams.get('session_id') ?? json.sessionId
+        const sessionId =
+          new URL(redirectUrl.replace('clickk://', 'https://placeholder/')).searchParams.get('session_id') ??
+          json.sessionId
         router.replace({
           pathname: '/listing/order-confirmation',
           params: {
@@ -192,6 +246,7 @@ export default function ListingDetailScreen() {
       Alert.alert('Erreur de paiement', msg)
     } finally {
       setBuying(false)
+      setInstantLoading(false)
     }
   }
 
@@ -362,7 +417,12 @@ export default function ListingDetailScreen() {
             disabled={unavailable || buying}
             activeOpacity={0.85}
           >
-            {buying ? (
+            {instantLoading ? (
+              <View style={styles.buyBtnInner}>
+                <ActivityIndicator size="small" color="#0F0F0F" />
+                <Text style={styles.buyBtnText}>Achat en cours...</Text>
+              </View>
+            ) : buying ? (
               <ActivityIndicator size="small" color="#0F0F0F" />
             ) : (
               <Text style={styles.buyBtnText}>
@@ -553,6 +613,11 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.body,
     color: '#0F0F0F',
+  },
+  buyBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   ownerLabel: {
     borderRadius: 12,
