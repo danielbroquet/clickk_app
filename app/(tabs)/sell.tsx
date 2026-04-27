@@ -56,6 +56,21 @@ export default function SellScreen() {
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.8}
+              onPress={() => router.push('/(seller)/listings')}
+            >
+              <View style={styles.cardIcon}>
+                <Ionicons name="list-outline" size={48} color={colors.primary} />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={styles.cardTitle}>Mes annonces</Text>
+                <Text style={styles.cardSubtitle}>Gérer vos stories et articles</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.notSellerBox}>

@@ -41,6 +41,7 @@ function RootRedirector() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="become-seller" />
       <Stack.Screen name="wallet/index" />
+      <Stack.Screen name="(seller)/listings" options={{ headerShown: false }} />
       <Stack.Screen name="story/create" />
       <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
