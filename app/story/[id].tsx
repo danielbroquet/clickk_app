@@ -141,7 +141,7 @@ export default function StoryViewerScreen() {
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
-  const { handlePurchase, purchasing } = useStoryPurchase()
+  const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
 
   const [confirmDelivering, setConfirmDelivering] = useState(false)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
@@ -656,7 +656,12 @@ export default function StoryViewerScreen() {
             onPress={onConfirmPurchase}
             disabled={purchasing}
           >
-            {purchasing ? (
+            {instantLoading ? (
+              <View style={styles.confirmBtnInner}>
+                <ActivityIndicator color="#0F0F0F" size="small" />
+                <Text style={styles.confirmBtnText}>Achat en cours...</Text>
+              </View>
+            ) : purchasing ? (
               <ActivityIndicator color="#0F0F0F" />
             ) : (
               <Text style={styles.confirmBtnText}>
@@ -896,6 +901,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   confirmBtnText: { color: '#0F0F0F', fontSize: 16, fontWeight: '700' },
+  confirmBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   cancelBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 8 },
   cancelBtnText: { color: C.muted, fontSize: 14 },
 
