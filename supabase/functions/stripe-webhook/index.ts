@@ -49,6 +49,28 @@ interface StripeObject {
   details_submitted?: boolean;
 }
 
+const PI_LOG = "[stripe-webhook payment_intent.succeeded]";
+
+async function refundPaymentIntent(paymentIntentId: string, stripeKey: string): Promise<void> {
+  const params = new URLSearchParams();
+  params.set("payment_intent", paymentIntentId);
+
+  const res = await fetch("https://api.stripe.com/v1/refunds", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: params.toString(),
+  });
+  const json = await res.json();
+  if (!res.ok || json.error) {
+    console.error(`${PI_LOG} refund failed:`, json.error?.message ?? "unknown");
+    return;
+  }
+  console.log(`${PI_LOG} refund issued for ${paymentIntentId}`);
+}
+
 interface StripeEvent {
   type: string;
   id: string;
@@ -286,6 +308,240 @@ Deno.serve(async (req: Request) => {
       }
 
       await processPurchase(supabase, story_id.trim(), buyer_id.trim(), parseFloat(amount_chf));
+    } else if (event.type === "payment_intent.succeeded") {
+      const pi = event.data.object;
+      const paymentIntentId = pi.id ?? "";
+      const metadata = pi.metadata ?? {};
+      const { story_id, listing_id, buyer_id, seller_id: sellerIdMeta, amount_chf } = metadata;
+
+      const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+      if (!stripeKey) {
+        console.error(`${PI_LOG} STRIPE_SECRET_KEY not configured`);
+      }
+
+      if (!buyer_id) {
+        console.warn(`${PI_LOG} missing buyer_id`);
+        return new Response(JSON.stringify({ received: true, warning: "missing_buyer_id" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (!amount_chf) {
+        console.warn(`${PI_LOG} missing amount_chf`);
+        return new Response(JSON.stringify({ received: true, warning: "missing_amount" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const amountChf = parseFloat(amount_chf);
+
+      if (story_id) {
+        if (!UUID_RE.test(story_id) || !UUID_RE.test(buyer_id)) {
+          console.warn(`${PI_LOG} invalid story_id or buyer_id`);
+          return new Response(JSON.stringify({ received: true, warning: "invalid_ids" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: story, error: fetchErr } = await supabase
+          .from("stories")
+          .select("id, seller_id, status, buyer_id")
+          .eq("id", story_id)
+          .eq("status", "active")
+          .is("buyer_id", null)
+          .maybeSingle();
+
+        if (fetchErr) {
+          console.error(`${PI_LOG} story select failed:`, fetchErr.message);
+          throw new Error(`story select failed: ${fetchErr.message}`);
+        }
+
+        if (!story) {
+          console.warn(`${PI_LOG} already_sold story=${story_id} — refunding`);
+          if (stripeKey && paymentIntentId) {
+            await refundPaymentIntent(paymentIntentId, stripeKey);
+          }
+          await supabase.from("notifications").insert({
+            user_id: buyer_id,
+            type: "purchase_refunded",
+            title: "Achat remboursé",
+            message: "Cet article n'était plus disponible. Vous avez été remboursé.",
+            is_read: false,
+          });
+          return new Response(JSON.stringify({ received: true, refunded: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from("stories")
+          .update({
+            status: "sold",
+            buyer_id,
+            final_price_chf: amountChf,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", story_id)
+          .eq("status", "active")
+          .is("buyer_id", null)
+          .select();
+
+        if (updateErr) {
+          console.error(`${PI_LOG} story update failed:`, updateErr.message);
+          throw new Error(`story update failed: ${updateErr.message}`);
+        }
+
+        if (!updatedRows || updatedRows.length === 0) {
+          console.warn(`${PI_LOG} race lost story=${story_id} — refunding`);
+          if (stripeKey && paymentIntentId) {
+            await refundPaymentIntent(paymentIntentId, stripeKey);
+          }
+          await supabase.from("notifications").insert({
+            user_id: buyer_id,
+            type: "purchase_refunded",
+            title: "Achat remboursé",
+            message: "Cet article n'était plus disponible. Vous avez été remboursé.",
+            is_read: false,
+          });
+          return new Response(JSON.stringify({ received: true, refunded: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const sellerId = story.seller_id as string;
+        const { error: notifErr } = await supabase.from("notifications").insert([
+          {
+            user_id: buyer_id,
+            type: "purchase",
+            title: "Achat confirmé",
+            message: `Votre achat a été confirmé pour CHF ${amountChf.toFixed(2)}.`,
+            is_read: false,
+          },
+          {
+            user_id: sellerId,
+            type: "story_sold",
+            title: "Article vendu !",
+            message: `Votre story a été vendue pour CHF ${amountChf.toFixed(2)}.`,
+            is_read: false,
+          },
+        ]);
+        if (notifErr) {
+          console.error(`${PI_LOG} notifications insert failed:`, notifErr.message);
+        }
+
+        return new Response(JSON.stringify({ received: true, story_id }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } else if (listing_id) {
+        if (!UUID_RE.test(listing_id) || !UUID_RE.test(buyer_id)) {
+          console.warn(`${PI_LOG} invalid listing_id or buyer_id`);
+          return new Response(JSON.stringify({ received: true, warning: "invalid_ids" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const { data: listing, error: fetchErr } = await supabase
+          .from("shop_listings")
+          .select("id, seller_id, stock, is_active")
+          .eq("id", listing_id)
+          .maybeSingle();
+
+        if (fetchErr) {
+          console.error(`${PI_LOG} listing select failed:`, fetchErr.message);
+          throw new Error(`listing select failed: ${fetchErr.message}`);
+        }
+
+        if (!listing || !listing.is_active || listing.stock <= 0) {
+          console.warn(`${PI_LOG} listing unavailable=${listing_id} — refunding`);
+          if (stripeKey && paymentIntentId) {
+            await refundPaymentIntent(paymentIntentId, stripeKey);
+          }
+          await supabase.from("notifications").insert({
+            user_id: buyer_id,
+            type: "purchase_refunded",
+            title: "Achat remboursé",
+            message: "Cet article n'était plus disponible. Vous avez été remboursé.",
+            is_read: false,
+          });
+          return new Response(JSON.stringify({ received: true, refunded: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const sellerId = (sellerIdMeta && UUID_RE.test(sellerIdMeta))
+          ? sellerIdMeta
+          : (listing.seller_id as string);
+
+        const { error: orderErr } = await supabase
+          .from("shop_orders")
+          .upsert(
+            {
+              session_id: paymentIntentId,
+              listing_id,
+              buyer_id,
+              seller_id: sellerId,
+              quantity: 1,
+              total_chf: amountChf,
+              status: "paid",
+            },
+            { onConflict: "session_id", ignoreDuplicates: true }
+          );
+
+        if (orderErr) {
+          console.error(`${PI_LOG} shop_orders insert failed:`, orderErr.message);
+          throw new Error(`shop_orders insert failed: ${orderErr.message}`);
+        }
+
+        const newStock = listing.stock - 1;
+        const { error: updateErr } = await supabase
+          .from("shop_listings")
+          .update({ stock: newStock, is_active: newStock > 0 })
+          .eq("id", listing_id)
+          .eq("stock", listing.stock);
+
+        if (updateErr) {
+          console.error(`${PI_LOG} listing stock update failed:`, updateErr.message);
+        }
+
+        const { error: notifErr } = await supabase.from("notifications").insert([
+          {
+            user_id: buyer_id,
+            type: "purchase",
+            story_id: null,
+            message: "Votre commande a été confirmée",
+            is_read: false,
+          },
+          {
+            user_id: sellerId,
+            type: "story_sold",
+            story_id: null,
+            message: "Vous avez vendu un article",
+            is_read: false,
+          },
+        ]);
+        if (notifErr) {
+          console.error(`${PI_LOG} notifications insert failed:`, notifErr.message);
+        }
+
+        return new Response(JSON.stringify({ received: true, listing_id }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        console.warn(`${PI_LOG} no story_id or listing_id in metadata`);
+        return new Response(JSON.stringify({ received: true, warning: "missing_target" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     } else if (event.type === "account.updated") {
       const account = event.data.object;
       const accountId = account.id;
