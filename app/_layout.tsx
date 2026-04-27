@@ -45,6 +45,8 @@ function RootRedirector() {
       <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
       <Stack.Screen name="profile/orders" />
+      <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/orders" />
     </Stack>
   )
 }
