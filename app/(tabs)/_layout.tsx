@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useUnreadMessages } from '../../hooks/useUnreadMessages'
+import { useAuth } from '../../lib/auth'
 import {
   View,
   Text,
@@ -36,6 +37,8 @@ const SELL_OPTIONS: SellOption[] = [
 export default function TabLayout() {
   const [showSellModal, setShowSellModal] = useState(false)
   const { unreadCount } = useUnreadMessages()
+  const { profile } = useAuth()
+  const isSeller = profile?.role === 'seller'
 
   return (
     <>
@@ -154,6 +157,21 @@ export default function TabLayout() {
                 </View>
               </TouchableOpacity>
             ))}
+            {isSeller && (
+              <TouchableOpacity
+                style={styles.option}
+                onPress={() => {
+                  setShowSellModal(false)
+                  router.push('/(seller)/listings')
+                }}
+              >
+                <Ionicons name="list-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
+                <View style={styles.optionText}>
+                  <Text style={styles.optionTitle}>Mes annonces</Text>
+                  <Text style={styles.optionSub}>Gérer vos stories et articles</Text>
+                </View>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.cancelBtn}
               onPress={() => setShowSellModal(false)}
