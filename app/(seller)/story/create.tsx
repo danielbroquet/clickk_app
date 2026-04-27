@@ -23,21 +23,15 @@ import { supabase } from '../../../lib/supabase'
 type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
 
 const DURATION: Record<SpeedPreset, { hours: number; ms: number }> = {
-  FLASH:    { hours: 24,  ms: 24  * 60 * 60 * 1000 },
-  STANDARD: { hours: 72,  ms: 72  * 60 * 60 * 1000 },
-  RELAX:    { hours: 168, ms: 168 * 60 * 60 * 1000 },
-}
-
-const SPEED_TO_SECONDS: Record<SpeedPreset, number> = {
-  FLASH:    30,
-  STANDARD: 120,
-  RELAX:    300,
+  FLASH:    { hours: 1,  ms: 1  * 60 * 60 * 1000 },
+  STANDARD: { hours: 6,  ms: 6  * 60 * 60 * 1000 },
+  RELAX:    { hours: 24, ms: 24 * 60 * 60 * 1000 },
 }
 
 const PRESETS: { key: SpeedPreset; emoji: string; label: string; sub: string }[] = [
-  { key: 'FLASH',    emoji: '⚡', label: 'Flash',    sub: '24h'    },
-  { key: 'STANDARD', emoji: '🕐', label: 'Standard', sub: '72h'    },
-  { key: 'RELAX',    emoji: '🌿', label: 'Relax',    sub: '7 days' },
+  { key: 'FLASH',    emoji: '⚡', label: 'Flash',    sub: '1h'  },
+  { key: 'STANDARD', emoji: '🕐', label: 'Standard', sub: '6h'  },
+  { key: 'RELAX',    emoji: '🌿', label: 'Relax',    sub: '24h' },
 ]
 
 const PRESET_COLORS: Record<SpeedPreset, { bg: string; text: string }> = {
@@ -162,7 +156,7 @@ export default function CreateStoryScreen() {
           start_price_chf: parseFloat(startPrice),
           floor_price_chf: parseFloat(floorPrice),
           current_price_chf: parseFloat(startPrice),
-          price_drop_seconds: SPEED_TO_SECONDS[selectedPreset],
+          price_drop_seconds: 5,
           last_drop_at: new Date().toISOString(),
           speed_preset: selectedPreset,
           duration_hours: durationHours,
@@ -342,6 +336,7 @@ export default function CreateStoryScreen() {
                 )
               })}
             </View>
+            <Text style={s.dropNote}>Prix baisse toutes les 5s</Text>
             <Text style={s.endsOn}>
               Ends on {formatDate(Date.now() + durationMs)}
             </Text>
@@ -543,11 +538,16 @@ const s = StyleSheet.create({
   pillSub: {
     fontSize: 10,
   },
+  dropNote: {
+    color: '#00D2B8',
+    fontSize: 11,
+    marginTop: 10,
+  },
   endsOn: {
     color: '#717976',
     fontSize: 12,
     fontStyle: 'italic',
-    marginTop: 10,
+    marginTop: 4,
   },
 
   // Publish
