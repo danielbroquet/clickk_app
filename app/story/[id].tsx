@@ -82,6 +82,10 @@ function computeRatio(story: StoryData): number {
   return Math.min(Math.max(elapsedMs / totalMs, 0), 1)
 }
 
+function computeExpiry(story: StoryData): number {
+  return Math.max(0, (new Date(story.expires_at).getTime() - Date.now()) / 1000)
+}
+
 // ── Price display with fade animation on integer change ────────────────────
 
 interface PriceDisplayProps {
@@ -131,6 +135,9 @@ export default function StoryViewerScreen() {
   const [expiresRemaining, setExpiresRemaining] = useState(0)
   // timeRatio: 0 = just started (full price), 1 = expired (floor)
   const [timeRatio, setTimeRatio] = useState(0)
+  const [nearFloor, setNearFloor] = useState(false)
+
+  const storyRef = useRef<StoryData | null>(null)
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -163,9 +170,12 @@ export default function StoryViewerScreen() {
 
       const { profiles, ...storyFields } = data as any
       const s = storyFields as StoryData
+      storyRef.current = s
       setStory(s)
       setCurrentPrice(computePrice(s))
       setTimeRatio(computeRatio(s))
+      setNearFloor(computePrice(s) <= s.floor_price_chf * 1.15)
+      setExpiresRemaining(computeExpiry(s))
       setSeller(profiles as SellerProfile)
       setLoading(false)
     })()
@@ -182,11 +192,16 @@ export default function StoryViewerScreen() {
         { event: 'UPDATE', schema: 'public', table: 'stories', filter: `id=eq.${story.id}` },
         (payload) => {
           const updated = payload.new as Partial<StoryData>
-          setStory(prev => prev ? {
-            ...prev,
-            buyer_id: updated.buyer_id !== undefined ? updated.buyer_id : prev.buyer_id,
-            status: updated.status ?? prev.status,
-          } : prev)
+          setStory(prev => {
+            if (!prev) return prev
+            const next = {
+              ...prev,
+              buyer_id: updated.buyer_id !== undefined ? updated.buyer_id : prev.buyer_id,
+              status: updated.status ?? prev.status,
+            }
+            storyRef.current = next
+            return next
+          })
         }
       )
       .subscribe()
@@ -199,16 +214,18 @@ export default function StoryViewerScreen() {
   const prevIntPriceRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!story || story.status !== 'active') return
-
     const tick = () => {
-      const price = computePrice(story)
-      const ratio = computeRatio(story)
+      const s = storyRef.current
+      if (!s || s.status !== 'active') return
+
+      const price = computePrice(s)
+      const ratio = computeRatio(s)
+      const expiry = computeExpiry(s)
+
       setCurrentPrice(price)
       setTimeRatio(ratio)
-
-      const untilExpiry = (new Date(story.expires_at).getTime() - Date.now()) / 1000
-      setExpiresRemaining(Math.max(0, untilExpiry))
+      setNearFloor(price <= s.floor_price_chf * 1.15)
+      setExpiresRemaining(expiry)
 
       // Haptic only when integer part changes
       const intPrice = Math.floor(price)
@@ -223,7 +240,7 @@ export default function StoryViewerScreen() {
     tick()
     const handle = setInterval(tick, 1000)
     return () => clearInterval(handle)
-  }, [story?.id, story?.status, story?.expires_at, story?.created_at])
+  }, [])
 
   // ── Progress bar animation ─────────────────────────────────────────────────
 
@@ -396,7 +413,6 @@ export default function StoryViewerScreen() {
 
   const savedPct = Math.round((1 - currentPrice / story.start_price_chf) * 100)
   const savedAmt = (story.start_price_chf - currentPrice).toFixed(2)
-  const nearFloor = currentPrice <= story.floor_price_chf * 1.15
 
   return (
     <View style={styles.container}>
