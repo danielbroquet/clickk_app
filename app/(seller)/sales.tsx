@@ -36,8 +36,9 @@ interface SaleOrder {
   tracking_number: string | null
   delivered_at: string | null
   listing_id: string
+  buyer_id: string
   listing: { title: string; images: string[] } | null
-  buyer: { username: string; avatar_url: string | null } | null
+  buyer: { id: string; username: string; avatar_url: string | null } | null
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -305,6 +306,33 @@ function SaleCard({
   onShipped: (id: string, trackingNumber: string | null) => void
 }) {
   const [modalVisible, setModalVisible] = useState(false)
+  const [chatLoading, setChatLoading] = useState(false)
+
+  const handleViewProfile = () => {
+    if (order.buyer?.id) router.push(`/profile/${order.buyer.id}`)
+  }
+
+  const handleMessage = async () => {
+    if (chatLoading || !order.buyer_id) return
+    setChatLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .upsert(
+          {
+            buyer_id: order.buyer_id,
+            seller_id: currentUserId,
+            story_id: order.listing_id,
+          },
+          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
+        )
+        .select('id')
+        .single()
+      if (!error && data) router.push(`/conversation/${data.id}`)
+    } finally {
+      setChatLoading(false)
+    }
+  }
   const thumb = order.listing?.images?.[0] ?? null
 
   const handleShipSuccess = (trackingNumber: string | null) => {
@@ -361,17 +389,40 @@ function SaleCard({
 
             {/* Buyer row */}
             <View style={styles.buyerRow}>
-              {order.buyer?.avatar_url ? (
-                <Image source={{ uri: order.buyer.avatar_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={10} color={colors.textSecondary} />
-                </View>
-              )}
-              <Text style={styles.buyerName} numberOfLines={1}>
-                {order.buyer?.username ?? '—'}
-              </Text>
-              <Text style={styles.dateText}>{formattedDate}</Text>
+              <TouchableOpacity
+                style={styles.buyerTouchable}
+                onPress={handleViewProfile}
+                activeOpacity={0.7}
+                disabled={!order.buyer?.id}
+              >
+                {order.buyer?.avatar_url ? (
+                  <Image source={{ uri: order.buyer.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Ionicons name="person" size={10} color={colors.textSecondary} />
+                  </View>
+                )}
+                <Text style={styles.buyerName} numberOfLines={1}>
+                  @{order.buyer?.username ?? '—'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.buyerActions}>
+                <TouchableOpacity
+                  style={styles.msgBtn}
+                  onPress={handleMessage}
+                  disabled={chatLoading}
+                  activeOpacity={0.7}
+                  hitSlop={6}
+                >
+                  {chatLoading ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="chatbubble-outline" size={15} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.dateText}>{formattedDate}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -479,8 +530,9 @@ export default function SellerSalesScreen() {
         tracking_number,
         delivered_at,
         listing_id,
+        buyer_id,
         listing:shop_listings!listing_id(title, images),
-        buyer:profiles!buyer_id(username, avatar_url)
+        buyer:profiles!buyer_id(id, username, avatar_url)
       `)
       .eq('seller_id', currentUserId)
       .order('created_at', { ascending: false })
@@ -636,7 +688,31 @@ const styles = StyleSheet.create({
   buyerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 6,
+  },
+  buyerTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  buyerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  msgBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,210,184,0.1)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   avatar: {
     width: 18,
@@ -651,7 +727,7 @@ const styles = StyleSheet.create({
   buyerName: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.caption,
-    color: colors.textSecondary,
+    color: colors.primary,
     flex: 1,
   },
   dateText: {
