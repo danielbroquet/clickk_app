@@ -111,6 +111,9 @@ function OrderCard({
   const [confirming, setConfirming] = useState(false)
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
 
+  const { session } = useAuth()
+  const currentUserId = session?.user?.id ?? ''
+
   const handleConfirmDelivery = () => {
     Alert.alert(
       'Confirmer la réception ?',
@@ -123,21 +126,39 @@ function OrderCard({
           onPress: async () => {
             setConfirming(true)
             try {
-              const { data, error } = await supabase.functions.invoke('confirm-delivery', {
-                body: { story_id: item.story_id },
-              })
+              if (item.type === 'listing') {
+                const orderId = item.id.replace('order-', '')
+                const { error } = await supabase
+                  .from('shop_orders')
+                  .update({
+                    delivery_status: 'delivered',
+                    delivered_at: new Date().toISOString(),
+                  })
+                  .eq('id', orderId)
+                  .eq('buyer_id', currentUserId)
 
-              if (error) {
-                Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
-                setConfirming(false)
-                return
-              }
+                if (error) {
+                  Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
+                  setConfirming(false)
+                  return
+                }
+              } else {
+                const { data, error } = await supabase.functions.invoke('confirm-delivery', {
+                  body: { story_id: item.story_id },
+                })
 
-              // already_delivered counts as success
-              if (!data?.success && !data?.already_delivered) {
-                Alert.alert('Erreur', data?.error ?? 'Une erreur est survenue')
-                setConfirming(false)
-                return
+                if (error) {
+                  Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
+                  setConfirming(false)
+                  return
+                }
+
+                // already_delivered counts as success
+                if (!data?.success && !data?.already_delivered) {
+                  Alert.alert('Erreur', data?.error ?? 'Une erreur est survenue')
+                  setConfirming(false)
+                  return
+                }
               }
 
               if (Platform.OS !== 'web') {
@@ -238,24 +259,21 @@ function OrderCard({
             </TouchableOpacity>
           ) : null}
 
-          {/* only show for story orders — shop orders use delivery_status */}
-          {item.type === 'story' && (
-            <TouchableOpacity
-              style={[styles.receivedBtn, confirming && styles.receivedBtnDisabled]}
-              onPress={handleConfirmDelivery}
-              disabled={confirming}
-              activeOpacity={0.8}
-            >
-              {confirming ? (
-                <ActivityIndicator size="small" color="#0F0F0F" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle-outline" size={16} color="#0F0F0F" />
-                  <Text style={styles.receivedBtnText}>J'ai bien reçu</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={[styles.receivedBtn, confirming && styles.receivedBtnDisabled]}
+            onPress={handleConfirmDelivery}
+            disabled={confirming}
+            activeOpacity={0.8}
+          >
+            {confirming ? (
+              <ActivityIndicator size="small" color="#0F0F0F" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#0F0F0F" />
+                <Text style={styles.receivedBtnText}>J'ai bien reçu</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -283,7 +301,7 @@ export default function OrdersScreen() {
 
       supabase
         .from('shop_orders')
-        .select('id, created_at, total_chf, status, delivery_status, listing:shop_listings!listing_id(id, title, images, seller:profiles!seller_id(username, avatar_url))')
+        .select('id, created_at, total_chf, status, delivery_status, tracking_number, delivered_at, listing:shop_listings!listing_id(id, title, images, seller:profiles!seller_id(username, avatar_url))')
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false }),
     ])
@@ -320,8 +338,8 @@ export default function OrdersScreen() {
       price:          o.total_chf ?? 0,
       displayStatus:  resolveListingStatus(o.status, o.delivery_status),
       shipped_at:     null,
-      delivered_at:   null,
-      tracking_number: null,
+      delivered_at:   o.delivered_at ?? null,
+      tracking_number: o.tracking_number ?? null,
       created_at:     o.created_at,
     }))
 
