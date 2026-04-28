@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+import { getOrCreateConversation } from '../../lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -316,19 +317,10 @@ function SaleCard({
     if (chatLoading || !order.buyer_id) return
     setChatLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .upsert(
-          {
-            buyer_id: order.buyer_id,
-            seller_id: currentUserId,
-            story_id: order.listing_id,
-          },
-          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
-        )
-        .select('id')
-        .single()
-      if (!error && data) router.push(`/conversation/${data.id}`)
+      const convId = await getOrCreateConversation(supabase, currentUserId, order.buyer_id)
+      router.push(`/conversation/${convId}`)
+    } catch {
+      // silently ignore
     } finally {
       setChatLoading(false)
     }

@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+import { getOrCreateConversation } from '../../lib/utils'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const LISTING_CELL = Math.floor((SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2)
@@ -164,15 +165,10 @@ export default function PublicProfileScreen() {
     if (!id || !currentUserId) return
     setChatLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .upsert(
-          { buyer_id: currentUserId, seller_id: id },
-          { onConflict: 'buyer_id,seller_id', ignoreDuplicates: false }
-        )
-        .select('id')
-        .maybeSingle()
-      if (!error && data) router.push(`/conversation/${data.id}`)
+      const convId = await getOrCreateConversation(supabase, currentUserId, id)
+      router.push(`/conversation/${convId}`)
+    } catch {
+      // silently ignore — user stays on profile
     } finally {
       setChatLoading(false)
     }
