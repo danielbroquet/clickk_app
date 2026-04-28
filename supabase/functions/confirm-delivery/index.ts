@@ -180,6 +180,45 @@ Deno.serve(async (req: Request) => {
     }
     await admin.from("notifications").insert(notifRows);
 
+    // Send push notifications (fire-and-forget)
+    const pushCalls: Promise<unknown>[] = [];
+
+    pushCalls.push(
+      fetch(`${supabaseUrl}/functions/v1/send-push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          user_id: story.seller_id,
+          title: "Livraison confirmée",
+          body: sellerNotifMessage,
+          data: { story_id, auto_released: systemMode },
+        }),
+      }).catch(() => {})
+    );
+
+    if (buyerRecipient) {
+      pushCalls.push(
+        fetch(`${supabaseUrl}/functions/v1/send-push`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            user_id: buyerRecipient,
+            title: buyerNotifTitle,
+            body: buyerNotifMessage,
+            data: { story_id, auto_released: systemMode },
+          }),
+        }).catch(() => {})
+      );
+    }
+
+    EdgeRuntime.waitUntil(Promise.all(pushCalls));
+
     return jsonResponse({
       success: true,
       transfer_id: transfer.id,

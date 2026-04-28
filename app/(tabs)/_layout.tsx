@@ -7,13 +7,13 @@ import {
   Text,
   TouchableOpacity,
   Modal,
-  Alert,
   StyleSheet,
   Pressable,
 } from 'react-native'
 import { Tabs, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import i18n from '../../lib/i18n'
 
 function SellButton({ onPress }: { onPress: () => void }) {
   return (
@@ -30,9 +30,8 @@ interface SellOption {
 }
 
 const SELL_OPTIONS: SellOption[] = [
-  { icon: '📸', title: 'Créer une Story', subtitle: 'Enchère hollandaise — prix descendant' },
-  { icon: '🏪', title: 'Publier un article', subtitle: 'Vente directe dans ton shop' },
-  { icon: '🔨', title: 'Créer une enchère', subtitle: 'Les acheteurs misent en temps réel' },
+  { icon: '📸', title: i18n.t('sell.option_story_title'), subtitle: i18n.t('sell.option_story_sub') },
+  { icon: '🏪', title: i18n.t('sell.option_listing_title'), subtitle: i18n.t('sell.option_listing_sub') },
 ]
 
 export default function TabLayout() {
@@ -122,21 +121,17 @@ export default function TabLayout() {
       >
         <Pressable style={styles.overlay} onPress={() => setShowSellModal(false)}>
           <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>Que veux-tu vendre ?</Text>
+            <Text style={styles.sheetTitle}>{i18n.t('sell.modal_title')}</Text>
             {SELL_OPTIONS.map((opt, index) => (
               <TouchableOpacity
                 key={opt.title}
                 style={styles.option}
                 onPress={() => {
+                  setShowSellModal(false)
                   if (index === 0) {
-                    setShowSellModal(false)
                     router.push('/story/create')
-                  } else if (index === 1) {
-                    setShowSellModal(false)
-                    router.push('/listing/create')
                   } else {
-                    setShowSellModal(false)
-                    Alert.alert('Bientôt disponible', 'Les enchères classiques arrivent prochainement.')
+                    router.push('/listing/create')
                   }
                 }}
               >
@@ -157,8 +152,8 @@ export default function TabLayout() {
               >
                 <Ionicons name="list-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
                 <View style={styles.optionText}>
-                  <Text style={styles.optionTitle}>Mes annonces</Text>
-                  <Text style={styles.optionSub}>Gérer vos stories et articles</Text>
+                  <Text style={styles.optionTitle}>{i18n.t('sell.my_listings')}</Text>
+                  <Text style={styles.optionSub}>{i18n.t('sell.my_listings_sub')}</Text>
                 </View>
               </TouchableOpacity>
             )}

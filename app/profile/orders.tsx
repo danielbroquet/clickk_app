@@ -120,18 +120,34 @@ function OrderCard({
     try {
       if (item.type === 'listing') {
         const orderId = item.id.replace('order-', '')
-        const { error } = await supabase
+        const deliveredAt = new Date().toISOString()
+
+        const { data: updatedOrder, error } = await supabase
           .from('shop_orders')
           .update({
             delivery_status: 'delivered',
-            delivered_at: new Date().toISOString(),
+            delivered_at: deliveredAt,
           })
           .eq('id', orderId)
           .eq('buyer_id', currentUserId)
+          .select('seller_id, listing:shop_listings!listing_id(title)')
+          .maybeSingle()
 
         if (error) {
           setConfirming(false)
           return
+        }
+
+        // Notify the seller
+        if (updatedOrder?.seller_id) {
+          const listingTitle = (updatedOrder.listing as any)?.title ?? 'Article'
+          await supabase.from('notifications').insert({
+            user_id: updatedOrder.seller_id,
+            type: 'delivery_confirmed',
+            title: 'Livraison confirmée',
+            message: `L'acheteur a confirmé la réception de "${listingTitle}". Les fonds vont être transférés.`,
+            payload: { order_id: orderId },
+          })
         }
       } else {
         const { data, error } = await supabase.functions.invoke('confirm-delivery', {

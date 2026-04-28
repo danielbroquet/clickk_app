@@ -107,6 +107,25 @@ Deno.serve(async (req: Request) => {
       },
     ]);
 
+    // Send push notification to buyer
+    if (story.buyer_id) {
+      fetch(`${supabaseUrl}/functions/v1/send-push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          user_id: story.buyer_id,
+          title: "Colis expédié",
+          body: tracking
+            ? `Votre colis est en route. Suivi: ${tracking}`
+            : "Votre colis a été expédié",
+          data: { story_id, tracking_number: tracking },
+        }),
+      }).catch(() => {});
+    }
+
     return jsonResponse({
       success: true,
       shipped_at,

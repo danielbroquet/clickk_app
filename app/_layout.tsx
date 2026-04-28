@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/montserrat'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -20,6 +21,7 @@ function RootRedirector() {
   const { session, loading } = useAuth()
   const router = useRouter()
   const segments = useSegments()
+  usePushNotifications(session?.user?.id ?? null)
 
   useEffect(() => {
     if (loading) return

@@ -22,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
+import i18n from '../../lib/i18n'
 import { useFollow } from '../../hooks/useFollow'
 import { callEdgeFunction } from '../../lib/edgeFunction'
 
@@ -460,9 +461,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statsRow}>
               {[
-                { value: articlesCount, label: 'Articles' },
-                { value: followLoading ? null : followersCount, label: 'Abonnés' },
-                { value: ventesCount, label: 'Ventes' },
+                { value: articlesCount, label: i18n.t('profile.articles') },
+                { value: followLoading ? null : followersCount, label: i18n.t('profile.followers') },
+                { value: ventesCount, label: i18n.t('profile.sales') },
               ].map(stat => (
                 <View key={stat.label} style={styles.stat}>
                   <Text style={styles.statNum}>{stat.value === null ? '--' : stat.value}</Text>
@@ -482,7 +483,7 @@ export default function ProfileScreen() {
             {isOwnProfile ? (
               <>
                 <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
-                  <Text style={styles.editBtnText}>Modifier le profil</Text>
+                  <Text style={styles.editBtnText}>{i18n.t('profile.edit')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.addBtn}
@@ -511,7 +512,7 @@ export default function ProfileScreen() {
               style={styles.becomeSellerBtn}
               onPress={() => router.push('/become-seller')}
             >
-              <Text style={styles.becomeSellerText}>Devenir vendeur</Text>
+              <Text style={styles.becomeSellerText}>{i18n.t('profile.become_seller')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -544,7 +545,7 @@ export default function ProfileScreen() {
               <View style={[styles.storyCircle, styles.storyCircleAdd]}>
                 <Ionicons name="add" size={26} color={colors.primary} />
               </View>
-              <Text style={styles.storyLabel}>Nouvelle</Text>
+              <Text style={styles.storyLabel}>{i18n.t('profile.new_story')}</Text>
             </TouchableOpacity>
 
             {/* Existing stories */}
@@ -580,7 +581,7 @@ export default function ProfileScreen() {
         {/* Publications grid */}
         {stories.length === 0 ? (
           <View style={styles.emptyGrid}>
-            <Text style={styles.emptyTitle}>Aucune publication</Text>
+            <Text style={styles.emptyTitle}>{i18n.t('profile.no_publications')}</Text>
           </View>
         ) : (
           <FlatList
@@ -601,7 +602,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsRowLeft}>
               <Ionicons name="bag-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>Mes commandes</Text>
+              <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_orders')}</Text>
             </View>
             <View style={styles.settingsRowRight}>
               {activeOrdersCount > 0 && (
@@ -622,7 +623,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsRowLeft}>
               <Ionicons name="wallet-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>Mon Wallet</Text>
+              <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_wallet')}</Text>
             </View>
             <View style={styles.settingsRowRight}>
               {walletBalance !== null && (
@@ -645,7 +646,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.settingsRowLeft}>
               <Ionicons name="card-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>Moyens de paiement</Text>
+              <Text style={styles.settingsRowLabel}>{i18n.t('profile.payment_methods')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -660,7 +661,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.settingsRowLeft}>
                   <Ionicons name="receipt-outline" size={20} color={colors.textSecondary} />
-                  <Text style={styles.settingsRowLabel}>Mes ventes</Text>
+                  <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_sales')}</Text>
                 </View>
                 <View style={styles.settingsRowRight}>
                   {ventesCount !== null && ventesCount > 0 && (
@@ -677,7 +678,7 @@ export default function ProfileScreen() {
 
         {/* Sign out */}
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-          <Text style={styles.signOutText}>Se déconnecter</Text>
+          <Text style={styles.signOutText}>{i18n.t('profile.sign_out')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
