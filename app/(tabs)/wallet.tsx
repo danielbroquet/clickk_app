@@ -153,8 +153,6 @@ export default function WalletScreen() {
         throw new Error(body?.error ?? 'Erreur inconnue')
       }
       const json: WalletData = await res.json()
-      // TODO: REMOVE TEST OVERRIDE
-      json.available_chf = 25.50
       setData(json)
       setError(null)
       setNotSeller(false)
