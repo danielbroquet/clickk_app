@@ -484,7 +484,11 @@ export default function ProfileScreen() {
                 <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
                   <Text style={styles.editBtnText}>Modifier le profil</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.addBtn}>
+                <TouchableOpacity
+                  style={styles.addBtn}
+                  onPress={() => router.push('/(tabs)/discover')}
+                  activeOpacity={0.8}
+                >
                   <Ionicons name="person-add-outline" size={18} color={colors.text} />
                 </TouchableOpacity>
               </>
@@ -531,13 +535,37 @@ export default function ProfileScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.storiesRow}
           >
-            {[1, 2, 3, 4].map(i => (
-              <View key={i} style={styles.storyItem}>
-                <View style={styles.storyCircle}>
-                  <Ionicons name="add" size={24} color={colors.text} />
-                </View>
-                <Text style={styles.storyLabel}>Story</Text>
+            {/* Create new story */}
+            <TouchableOpacity
+              style={styles.storyItem}
+              activeOpacity={0.8}
+              onPress={() => router.push('/story/create')}
+            >
+              <View style={[styles.storyCircle, styles.storyCircleAdd]}>
+                <Ionicons name="add" size={26} color={colors.primary} />
               </View>
+              <Text style={styles.storyLabel}>Nouvelle</Text>
+            </TouchableOpacity>
+
+            {/* Existing stories */}
+            {stories.map(story => (
+              <TouchableOpacity
+                key={story.id}
+                style={styles.storyItem}
+                activeOpacity={0.8}
+                onPress={() => router.push(`/story/${story.id}`)}
+              >
+                <View style={[styles.storyCircle, story.status === 'sold' && styles.storyCircleSold]}>
+                  {story.video_url ? (
+                    <Image source={{ uri: story.video_url }} style={styles.storyCircleImg} />
+                  ) : (
+                    <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
+                  )}
+                </View>
+                <Text style={styles.storyLabel} numberOfLines={1}>
+                  {story.status === 'sold' ? 'Vendu' : `CHF ${story.current_price_chf.toFixed(0)}`}
+                </Text>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -608,6 +636,8 @@ export default function ProfileScreen() {
 
           <View style={styles.settingsDivider} />
 
+          <View style={styles.settingsDivider} />
+
           <TouchableOpacity
             style={styles.settingsRow}
             onPress={() => router.push('/profile/payment-methods')}
@@ -619,6 +649,30 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
+
+          {profile?.role === 'seller' && (
+            <>
+              <View style={styles.settingsDivider} />
+              <TouchableOpacity
+                style={styles.settingsRow}
+                onPress={() => router.push('/(seller)/sales')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.settingsRowLeft}>
+                  <Ionicons name="receipt-outline" size={20} color={colors.textSecondary} />
+                  <Text style={styles.settingsRowLabel}>Mes ventes</Text>
+                </View>
+                <View style={styles.settingsRowRight}>
+                  {ventesCount !== null && ventesCount > 0 && (
+                    <View style={styles.ordersBadge}>
+                      <Text style={styles.ordersBadgeText}>{ventesCount}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                </View>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Sign out */}
@@ -699,9 +753,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 2,
     borderColor: colors.border,
-    borderStyle: 'dashed',
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  storyCircleAdd: {
+    borderStyle: 'dashed',
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,210,184,0.06)',
+  },
+  storyCircleSold: {
+    borderColor: colors.border,
+    opacity: 0.5,
+  },
+  storyCircleImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   storyLabel: { fontSize: 11, color: colors.textSecondary },
   tabBar: {

@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { Video, ResizeMode } from 'expo-av'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+import { getOrCreateConversation } from '../../lib/utils'
 
 type ListingMediaItemProps = {
   url: string
@@ -131,15 +132,10 @@ export default function ListingDetailScreen() {
     if (!listing || !listing.seller || currentUserId === listing.seller_id) return
     setChatLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .upsert(
-          { buyer_id: currentUserId, seller_id: listing.seller_id, story_id: listing.id },
-          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
-        )
-        .select('id')
-        .single()
-      if (!error && data) router.push(`/conversation/${data.id}`)
+      const convId = await getOrCreateConversation(supabase, currentUserId, listing.seller_id)
+      router.push(`/conversation/${convId}`)
+    } catch {
+      // silently ignore
     } finally {
       setChatLoading(false)
     }
