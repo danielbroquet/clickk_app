@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  Alert,
   Linking,
   Platform,
 } from 'react-native'
@@ -109,79 +108,55 @@ function OrderCard({
   onDelivered: (id: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
+  const [awaitingConfirm, setAwaitingConfirm] = useState(false)
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
 
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
 
-  const handleConfirmDelivery = () => {
-    console.log('handleConfirmDelivery called', {
-      type: item.type,
-      id: item.id,
-      displayStatus: item.displayStatus,
-    })
-    console.log('currentUserId in OrderCard:', currentUserId)
-    Alert.alert(
-      'Confirmer la réception ?',
-      'Cette action libère le paiement vers le vendeur et ne peut pas être annulée.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('user confirmed delivery')
-            setConfirming(true)
-            try {
-              if (item.type === 'listing') {
-                const orderId = item.id.replace('order-', '')
-                console.log('updating shop_order', orderId)
-                const { data, error } = await supabase
-                  .from('shop_orders')
-                  .update({
-                    delivery_status: 'delivered',
-                    delivered_at: new Date().toISOString(),
-                  })
-                  .eq('id', orderId)
-                  .eq('buyer_id', currentUserId)
-                console.log('update result', { data, error })
+  const handleConfirmDelivery = async () => {
+    setAwaitingConfirm(false)
+    setConfirming(true)
+    try {
+      if (item.type === 'listing') {
+        const orderId = item.id.replace('order-', '')
+        const { error } = await supabase
+          .from('shop_orders')
+          .update({
+            delivery_status: 'delivered',
+            delivered_at: new Date().toISOString(),
+          })
+          .eq('id', orderId)
+          .eq('buyer_id', currentUserId)
 
-                if (error) {
-                  Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
-                  setConfirming(false)
-                  return
-                }
-              } else {
-                const { data, error } = await supabase.functions.invoke('confirm-delivery', {
-                  body: { story_id: item.story_id },
-                })
+        if (error) {
+          setConfirming(false)
+          return
+        }
+      } else {
+        const { data, error } = await supabase.functions.invoke('confirm-delivery', {
+          body: { story_id: item.story_id },
+        })
 
-                if (error) {
-                  Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
-                  setConfirming(false)
-                  return
-                }
+        if (error) {
+          setConfirming(false)
+          return
+        }
 
-                // already_delivered counts as success
-                if (!data?.success && !data?.already_delivered) {
-                  Alert.alert('Erreur', data?.error ?? 'Une erreur est survenue')
-                  setConfirming(false)
-                  return
-                }
-              }
+        // already_delivered counts as success
+        if (!data?.success && !data?.already_delivered) {
+          setConfirming(false)
+          return
+        }
+      }
 
-              if (Platform.OS !== 'web') {
-                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-              }
-              onDelivered(item.id)
-            } catch (e: unknown) {
-              Alert.alert('Erreur', e instanceof Error ? e.message : 'Une erreur est survenue')
-              setConfirming(false)
-            }
-          },
-        },
-      ],
-    )
+      if (Platform.OS !== 'web') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      }
+      onDelivered(item.id)
+    } catch {
+      setConfirming(false)
+    }
   }
 
   const handleTrackParcel = () => {
@@ -268,21 +243,39 @@ function OrderCard({
             </TouchableOpacity>
           ) : null}
 
-          <TouchableOpacity
-            style={[styles.receivedBtn, confirming && styles.receivedBtnDisabled]}
-            onPress={handleConfirmDelivery}
-            disabled={confirming}
-            activeOpacity={0.8}
-          >
-            {confirming ? (
-              <ActivityIndicator size="small" color="#0F0F0F" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#0F0F0F" />
-                <Text style={styles.receivedBtnText}>J'ai bien reçu</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {awaitingConfirm ? (
+            <View style={styles.confirmRow}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                onPress={() => setAwaitingConfirm(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.confirmCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmDestructiveBtn, confirming && styles.receivedBtnDisabled]}
+                onPress={handleConfirmDelivery}
+                disabled={confirming}
+                activeOpacity={0.8}
+              >
+                {confirming ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmDestructiveText}>Confirmer ✓</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.receivedBtn, confirming && styles.receivedBtnDisabled]}
+              onPress={() => setAwaitingConfirm(true)}
+              disabled={confirming}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle-outline" size={16} color="#0F0F0F" />
+              <Text style={styles.receivedBtnText}>J'ai bien reçu</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>
@@ -652,5 +645,36 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.label,
     color: '#0F0F0F',
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmCancelText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.label,
+    color: colors.textSecondary,
+  },
+  confirmDestructiveBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.error,
+    minHeight: 46,
+  },
+  confirmDestructiveText: {
+    fontFamily: fontFamily.bold,
+    fontSize: fontSize.label,
+    color: '#fff',
   },
 })
