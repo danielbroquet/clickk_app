@@ -64,6 +64,7 @@ function resolveListingStatus(
   if (deliveryStatus === 'delivered') return 'delivered'
   if (deliveryStatus === 'shipped')   return 'shipped'
   if (status === 'refunded')          return 'refunded'
+  if (status === 'paid')              return 'paid'
   return 'paid'
 }
 
@@ -282,10 +283,17 @@ export default function OrdersScreen() {
 
       supabase
         .from('shop_orders')
-        .select('id, created_at, total_chf, status, delivery_status, listing:shop_listings(id, title, images, seller:profiles!seller_id(username, avatar_url))')
+        .select('id, created_at, total_chf, status, delivery_status, listing:shop_listings!listing_id(id, title, images, seller:profiles!seller_id(username, avatar_url))')
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false }),
     ])
+
+    if (storiesRes.error) {
+      console.error('[fetchOrders] stories query failed:', storiesRes.error)
+    }
+    if (ordersRes.error) {
+      console.error('[fetchOrders] shop_orders query failed:', ordersRes.error)
+    }
 
     const storyOrders: OrderItem[] = (storiesRes.data ?? []).map((s: any) => ({
       id:             `story-${s.id}`,
