@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
@@ -25,6 +25,7 @@ function RootRedirector() {
   const segments = useSegments()
   const [onboardingChecked, setOnboardingChecked] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(true)
+  const redirectedRef = useRef(false)
 
   usePushNotifications(session?.user?.id ?? null)
 
@@ -41,8 +42,9 @@ function RootRedirector() {
     const inOnboarding = segments[0] === 'onboarding'
     const inAuthGroup = segments[0] === '(auth)'
 
-    // First launch: show onboarding
-    if (!onboardingDone && !inOnboarding) {
+    // First launch: show onboarding (only redirect once)
+    if (!onboardingDone && !inOnboarding && !redirectedRef.current) {
+      redirectedRef.current = true
       router.replace('/onboarding')
       return
     }
