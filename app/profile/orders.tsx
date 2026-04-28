@@ -275,6 +275,20 @@ export default function OrdersScreen() {
     console.log('fetchOrders userId:', userId)
     if (!userId) return
 
+    // DEBUG step 1: simplest possible shop_orders query — no join
+    const simpleOrdersRes = await supabase
+      .from('shop_orders')
+      .select('id, listing_id, total_chf, status, delivery_status, created_at')
+      .eq('buyer_id', userId)
+    console.log('simple orders:', JSON.stringify(simpleOrdersRes))
+
+    // DEBUG step 2: with nested listing join (no FK hint)
+    const joinOrdersRes = await supabase
+      .from('shop_orders')
+      .select('id, total_chf, status, delivery_status, created_at, listing:shop_listings(id, title, images)')
+      .eq('buyer_id', userId)
+    console.log('join orders:', JSON.stringify(joinOrdersRes))
+
     const [storiesRes, ordersRes] = await Promise.all([
       supabase
         .from('stories')
