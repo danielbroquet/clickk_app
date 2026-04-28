@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
@@ -9,46 +9,69 @@ import {
   Montserrat_600SemiBold,
   Montserrat_700Bold,
 } from '@expo-google-fonts/montserrat'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import { View } from 'react-native'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import { ONBOARDING_KEY } from './onboarding'
+import NetworkBanner from '../components/ui/NetworkBanner'
 
 SplashScreen.preventAutoHideAsync()
-
-const PROTECTED_SEGMENTS = ['(tabs)', 'become-seller', 'wallet', 'story', 'listing']
 
 function RootRedirector() {
   const { session, loading } = useAuth()
   const router = useRouter()
   const segments = useSegments()
+  const [onboardingChecked, setOnboardingChecked] = useState(false)
+  const [onboardingDone, setOnboardingDone] = useState(true)
+
   usePushNotifications(session?.user?.id ?? null)
 
   useEffect(() => {
-    if (loading) return
+    AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
+      setOnboardingDone(val === 'true')
+      setOnboardingChecked(true)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (loading || !onboardingChecked) return
+
+    const inOnboarding = segments[0] === 'onboarding'
     const inAuthGroup = segments[0] === '(auth)'
-    const inProtectedRoute = !inAuthGroup
+
+    // First launch: show onboarding
+    if (!onboardingDone && !inOnboarding) {
+      router.replace('/onboarding')
+      return
+    }
+
+    const inProtectedRoute = !inAuthGroup && !inOnboarding
 
     if (!session && inProtectedRoute) {
       router.replace('/(auth)/login')
-    } else if (session && inAuthGroup) {
+    } else if (session && (inAuthGroup || inOnboarding)) {
       router.replace('/(tabs)')
     }
-  }, [session, loading, segments])
+  }, [session, loading, segments, onboardingChecked, onboardingDone])
 
-  if (loading) return null
+  if (loading || !onboardingChecked) return null
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(auth)" />
+      <Stack.Screen name="onboarding" />
       <Stack.Screen name="become-seller" />
       <Stack.Screen name="wallet/index" />
-      <Stack.Screen name="(seller)/listings" options={{ headerShown: false }} />
+      <Stack.Screen name="(seller)/listings" />
       <Stack.Screen name="story/create" />
       <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
       <Stack.Screen name="profile/orders" />
-      <Stack.Screen name="profile/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/about" />
+      <Stack.Screen name="profile/[id]" />
     </Stack>
   )
 }
@@ -74,7 +97,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="light" backgroundColor="#0F0F0F" />
-      <RootRedirector />
+      <View style={{ flex: 1 }}>
+        <RootRedirector />
+        <NetworkBanner />
+      </View>
     </AuthProvider>
   )
 }

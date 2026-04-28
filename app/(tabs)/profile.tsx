@@ -676,6 +676,12 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* À propos */}
+        <TouchableOpacity style={styles.aboutBtn} onPress={() => router.push('/profile/about')}>
+          <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+          <Text style={styles.aboutText}>À propos · CGU · Confidentialité</Text>
+        </TouchableOpacity>
+
         {/* Sign out */}
         <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
           <Text style={styles.signOutText}>{i18n.t('profile.sign_out')}</Text>
@@ -848,7 +854,20 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     color: '#0F0F0F',
   },
-  signOutBtn: { padding: 16, marginTop: 8, alignItems: 'center' },
+  aboutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 14,
+    marginTop: 4,
+  },
+  aboutText: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  signOutBtn: { padding: 16, marginTop: 4, alignItems: 'center' },
   signOutText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.error },
   becomeSellerBtn: {
     backgroundColor: 'rgba(0,210,184,0.1)',
