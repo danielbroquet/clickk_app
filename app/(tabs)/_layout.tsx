@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useUnreadMessages } from '../../hooks/useUnreadMessages'
 import { useAuth } from '../../lib/auth'
+import { useUnreadNotifCount } from './inbox'
 import {
   View,
   Text,
@@ -37,8 +38,11 @@ const SELL_OPTIONS: SellOption[] = [
 export default function TabLayout() {
   const [showSellModal, setShowSellModal] = useState(false)
   const { unreadCount } = useUnreadMessages()
-  const { profile } = useAuth()
+  const { profile, session } = useAuth()
   const isSeller = profile?.role === 'seller'
+  const userId = session?.user?.id ?? ''
+  const unreadNotifCount = useUnreadNotifCount(userId)
+  const totalInboxBadge = unreadCount + unreadNotifCount
 
   return (
     <>
@@ -48,57 +52,45 @@ export default function TabLayout() {
           tabBarStyle: styles.tabBar,
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textSecondary,
-          tabBarShowLabel: false,
+          tabBarShowLabel: true,
+          tabBarLabelStyle: styles.tabLabel,
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
+            title: 'Feed',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="discover"
           options={{
+            title: 'Découvrir',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'compass' : 'compass-outline'} size={22} color={color} />
             ),
           }}
         />
         <Tabs.Screen
           name="sell"
           options={{
+            title: '',
             tabBarButton: () => (
               <SellButton onPress={() => setShowSellModal(true)} />
             ),
           }}
         />
         <Tabs.Screen
-          name="notifications"
+          name="inbox"
           options={{
+            title: 'Inbox',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons
-                name={focused ? 'notifications' : 'notifications-outline'}
-                size={24}
-                color={color}
-              />
+              <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={22} color={color} />
             ),
-          }}
-        />
-        <Tabs.Screen
-          name="messages"
-          options={{
-            title: 'Messages',
-            tabBarIcon: ({ focused, color }) => (
-              <Ionicons
-                name={focused ? 'chatbubble' : 'chatbubble-outline'}
-                size={24}
-                color={color}
-              />
-            ),
-            tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+            tabBarBadge: totalInboxBadge > 0 ? totalInboxBadge : undefined,
             tabBarBadgeStyle: {
               backgroundColor: '#00D2B8',
               color: '#0F0F0F',
@@ -107,21 +99,19 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="wallet"
-          options={{
-            tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={24} color={color} />
-            ),
-          }}
-        />
-        <Tabs.Screen
           name="profile"
           options={{
+            title: 'Profil',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
             ),
           }}
         />
+
+        {/* Hidden — files kept intact, removed from tab bar */}
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="messages" options={{ href: null }} />
+        <Tabs.Screen name="wallet" options={{ href: null }} />
       </Tabs>
 
       <Modal
@@ -190,7 +180,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     borderTopColor: colors.border,
     borderTopWidth: 1,
-    height: 60,
+    height: 68,
+    paddingBottom: 8,
+  },
+  tabLabel: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 10,
   },
   sellBtn: {
     width: 56,

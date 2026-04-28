@@ -23,6 +23,7 @@ import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
 import { useFollow } from '../../hooks/useFollow'
+import { callEdgeFunction } from '../../lib/edgeFunction'
 
 const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3)
 
@@ -381,6 +382,7 @@ export default function ProfileScreen() {
   const [stories, setStories] = useState<StoryCell[]>([])
   const [editVisible, setEditVisible] = useState(false)
   const [activeOrdersCount, setActiveOrdersCount] = useState(0)
+  const [walletBalance, setWalletBalance] = useState<number | null>(null)
 
   useEffect(() => {
     const userId = session?.user?.id
@@ -421,6 +423,10 @@ export default function ProfileScreen() {
     ]).then(([sRes, oRes]) => {
       setActiveOrdersCount((sRes.count ?? 0) + (oRes.count ?? 0))
     })
+
+    callEdgeFunction<{ available_chf: number }>('get-seller-wallet')
+      .then(data => setWalletBalance(data.available_chf ?? 0))
+      .catch(() => setWalletBalance(null))
   }, [session?.user?.id])
 
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
@@ -583,6 +589,27 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.settingsRow}
+            onPress={() => router.push('/(tabs)/wallet')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.settingsRowLeft}>
+              <Ionicons name="wallet-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.settingsRowLabel}>Mon Wallet</Text>
+            </View>
+            <View style={styles.settingsRowRight}>
+              {walletBalance !== null && (
+                <Text style={styles.walletBalance}>
+                  CHF {walletBalance.toFixed(2)}
+                </Text>
+              )}
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.settingsDivider} />
+
+          <TouchableOpacity
+            style={styles.settingsRow}
             onPress={() => router.push('/profile/payment-methods')}
             activeOpacity={0.7}
           >
@@ -727,6 +754,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  walletBalance: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.primary,
   },
   settingsDivider: {
     height: 1,

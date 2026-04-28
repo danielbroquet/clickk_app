@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import type { Story, Profile } from '../../types'
@@ -25,7 +26,11 @@ function DiscoverCard({ item }: { item: StoryWithSeller }) {
   const sellerName = item.seller?.username ?? 'vendeur'
 
   return (
-    <TouchableOpacity style={styles.card} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.85}
+      onPress={() => router.push(`/story/${item.id}`)}
+    >
       <Image
         source={{ uri: imageUri }}
         style={styles.cardImage}
