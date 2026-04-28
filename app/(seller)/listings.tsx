@@ -709,7 +709,15 @@ export default function SellerListingsScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Mes annonces</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity
+          onPress={() => router.push('/(seller)/sales')}
+          hitSlop={8}
+          activeOpacity={0.7}
+          style={styles.salesBtn}
+        >
+          <Ionicons name="receipt-outline" size={16} color={colors.primary} />
+          <Text style={styles.salesBtnText}>Ventes</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab toggle */}
@@ -809,6 +817,20 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.body,
     color: colors.text,
+  },
+  salesBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,210,184,0.10)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  salesBtnText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.caption,
+    color: colors.primary,
   },
 
   tabs: {
