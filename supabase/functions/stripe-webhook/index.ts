@@ -157,6 +157,12 @@ async function processPurchase(
 
 Deno.serve(async (req: Request) => {
   try {
+    console.log(
+      `[WEBHOOK] incoming ${req.method} ${new URL(req.url).pathname} ` +
+        `sig=${req.headers.get("stripe-signature") ? "present" : "missing"} ` +
+        `ua=${req.headers.get("user-agent") ?? "?"}`
+    );
+
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "method_not_allowed" }), {
         status: 405,
@@ -198,6 +204,10 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (!valid) {
+      console.error(
+        `[WEBHOOK] signature_invalid bodyLen=${body.length} ` +
+          `secretsTried=${secrets.length}`
+      );
       return new Response(JSON.stringify({ error: "invalid_signature" }), {
         status: 400,
         headers: { "Content-Type": "application/json" },
@@ -205,10 +215,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const event = JSON.parse(body) as StripeEvent;
-    console.log(`[stripe-webhook] Received event: ${event.type} (${event.id})`);
+    console.log(`[WEBHOOK] verified event ${event.type} id=${event.id}`);
 
     if (event.type === "checkout.session.completed") {
       const metadata = event.data.object.metadata ?? {};
+      console.log("[WEBHOOK] checkout.session.completed received", {
+        session_id: event.data.object.id,
+        listing_id: metadata.listing_id,
+        type: metadata.type,
+      });
 
       if (metadata.type === "listing") {
         const { listing_id, buyer_id, seller_id, amount_chf } = metadata;
@@ -336,6 +351,11 @@ Deno.serve(async (req: Request) => {
       const pi = event.data.object;
       const paymentIntentId = pi.id ?? "";
       const metadata = pi.metadata ?? {};
+      console.log("[WEBHOOK] payment_intent.succeeded received", {
+        intent_id: paymentIntentId,
+        listing_id: metadata.listing_id,
+        story_id: metadata.story_id,
+      });
       const { story_id, listing_id, buyer_id, seller_id: sellerIdMeta, amount_chf } = metadata;
 
       const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");

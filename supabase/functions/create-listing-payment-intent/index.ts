@@ -32,6 +32,12 @@ async function recordListingOrder(opts: {
 }) {
   const { supabase, paymentIntentId, listing, buyerId, amountChf } = opts;
 
+  console.log("[INSTANT] recordListingOrder called", {
+    intent_id: paymentIntentId,
+    listing_id: listing.id,
+    buyer_id: buyerId,
+  });
+
   const { error: orderErr } = await supabase
     .from("shop_orders")
     .upsert(
