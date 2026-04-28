@@ -39,12 +39,20 @@ Deno.serve(async (req: Request) => {
     if (!authHeader) {
       return jsonResponse({ error: "unauthorized" }, 401);
     }
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace("Bearer ", "").trim();
+
+    let buyer_id: string | null = null;
+    let systemMode = false;
+
     const { data: userData, error: userErr } = await admin.auth.getUser(token);
-    if (userErr || !userData?.user) {
+    if (!userErr && userData?.user) {
+      buyer_id = userData.user.id;
+    } else if (token === serviceRoleKey) {
+      systemMode = true;
+      console.log("[confirm-delivery] system mode auto-release");
+    } else {
       return jsonResponse({ error: "unauthorized" }, 401);
     }
-    const buyer_id = userData.user.id;
 
     const { story_id } = await req.json();
     if (!story_id || typeof story_id !== "string") {
@@ -63,13 +71,16 @@ Deno.serve(async (req: Request) => {
     if (!story) {
       return jsonResponse({ error: "story_not_found" }, 404);
     }
-    if (story.buyer_id !== buyer_id) {
+    if (!systemMode && story.buyer_id !== buyer_id) {
       return jsonResponse({ error: "forbidden" }, 403);
     }
     if (story.status === "delivered") {
       return jsonResponse({ success: true, already_delivered: true }, 200);
     }
-    if (story.status !== "sold") {
+    if (!systemMode && story.status !== "sold") {
+      return jsonResponse({ error: "invalid_status" }, 400);
+    }
+    if (systemMode && story.status !== "sold" && story.status !== "shipped") {
       return jsonResponse({ error: "invalid_status" }, 400);
     }
     if (!story.final_price_chf || story.final_price_chf <= 0) {
@@ -97,6 +108,9 @@ Deno.serve(async (req: Request) => {
       destination: sellerProfile.stripe_account_id,
       "metadata[story_id]": story_id,
     });
+    if (systemMode) {
+      transferParams.append("metadata[release_reason]", "auto_released");
+    }
 
     const stripeRes = await fetch("https://api.stripe.com/v1/transfers", {
       method: "POST",
@@ -116,40 +130,61 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const updatePayload: Record<string, unknown> = {
+      status: "delivered",
+      delivered_at: new Date().toISOString(),
+    };
+    if (systemMode) {
+      updatePayload.release_reason = "auto_released";
+    }
+
+    const allowedStatuses = systemMode ? ["sold", "shipped"] : ["sold"];
     const { error: updateErr } = await admin
       .from("stories")
-      .update({
-        status: "delivered",
-        delivered_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", story_id)
-      .eq("status", "sold");
+      .in("status", allowedStatuses);
 
     if (updateErr) {
       return jsonResponse({ error: "story_update_failed" }, 500);
     }
 
-    await admin.from("notifications").insert([
+    const buyerNotifTitle = systemMode
+      ? "Paiement libéré automatiquement"
+      : "Réception confirmée";
+    const buyerNotifMessage = systemMode
+      ? "Le paiement a été libéré automatiquement au vendeur après 7 jours."
+      : "Merci d'avoir confirmé la réception";
+    const sellerNotifMessage = systemMode
+      ? "Paiement libéré automatiquement après 7 jours."
+      : "Livraison confirmée — fonds transférés";
+
+    const buyerRecipient = story.buyer_id ?? buyer_id;
+    const notifRows = [
       {
         user_id: story.seller_id,
         type: "delivery_confirmed",
         title: "Livraison confirmée",
-        message: "Livraison confirmée — fonds transférés",
-        payload: { story_id },
+        message: sellerNotifMessage,
+        payload: { story_id, auto_released: systemMode },
       },
-      {
-        user_id: buyer_id,
+    ];
+    if (buyerRecipient) {
+      notifRows.push({
+        user_id: buyerRecipient,
         type: "delivery_confirmed",
-        title: "Réception confirmée",
-        message: "Merci d'avoir confirmé la réception",
-        payload: { story_id },
-      },
-    ]);
+        title: buyerNotifTitle,
+        message: buyerNotifMessage,
+        payload: { story_id, auto_released: systemMode },
+      });
+    }
+    await admin.from("notifications").insert(notifRows);
 
     return jsonResponse({
       success: true,
       transfer_id: transfer.id,
       amount_chf: amount_cents / 100,
+      auto_released: systemMode,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "internal_error";
