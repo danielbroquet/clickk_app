@@ -240,6 +240,8 @@ Deno.serve(async (req: Request) => {
         }
 
         const amountChf = parseFloat(amount_chf);
+        const commissionChf = Math.round(amountChf * 0.08 * 100) / 100;
+        const sellerAmountChf = Math.round(amountChf * 0.92 * 100) / 100;
         const sessionId = event.data.object.id ?? "";
 
         // Insert the order FIRST so the buyer's purchase is always recorded,
@@ -254,7 +256,8 @@ Deno.serve(async (req: Request) => {
               seller_id,
               quantity: 1,
               total_chf: amountChf,
-              seller_amount_chf: amountChf,
+              commission_chf: commissionChf,
+              seller_amount_chf: sellerAmountChf,
               status: "paid",
             },
             { onConflict: "session_id", ignoreDuplicates: true }
@@ -524,6 +527,9 @@ Deno.serve(async (req: Request) => {
           ? sellerIdMeta
           : (listing.seller_id as string);
 
+        const piCommissionChf = Math.round(amountChf * 0.08 * 100) / 100;
+        const piSellerAmountChf = Math.round(amountChf * 0.92 * 100) / 100;
+
         const { error: orderErr } = await supabase
           .from("shop_orders")
           .upsert(
@@ -534,7 +540,8 @@ Deno.serve(async (req: Request) => {
               seller_id: sellerId,
               quantity: 1,
               total_chf: amountChf,
-              seller_amount_chf: amountChf,
+              commission_chf: piCommissionChf,
+              seller_amount_chf: piSellerAmountChf,
               status: "paid",
             },
             { onConflict: "session_id", ignoreDuplicates: true }

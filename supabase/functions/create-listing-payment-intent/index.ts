@@ -38,6 +38,9 @@ async function recordListingOrder(opts: {
     buyer_id: buyerId,
   });
 
+  const commissionChf = Math.round(amountChf * 0.08 * 100) / 100;
+  const sellerAmountChf = Math.round(amountChf * 0.92 * 100) / 100;
+
   const { error: orderErr } = await supabase
     .from("shop_orders")
     .upsert(
@@ -48,7 +51,8 @@ async function recordListingOrder(opts: {
         seller_id: listing.seller_id,
         quantity: 1,
         total_chf: amountChf,
-        seller_amount_chf: amountChf,
+        commission_chf: commissionChf,
+        seller_amount_chf: sellerAmountChf,
         status: "paid",
       },
       { onConflict: "session_id", ignoreDuplicates: true }
