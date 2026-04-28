@@ -70,6 +70,25 @@ async function recordListingOrder(opts: {
     }
   }
 
+  // Safety: ensure is_active is false whenever stock has reached 0,
+  // regardless of whether the CAS decrement above won or was skipped.
+  const { data: finalStock, error: finalStockErr } = await supabase
+    .from("shop_listings")
+    .select("stock")
+    .eq("id", listing.id)
+    .maybeSingle();
+
+  if (!finalStockErr && finalStock && (finalStock.stock ?? 0) <= 0) {
+    const { error: deactivateErr } = await supabase
+      .from("shop_listings")
+      .update({ is_active: false })
+      .eq("id", listing.id)
+      .lte("stock", 0);
+    if (deactivateErr) {
+      console.error(`${LOG} deactivate listing failed`, deactivateErr.message);
+    }
+  }
+
   const { error: notifErr } = await supabase.from("notifications").insert([
     {
       user_id: buyerId,

@@ -234,9 +234,10 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (!fetchErr && listingRow && listingRow.stock > 0) {
+          const newStock = listingRow.stock - 1;
           const { error: updateErr } = await supabase
             .from("shop_listings")
-            .update({ stock: listingRow.stock - 1 })
+            .update({ stock: newStock, is_active: newStock > 0 })
             .eq("id", listing_id)
             .eq("stock", listingRow.stock);
 
@@ -245,6 +246,26 @@ Deno.serve(async (req: Request) => {
           }
         } else if (fetchErr) {
           console.error("[stripe-webhook] stock fetch failed:", fetchErr.message);
+        }
+
+        // Safety: ensure is_active is false whenever stock has reached 0.
+        {
+          const { data: finalStock, error: finalStockErr } = await supabase
+            .from("shop_listings")
+            .select("stock")
+            .eq("id", listing_id)
+            .maybeSingle();
+
+          if (!finalStockErr && finalStock && (finalStock.stock ?? 0) <= 0) {
+            const { error: deactivateErr } = await supabase
+              .from("shop_listings")
+              .update({ is_active: false })
+              .eq("id", listing_id)
+              .lte("stock", 0);
+            if (deactivateErr) {
+              console.error("[stripe-webhook] deactivate listing failed:", deactivateErr.message);
+            }
+          }
         }
 
         const sessionId = event.data.object.id ?? "";
@@ -509,6 +530,26 @@ Deno.serve(async (req: Request) => {
 
         if (updateErr) {
           console.error(`${PI_LOG} listing stock update failed:`, updateErr.message);
+        }
+
+        // Safety: ensure is_active is false whenever stock has reached 0.
+        {
+          const { data: finalStock, error: finalStockErr } = await supabase
+            .from("shop_listings")
+            .select("stock")
+            .eq("id", listing_id)
+            .maybeSingle();
+
+          if (!finalStockErr && finalStock && (finalStock.stock ?? 0) <= 0) {
+            const { error: deactivateErr } = await supabase
+              .from("shop_listings")
+              .update({ is_active: false })
+              .eq("id", listing_id)
+              .lte("stock", 0);
+            if (deactivateErr) {
+              console.error(`${PI_LOG} deactivate listing failed:`, deactivateErr.message);
+            }
+          }
         }
 
         const { error: notifErr } = await supabase.from("notifications").insert([
