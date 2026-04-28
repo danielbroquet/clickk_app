@@ -541,6 +541,7 @@ function ListingCard({
 }) {
   const [toggling, setToggling] = useState(false)
   const thumb = listing.images?.[0] ?? null
+  const isSold = listing.stock === 0 && !listing.is_active
 
   const handleToggle = async (val: boolean) => {
     setToggling(true)
@@ -587,9 +588,14 @@ function ListingCard({
             <Text style={styles.cardTitle} numberOfLines={1}>
               {listing.title}
             </Text>
-            <View style={[styles.badge, listing.is_active ? styles.badgeTeal : styles.badgeGray]}>
-              <Text style={[styles.badgeText, { color: listing.is_active ? colors.primary : colors.textSecondary }]}>
-                {listing.is_active ? 'Actif' : 'Inactif'}
+            <View style={[
+              styles.badge,
+              isSold ? styles.badgeGray : listing.is_active ? styles.badgeTeal : styles.badgeGray,
+            ]}>
+              <Text style={[styles.badgeText, {
+                color: isSold ? colors.textSecondary : listing.is_active ? colors.primary : colors.textSecondary,
+              }]}>
+                {isSold ? 'Vendu' : listing.is_active ? 'Actif' : 'Désactivé'}
               </Text>
             </View>
           </View>
@@ -600,17 +606,19 @@ function ListingCard({
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>{listing.is_active ? 'Actif' : 'Inactif'}</Text>
-          <Switch
-            value={listing.is_active}
-            onValueChange={handleToggle}
-            disabled={toggling}
-            trackColor={{ false: colors.surfaceHigh, true: colors.primary }}
-            thumbColor={listing.is_active ? '#0F0F0F' : colors.textSecondary}
-          />
-        </View>
-        <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete} activeOpacity={0.8}>
+        {!isSold && (
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>{listing.is_active ? 'Actif' : 'Désactivé'}</Text>
+            <Switch
+              value={listing.is_active}
+              onValueChange={handleToggle}
+              disabled={toggling}
+              trackColor={{ false: colors.surfaceHigh, true: colors.primary }}
+              thumbColor={listing.is_active ? '#0F0F0F' : colors.textSecondary}
+            />
+          </View>
+        )}
+        <TouchableOpacity style={[styles.deleteBtn, isSold && { marginLeft: 'auto' }]} onPress={handleDelete} activeOpacity={0.8}>
           <Text style={styles.deleteBtnText}>Supprimer</Text>
         </TouchableOpacity>
       </View>
