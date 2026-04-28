@@ -42,6 +42,7 @@ async function recordListingOrder(opts: {
         seller_id: listing.seller_id,
         quantity: 1,
         total_chf: amountChf,
+        seller_amount_chf: amountChf,
         status: "paid",
       },
       { onConflict: "session_id", ignoreDuplicates: true }

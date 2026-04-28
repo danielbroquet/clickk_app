@@ -225,6 +225,30 @@ Deno.serve(async (req: Request) => {
         }
 
         const amountChf = parseFloat(amount_chf);
+        const sessionId = event.data.object.id ?? "";
+
+        // Insert the order FIRST so the buyer's purchase is always recorded,
+        // even if subsequent stock manipulation fails.
+        const { error: orderError } = await supabase
+          .from("shop_orders")
+          .upsert(
+            {
+              session_id: sessionId,
+              listing_id,
+              buyer_id,
+              seller_id,
+              quantity: 1,
+              total_chf: amountChf,
+              seller_amount_chf: amountChf,
+              status: "paid",
+            },
+            { onConflict: "session_id", ignoreDuplicates: true }
+          );
+
+        if (orderError) {
+          console.error("[stripe-webhook] shop_orders insert failed:", orderError.message);
+          throw new Error(`shop_orders insert failed: ${orderError.message}`);
+        }
 
         // Fetch current stock then decrement only if > 0 (idempotency via .eq("stock", current))
         const { data: listingRow, error: fetchErr } = await supabase
@@ -266,27 +290,6 @@ Deno.serve(async (req: Request) => {
               console.error("[stripe-webhook] deactivate listing failed:", deactivateErr.message);
             }
           }
-        }
-
-        const sessionId = event.data.object.id ?? "";
-        const { error: orderError } = await supabase
-          .from("shop_orders")
-          .upsert(
-            {
-              session_id: sessionId,
-              listing_id,
-              buyer_id,
-              seller_id,
-              quantity: 1,
-              total_chf: amountChf,
-              status: "paid",
-            },
-            { onConflict: "session_id", ignoreDuplicates: true }
-          );
-
-        if (orderError) {
-          console.error("[stripe-webhook] shop_orders insert failed:", orderError.message);
-          throw new Error(`shop_orders insert failed: ${orderError.message}`);
         }
 
         const { error: notifError } = await supabase.from("notifications").insert([
@@ -511,6 +514,7 @@ Deno.serve(async (req: Request) => {
               seller_id: sellerId,
               quantity: 1,
               total_chf: amountChf,
+              seller_amount_chf: amountChf,
               status: "paid",
             },
             { onConflict: "session_id", ignoreDuplicates: true }
