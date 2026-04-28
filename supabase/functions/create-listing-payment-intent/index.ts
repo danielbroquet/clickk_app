@@ -23,6 +23,74 @@ type Listing = {
   seller_id: string;
 };
 
+async function recordListingOrder(opts: {
+  supabase: ReturnType<typeof createClient>;
+  paymentIntentId: string;
+  listing: Listing;
+  buyerId: string;
+  amountChf: number;
+}) {
+  const { supabase, paymentIntentId, listing, buyerId, amountChf } = opts;
+
+  const { error: orderErr } = await supabase
+    .from("shop_orders")
+    .upsert(
+      {
+        session_id: paymentIntentId,
+        listing_id: listing.id,
+        buyer_id: buyerId,
+        seller_id: listing.seller_id,
+        quantity: 1,
+        total_chf: amountChf,
+        status: "paid",
+      },
+      { onConflict: "session_id", ignoreDuplicates: true }
+    );
+
+  if (orderErr) {
+    console.error(`${LOG} shop_orders upsert failed`, orderErr.message);
+    return;
+  }
+
+  const { data: stockRow, error: stockFetchErr } = await supabase
+    .from("shop_listings")
+    .select("stock")
+    .eq("id", listing.id)
+    .maybeSingle();
+
+  if (!stockFetchErr && stockRow && typeof stockRow.stock === "number" && stockRow.stock > 0) {
+    const newStock = stockRow.stock - 1;
+    const { error: stockUpdErr } = await supabase
+      .from("shop_listings")
+      .update({ stock: newStock, is_active: newStock > 0 })
+      .eq("id", listing.id)
+      .eq("stock", stockRow.stock);
+    if (stockUpdErr) {
+      console.error(`${LOG} stock decrement failed`, stockUpdErr.message);
+    }
+  }
+
+  const { error: notifErr } = await supabase.from("notifications").insert([
+    {
+      user_id: buyerId,
+      type: "purchase",
+      story_id: null,
+      message: "Votre commande a été confirmée",
+      is_read: false,
+    },
+    {
+      user_id: listing.seller_id,
+      type: "story_sold",
+      story_id: null,
+      message: "Vous avez vendu un article",
+      is_read: false,
+    },
+  ]);
+  if (notifErr) {
+    console.error(`${LOG} notifications insert failed`, notifErr.message);
+  }
+}
+
 async function handleInstant(opts: {
   stripeKey: string;
   supabase: ReturnType<typeof createClient>;
@@ -101,6 +169,13 @@ async function handleInstant(opts: {
   }
 
   if (intent.status === "succeeded") {
+    await recordListingOrder({
+      supabase,
+      paymentIntentId: intent.id,
+      listing,
+      buyerId,
+      amountChf: listing.price_chf,
+    });
     return jsonResponse({ status: "succeeded", payment_intent_id: intent.id });
   }
 
