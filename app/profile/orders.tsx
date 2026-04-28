@@ -272,6 +272,7 @@ export default function OrdersScreen() {
 
   const fetchOrders = useCallback(async () => {
     const userId = session?.user?.id
+    console.log('fetchOrders userId:', userId)
     if (!userId) return
 
     const [storiesRes, ordersRes] = await Promise.all([
@@ -288,12 +289,18 @@ export default function OrdersScreen() {
         .order('created_at', { ascending: false }),
     ])
 
+    console.log('storiesRes:', JSON.stringify(storiesRes))
+    console.log('ordersRes:', JSON.stringify(ordersRes))
+
     if (storiesRes.error) {
       console.error('[fetchOrders] stories query failed:', storiesRes.error)
     }
     if (ordersRes.error) {
       console.error('[fetchOrders] shop_orders query failed:', ordersRes.error)
     }
+
+    console.log('stories raw length:', (storiesRes.data ?? []).length)
+    console.log('orders raw length:', (ordersRes.data ?? []).length)
 
     const storyOrders: OrderItem[] = (storiesRes.data ?? []).map((s: any) => ({
       id:             `story-${s.id}`,
