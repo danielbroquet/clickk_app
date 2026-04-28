@@ -115,6 +115,12 @@ function OrderCard({
   const currentUserId = session?.user?.id ?? ''
 
   const handleConfirmDelivery = () => {
+    console.log('handleConfirmDelivery called', {
+      type: item.type,
+      id: item.id,
+      displayStatus: item.displayStatus,
+    })
+    console.log('currentUserId in OrderCard:', currentUserId)
     Alert.alert(
       'Confirmer la réception ?',
       'Cette action libère le paiement vers le vendeur et ne peut pas être annulée.',
@@ -124,11 +130,13 @@ function OrderCard({
           text: 'Confirmer',
           style: 'destructive',
           onPress: async () => {
+            console.log('user confirmed delivery')
             setConfirming(true)
             try {
               if (item.type === 'listing') {
                 const orderId = item.id.replace('order-', '')
-                const { error } = await supabase
+                console.log('updating shop_order', orderId)
+                const { data, error } = await supabase
                   .from('shop_orders')
                   .update({
                     delivery_status: 'delivered',
@@ -136,6 +144,7 @@ function OrderCard({
                   })
                   .eq('id', orderId)
                   .eq('buyer_id', currentUserId)
+                console.log('update result', { data, error })
 
                 if (error) {
                   Alert.alert('Erreur', error.message ?? 'Une erreur est survenue')
