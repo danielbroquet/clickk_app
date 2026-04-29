@@ -28,10 +28,36 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const refreshMethods = useCallback(async (): Promise<void> => {
+    try {
+      setError(null)
+      const res = await callEdgeFunction<{
+        payment_methods: Array<{
+          id: string
+          brand: string
+          last4: string
+          exp_month: number
+          exp_year: number
+        }>
+      }>('list-payment-methods')
+      setPaymentMethods(
+        res.payment_methods.map((pm) => ({
+          id: pm.id,
+          brand: pm.brand,
+          last4: pm.last4,
+          expMonth: pm.exp_month,
+          expYear: pm.exp_year,
+        }))
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'unknown_error')
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
-    async function loadCustomerId() {
+    async function load() {
       try {
         setLoading(true)
         setError(null)
@@ -44,8 +70,11 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        if (!cancelled) {
-          setCustomerId(profile?.stripe_customer_id ?? null)
+        if (cancelled) return
+        setCustomerId(profile?.stripe_customer_id ?? null)
+
+        if (profile?.stripe_customer_id) {
+          await refreshMethods()
         }
       } catch (err) {
         if (!cancelled) {
@@ -56,9 +85,9 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
       }
     }
 
-    loadCustomerId()
+    load()
     return () => { cancelled = true }
-  }, [])
+  }, [refreshMethods])
 
   const initializeCustomer = useCallback(async (): Promise<string> => {
     setError(null)
@@ -82,11 +111,6 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
     },
     []
   )
-
-  // TODO (EAS Build): fetch payment methods via @stripe/stripe-react-native SDK
-  const refreshMethods = useCallback(async (): Promise<void> => {
-    return
-  }, [])
 
   // TODO (EAS Build): detach payment method via @stripe/stripe-react-native SDK
   const removeMethod = useCallback(async (_methodId: string): Promise<void> => {
