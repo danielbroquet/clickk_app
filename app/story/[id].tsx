@@ -371,29 +371,16 @@ export default function StoryViewerScreen() {
 
   // ── Purchase ───────────────────────────────────────────────────────────────
 
-  const onConfirmPurchase = () => {
+  const onConfirmPurchase = async () => {
     if (!story) return
-    const priceFmt = snapshotPrice.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    Alert.alert(
-      "Confirmer l'achat",
-      `Voulez-vous acheter cet article pour CHF ${priceFmt} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          onPress: async () => {
-            await handlePurchase(story.id, snapshotPrice, () => {
-              setModalVisible(false)
-              Alert.alert(
-                i18n.t('story.viewer.purchase_success'),
-                '',
-                [{ text: 'OK', onPress: () => router.back() }]
-              )
-            })
-          },
-        },
-      ]
-    )
+    await handlePurchase(story.id, snapshotPrice, () => {
+      setModalVisible(false)
+      Alert.alert(
+        i18n.t('story.viewer.purchase_success'),
+        '',
+        [{ text: 'OK', onPress: () => router.back() }]
+      )
+    })
   }
 
   // ── Loading / Error ────────────────────────────────────────────────────────
