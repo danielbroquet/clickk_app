@@ -8,20 +8,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "clickk",
-  intentFilters: [
-    {
-      action: "VIEW",
-      autoVerify: true,
-      data: [
-        {
-          scheme: "https",
-          host: "clickk.app",
-          pathPrefix: "/",
-        },
-      ],
-      category: ["BROWSABLE", "DEFAULT"],
-    },
-  ],
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -36,7 +22,22 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.clickk.app",
     versionCode: 1,
+    googleServicesFile: "./google-services.json",
     permissions: ["INTERNET", "ACCESS_NETWORK_STATE", "VIBRATE"],
+    intentFilters: [
+      {
+        action: "VIEW",
+        autoVerify: true,
+        data: [
+          {
+            scheme: "https",
+            host: "clickk.app",
+            pathPrefix: "/",
+          },
+        ],
+        category: ["BROWSABLE", "DEFAULT"],
+      },
+    ],
   },
   web: {
     bundler: "metro",
@@ -53,6 +54,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         icon: "./assets/images/notification-icon.png",
         color: "#00D2B8",
         defaultChannel: "default",
+      },
+    ],
+    [
+      "@stripe/stripe-react-native",
+      {
+        merchantIdentifier: "merchant.com.clickk.app",
+        enableGooglePay: true,
       },
     ],
   ],
