@@ -24,7 +24,13 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "associatedDomains": ["applinks:clickk.app"]
+      "associatedDomains": ["applinks:clickk.app"],
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      }
+    },
+    "android": {
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +40,15 @@
     "plugins": [
       ["expo-router", { "origin": "https://clickk.app" }],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#00D2B8",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

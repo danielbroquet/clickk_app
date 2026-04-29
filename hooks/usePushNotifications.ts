@@ -1,21 +1,33 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
 import { supabase } from '../lib/supabase'
 
-// expo-notifications is a native-only module — not available on web.
-// All push logic is skipped on web.
+type PermissionStatus = 'granted' | 'denied' | 'undetermined'
 
-export function usePushNotifications(userId: string | null) {
+export interface PushNotificationState {
+  expoPushToken: string | null
+  notificationPermission: PermissionStatus
+}
+
+export function usePushNotifications(userId: string | null): PushNotificationState {
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null)
+  const [notificationPermission, setNotificationPermission] = useState<PermissionStatus>('undetermined')
   const cleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    if (!userId || Platform.OS === 'web') return
+    if (Platform.OS === 'web') return
 
     let cancelled = false
 
     async function setup() {
       try {
-        // Dynamic import so the web bundle never references this module
+        const Device = await import('expo-device')
+
+        if (!Device.isDevice) {
+          // Physical device required for push notifications
+          return
+        }
+
         const Notifications = await import('expo-notifications')
 
         Notifications.setNotificationHandler({
@@ -28,19 +40,48 @@ export function usePushNotifications(userId: string | null) {
           }),
         })
 
-        const { status: existing } = await Notifications.getPermissionsAsync()
-        let finalStatus = existing
-        if (existing !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync()
-          finalStatus = status
+        // Android: create default channel before requesting permissions
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'Default',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#00D2B8',
+            sound: 'default',
+          })
         }
 
-        if (finalStatus !== 'granted' || cancelled) return
+        const { status: existing } = await Notifications.getPermissionsAsync()
+        let finalStatus: PermissionStatus = existing as PermissionStatus
 
-        const tokenData = await Notifications.getExpoPushTokenAsync()
+        if (existing !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync()
+          finalStatus = status as PermissionStatus
+        }
+
+        if (cancelled) return
+
+        setNotificationPermission(finalStatus)
+
+        if (finalStatus !== 'granted') return
+
+        const Constants = await import('expo-constants')
+        const projectId =
+          Constants.default.expoConfig?.extra?.eas?.projectId ??
+          Constants.default.easConfig?.projectId
+
+        const tokenData = await Notifications.getExpoPushTokenAsync(
+          projectId ? { projectId } : undefined
+        )
         const token = tokenData.data
 
-        if (!cancelled && token) {
+        if (cancelled) return
+
+        setExpoPushToken(token)
+        console.log('[PushNotifications] Expo push token:', token)
+
+        // Persist token to profile if user is logged in
+        if (userId && token) {
           await supabase.from('profiles').update({ push_token: token }).eq('id', userId)
         }
 
@@ -54,8 +95,8 @@ export function usePushNotifications(userId: string | null) {
         })
 
         cleanupRef.current = () => sub.remove()
-      } catch {
-        // expo-notifications not available in this environment
+      } catch (err) {
+        console.warn('[PushNotifications] Setup failed:', err)
       }
     }
 
@@ -66,4 +107,6 @@ export function usePushNotifications(userId: string | null) {
       cleanupRef.current?.()
     }
   }, [userId])
+
+  return { expoPushToken, notificationPermission }
 }

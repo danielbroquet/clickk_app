@@ -27,7 +27,13 @@ function RootRedirector() {
   const [onboardingDone, setOnboardingDone] = useState(true)
   const redirectedRef = useRef(false)
 
-  usePushNotifications(session?.user?.id ?? null)
+  const { expoPushToken, notificationPermission } = usePushNotifications(session?.user?.id ?? null)
+  // Token is logged inside the hook on acquisition; log permission status here for diagnostics
+  useEffect(() => {
+    if (notificationPermission !== 'undetermined') {
+      console.log('[PushNotifications] Permission:', notificationPermission, '| Token:', expoPushToken)
+    }
+  }, [expoPushToken, notificationPermission])
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY).then(val => {
