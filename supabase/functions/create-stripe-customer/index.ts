@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: profile, error: selectErr } = await supabase
       .from("profiles")
-      .select("stripe_customer_id, email")
+      .select("stripe_customer_id")
       .eq("id", userId)
       .maybeSingle();
 
@@ -76,15 +76,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    let email = profile?.email ?? jwtEmail;
-    if (!email) {
-      const { data: userData, error: userErr } = await supabase.auth.admin.getUserById(userId);
-      if (userErr) {
-        console.error(`${LOG} auth.admin.getUserById failed`, userErr.message);
-        return jsonResponse({ error: userErr.message }, 500);
-      }
-      email = userData?.user?.email ?? undefined;
+    const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(userId);
+    if (userErr) {
+      console.error(`${LOG} auth.admin.getUserById failed`, userErr.message);
+      return jsonResponse({ error: userErr.message }, 500);
     }
+    const email = user?.email ?? jwtEmail;
 
     const customerParams = new URLSearchParams();
     if (email) customerParams.set("email", email);
