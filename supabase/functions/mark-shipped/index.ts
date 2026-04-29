@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendPushNotification } from "../_shared/sendPushNotification.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -124,6 +125,18 @@ Deno.serve(async (req: Request) => {
           data: { story_id, tracking_number: tracking },
         }),
       }).catch(() => {});
+
+      try {
+        await sendPushNotification(
+          admin,
+          story.buyer_id,
+          "Votre commande est en route 📦",
+          "Le vendeur a expédié votre commande.",
+          { type: "order_shipped", orderId: story_id },
+        );
+      } catch (err) {
+        console.error("[mark-shipped] push notification error:", err instanceof Error ? err.message : String(err));
+      }
     }
 
     return jsonResponse({

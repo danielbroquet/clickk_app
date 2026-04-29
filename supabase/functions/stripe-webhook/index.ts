@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendPushNotification } from "../_shared/sendPushNotification.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -152,6 +153,25 @@ async function processPurchase(
     console.error("[stripe-webhook] Error inserting notifications:", notifError.message);
   } else {
     console.log(`[stripe-webhook] Notifications sent to buyer ${buyerId} and seller ${story.seller_id}`);
+  }
+
+  try {
+    await sendPushNotification(
+      supabase,
+      buyerId,
+      "Commande confirmée 🎉",
+      "Votre paiement est accepté. Le vendeur va préparer votre commande.",
+      { type: "order_confirmed", orderId: storyId },
+    );
+    await sendPushNotification(
+      supabase,
+      story.seller_id as string,
+      "Nouvelle vente 💰",
+      "Vous avez une nouvelle commande à expédier !",
+      { type: "new_sale", orderId: storyId },
+    );
+  } catch (err) {
+    console.error("[stripe-webhook] push notification error:", err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -333,6 +353,25 @@ Deno.serve(async (req: Request) => {
 
         console.log(`[stripe-webhook] Listing order created: listing=${listing_id} buyer=${buyer_id}`);
 
+        try {
+          await sendPushNotification(
+            supabase,
+            buyer_id,
+            "Commande confirmée 🎉",
+            "Votre paiement est accepté. Le vendeur va préparer votre commande.",
+            { type: "order_confirmed", orderId: sessionId },
+          );
+          await sendPushNotification(
+            supabase,
+            seller_id,
+            "Nouvelle vente 💰",
+            "Vous avez une nouvelle commande à expédier !",
+            { type: "new_sale", orderId: sessionId },
+          );
+        } catch (err) {
+          console.error("[stripe-webhook] push notification error:", err instanceof Error ? err.message : String(err));
+        }
+
         return new Response(JSON.stringify({ received: true, listing_id }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -481,6 +520,25 @@ Deno.serve(async (req: Request) => {
           console.error(`${PI_LOG} notifications insert failed:`, notifErr.message);
         }
 
+        try {
+          await sendPushNotification(
+            supabase,
+            buyer_id,
+            "Commande confirmée 🎉",
+            "Votre paiement est accepté. Le vendeur va préparer votre commande.",
+            { type: "order_confirmed", orderId: story_id },
+          );
+          await sendPushNotification(
+            supabase,
+            sellerId,
+            "Nouvelle vente 💰",
+            "Vous avez une nouvelle commande à expédier !",
+            { type: "new_sale", orderId: story_id },
+          );
+        } catch (err) {
+          console.error(`${PI_LOG} push notification error:`, err instanceof Error ? err.message : String(err));
+        }
+
         return new Response(JSON.stringify({ received: true, story_id }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -601,6 +659,25 @@ Deno.serve(async (req: Request) => {
         ]);
         if (notifErr) {
           console.error(`${PI_LOG} notifications insert failed:`, notifErr.message);
+        }
+
+        try {
+          await sendPushNotification(
+            supabase,
+            buyer_id,
+            "Commande confirmée 🎉",
+            "Votre paiement est accepté. Le vendeur va préparer votre commande.",
+            { type: "order_confirmed", orderId: paymentIntentId },
+          );
+          await sendPushNotification(
+            supabase,
+            sellerId,
+            "Nouvelle vente 💰",
+            "Vous avez une nouvelle commande à expédier !",
+            { type: "new_sale", orderId: paymentIntentId },
+          );
+        } catch (err) {
+          console.error(`${PI_LOG} push notification error:`, err instanceof Error ? err.message : String(err));
         }
 
         return new Response(JSON.stringify({ received: true, listing_id }), {

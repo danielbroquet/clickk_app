@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendPushNotification } from "../_shared/sendPushNotification.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -218,6 +219,18 @@ Deno.serve(async (req: Request) => {
     }
 
     EdgeRuntime.waitUntil(Promise.all(pushCalls));
+
+    try {
+      await sendPushNotification(
+        admin,
+        story.seller_id as string,
+        "Livraison confirmée ✅",
+        "L'acheteur a confirmé la réception. Les fonds vont être virés.",
+        { type: "delivery_confirmed", orderId: story_id },
+      );
+    } catch (err) {
+      console.error("[confirm-delivery] push notification error:", err instanceof Error ? err.message : String(err));
+    }
 
     return jsonResponse({
       success: true,
