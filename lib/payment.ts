@@ -62,7 +62,12 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
 
   const initializeCustomer = useCallback(async (): Promise<string> => {
     setError(null)
-    const res = await callEdgeFunction<{ customer_id: string }>('create-stripe-customer')
+    const { data: { user } } = await supabase.auth.getUser()
+    const email = user?.email
+    const res = await callEdgeFunction<{ customer_id: string }>(
+      'create-stripe-customer',
+      email ? { email } : undefined
+    )
     setCustomerId(res.customer_id)
     return res.customer_id
   }, [])
