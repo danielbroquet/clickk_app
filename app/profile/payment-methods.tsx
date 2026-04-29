@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -13,6 +14,7 @@ import { router } from 'expo-router'
 import { ChevronLeft, CreditCard, Trash2, Plus } from 'lucide-react-native'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { usePaymentMethods, type PaymentMethod } from '../../lib/payment'
+import { useStripe } from '@stripe/stripe-react-native'
 
 function CardRow({
   method,
@@ -62,19 +64,47 @@ export default function PaymentMethodsScreen() {
     refreshMethods,
   } = usePaymentMethods()
 
+  const { initPaymentSheet, presentPaymentSheet } = useStripe()
+
   const [adding, setAdding] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
   const handleAddMethod = async () => {
-    setAdding(true)
-    try {
-      await initializeCustomer()
-      await createSetupIntent()
-      // TODO (EAS Build): open Stripe PaymentSheet with client_secret
+    if (Platform.OS === 'web') {
       Alert.alert(
         'Disponible avec EAS Build',
         "L'ajout de carte sera disponible dans la version native de l'application."
       )
+      return
+    }
+
+    setAdding(true)
+    try {
+      await initializeCustomer()
+      const { client_secret, customer_id } = await createSetupIntent()
+
+      const { error: initError } = await initPaymentSheet({
+        customerId: customer_id,
+        setupIntentClientSecret: client_secret,
+        merchantDisplayName: 'Clickk',
+        returnURL: 'clickk://stripe-return',
+      })
+
+      if (initError) {
+        Alert.alert('Erreur', initError.message)
+        return
+      }
+
+      const { error: presentError } = await presentPaymentSheet()
+
+      if (presentError) {
+        if (presentError.code !== 'Canceled') {
+          Alert.alert('Erreur', presentError.message)
+        }
+        return
+      }
+
+      await refreshMethods()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Une erreur est survenue'
       Alert.alert('Erreur', message)
