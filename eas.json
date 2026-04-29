@@ -39,7 +39,7 @@
   "appleTeamId": "6UN48FJN2G",
   "ascApiKeyPath": "./appstore-api-key.p8",
   "ascApiKeyIssuerId": "479398fc-1f8c-4afe-9ab4-7aca453639f2",
-  "ascApiKeyId": "D4342WSU4V" 
+  "ascApiKeyPath": "./AuthKey_D4342WSU4V.p8"
 }
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
