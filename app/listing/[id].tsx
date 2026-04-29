@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Modal,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native'
@@ -95,6 +96,7 @@ export default function ListingDetailScreen() {
   const [buying, setBuying] = useState(false)
   const [instantLoading, setInstantLoading] = useState(false)
   const [orderError, setOrderError] = useState<string | null>(null)
+  const [showBuyModal, setShowBuyModal] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -409,7 +411,7 @@ export default function ListingDetailScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.buyBtn, (unavailable || buying) && styles.buyBtnDisabled]}
-            onPress={handleBuy}
+            onPress={() => setShowBuyModal(true)}
             disabled={unavailable || buying}
             activeOpacity={0.85}
           >
@@ -428,6 +430,73 @@ export default function ListingDetailScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Buy confirmation modal */}
+      <Modal
+        visible={showBuyModal}
+        transparent
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setShowBuyModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowBuyModal(false)}
+        />
+        <View style={styles.bottomSheet}>
+          <View style={styles.handle} />
+
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Confirmer l'achat</Text>
+            <TouchableOpacity onPress={() => setShowBuyModal(false)}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          {listing && images.length > 0 && (
+            <Image
+              source={{ uri: images[0] }}
+              style={styles.modalImage}
+              resizeMode="cover"
+            />
+          )}
+
+          <Text style={styles.modalItemTitle} numberOfLines={2}>
+            {listing?.title}
+          </Text>
+
+          <View style={styles.modalPriceWrap}>
+            <Text style={styles.modalChf}>CHF</Text>
+            <Text style={styles.modalPriceValue}>
+              {listing?.price_chf.toFixed(2)}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.confirmBtn, buying && { opacity: 0.6 }]}
+            onPress={() => { setShowBuyModal(false); handleBuy() }}
+            disabled={buying}
+            activeOpacity={0.85}
+          >
+            {instantLoading ? (
+              <View style={styles.confirmBtnInner}>
+                <ActivityIndicator color="#0F0F0F" size="small" />
+                <Text style={styles.confirmBtnText}>Achat en cours...</Text>
+              </View>
+            ) : (
+              <Text style={styles.confirmBtnText}>Confirmer l'achat</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={() => setShowBuyModal(false)}
+          >
+            <Text style={styles.cancelBtnText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -625,6 +694,96 @@ const styles = StyleSheet.create({
   ownerLabelText: {
     fontFamily: fontFamily.semiBold,
     fontSize: fontSize.body,
+    color: colors.textSecondary,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+  },
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 18,
+    color: colors.text,
+  },
+  modalImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 14,
+  },
+  modalItemTitle: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 15,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  modalPriceWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginBottom: 20,
+  },
+  modalChf: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  modalPriceValue: {
+    fontFamily: fontFamily.bold,
+    fontSize: 36,
+    color: colors.primary,
+  },
+  confirmBtn: {
+    backgroundColor: colors.primary,
+    height: 54,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
+    color: '#0F0F0F',
+  },
+  confirmBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  cancelBtn: {
+    marginTop: 12,
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  cancelBtnText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 14,
     color: colors.textSecondary,
   },
 })
