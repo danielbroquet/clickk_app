@@ -1,25 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native'
+import { Animated, Platform, StyleSheet, Text } from 'react-native'
+import NetInfo from '@react-native-community/netinfo'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, fontFamily } from '../../lib/theme'
+
+const BANNER_HEIGHT = 36
 
 function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(true)
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return
-
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => setIsOnline(false)
-
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    setIsOnline(navigator.onLine)
-
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
+    if (Platform.OS === 'web') {
+      const handleOnline = () => setIsOnline(true)
+      const handleOffline = () => setIsOnline(false)
+      window.addEventListener('online', handleOnline)
+      window.addEventListener('offline', handleOffline)
+      setIsOnline(navigator.onLine)
+      return () => {
+        window.removeEventListener('online', handleOnline)
+        window.removeEventListener('offline', handleOffline)
+      }
     }
+
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const online = state.isConnected === true && state.isInternetReachable !== false
+      setIsOnline(online)
+    })
+
+    NetInfo.fetch().then(state => {
+      setIsOnline(state.isConnected === true && state.isInternetReachable !== false)
+    })
+
+    return unsubscribe
   }, [])
 
   return isOnline
@@ -28,8 +41,11 @@ function useNetworkStatus() {
 export default function NetworkBanner() {
   const isOnline = useNetworkStatus()
   const [visible, setVisible] = useState(false)
-  const translateY = useRef(new Animated.Value(-60)).current
+  const translateY = useRef(new Animated.Value(-BANNER_HEIGHT)).current
   const wasOffline = useRef(false)
+  const insets = useSafeAreaInsets()
+
+  const topPadding = Platform.OS === 'android' ? insets.top + 4 : insets.top
 
   useEffect(() => {
     if (!isOnline) {
@@ -41,12 +57,11 @@ export default function NetworkBanner() {
         bounciness: 4,
       }).start()
     } else if (wasOffline.current) {
-      // Show "back online" briefly then hide
       setVisible(true)
       Animated.sequence([
         Animated.spring(translateY, { toValue: 0, useNativeDriver: true, bounciness: 4 }),
         Animated.delay(2200),
-        Animated.timing(translateY, { toValue: -60, duration: 280, useNativeDriver: true }),
+        Animated.timing(translateY, { toValue: -BANNER_HEIGHT, duration: 280, useNativeDriver: true }),
       ]).start(() => {
         setVisible(false)
         wasOffline.current = false
@@ -58,7 +73,11 @@ export default function NetworkBanner() {
 
   return (
     <Animated.View
-      style={[styles.banner, { transform: [{ translateY }] }, !isOnline && styles.bannerOffline]}
+      style={[
+        styles.banner,
+        !isOnline && styles.bannerOffline,
+        { transform: [{ translateY }], paddingTop: topPadding },
+      ]}
       pointerEvents="none"
     >
       <Ionicons
@@ -84,7 +103,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 8,
+    paddingBottom: 8,
     zIndex: 9999,
   },
   bannerOffline: {
