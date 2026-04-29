@@ -36,7 +36,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.clickk.app",
     versionCode: 1,
-    googleServicesFile: "./google-services.json",
     permissions: ["INTERNET", "ACCESS_NETWORK_STATE", "VIBRATE"],
   },
   web: {
@@ -62,7 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: process.env.EAS_PROJECT_ID ?? "c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
+      projectId: process.env.EAS_PROJECT_ID ?? "",
     },
   },
 });
