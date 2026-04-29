@@ -2,8 +2,8 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "bolt-expo-nativewind",
-  slug: "bolt-expo-nativewind",
+  name: "clickk",
+  slug: "clickk",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
