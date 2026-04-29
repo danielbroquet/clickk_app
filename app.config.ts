@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     policy: "appVersion",
   },
   userInterfaceStyle: "automatic",
-  newArchEnabled: false,
+  newArchEnabled: true,
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.clickk.app",
@@ -39,6 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     ["expo-router", { origin: "https://clickk.app" }],
     "expo-font",
+    "expo-localization",
     "expo-web-browser",
     "expo-updates",
     [
