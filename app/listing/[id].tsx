@@ -409,7 +409,16 @@ export default function ListingDetailScreen() {
         ) : (
           <TouchableOpacity
             style={[styles.buyBtn, (unavailable || buying) && styles.buyBtnDisabled]}
-            onPress={handleBuy}
+            onPress={() => {
+              Alert.alert(
+                "Confirmer l'achat",
+                `Voulez-vous acheter cet article pour CHF ${listing.price_chf.toFixed(2)} ?`,
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Confirmer', onPress: handleBuy },
+                ]
+              )
+            }}
             disabled={unavailable || buying}
             activeOpacity={0.85}
           >
