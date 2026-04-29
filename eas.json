@@ -34,10 +34,13 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "danielbroquet@gmail.com",
-        "ascAppId": "6764506772",
-        "appleTeamId": "6UN48FJN2G"
-      },
+  "appleId": "danielbroquet@gmail.com",
+  "ascAppId": "6764506772",
+  "appleTeamId": "6UN48FJN2G",
+  "ascApiKeyPath": "./appstore-api-key.p8",
+  "ascApiKeyIssuerId": "479398fc-1f8c-4afe-9ab4-7aca453639f2",
+  "ascApiKeyId": "D4342WSU4V"
+}
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal"
