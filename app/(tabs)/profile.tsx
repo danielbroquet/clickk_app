@@ -618,7 +618,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.settingsRow}
-            onPress={() => router.push('/(tabs)/wallet')}
+            onPress={() => router.push('/wallet')}
             activeOpacity={0.7}
           >
             <View style={styles.settingsRowLeft}>
