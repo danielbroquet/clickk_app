@@ -8,20 +8,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "clickk",
-  intentFilters: [
-    {
-      action: "VIEW",
-      autoVerify: true,
-      data: [
-        {
-          scheme: "https",
-          host: "clickk.app",
-          pathPrefix: "/",
-        },
-      ],
-      category: ["BROWSABLE", "DEFAULT"],
-    },
-  ],
+  updates: {
+    url: "https://u.expo.dev/c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
+  },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -31,6 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     associatedDomains: ["applinks:clickk.app"],
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   android: {
@@ -47,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-router", { origin: "https://clickk.app" }],
     "expo-font",
     "expo-web-browser",
+    "expo-updates",
     [
       "expo-notifications",
       {
@@ -55,13 +49,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         defaultChannel: "default",
       },
     ],
+    [
+      "@stripe/stripe-react-native",
+      {
+        merchantIdentifier: "merchant.com.clickk.app",
+        enableGooglePay: true,
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
   },
   extra: {
     eas: {
-      projectId: process.env.EAS_PROJECT_ID ?? "",
+      projectId: "c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
     },
   },
 });
