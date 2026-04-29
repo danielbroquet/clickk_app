@@ -9,7 +9,7 @@ import { useAuth } from '../../lib/auth'
 
 interface FeedEntry {
   id: string
-  type: 'listing' | 'auction'
+  type: 'listing'
   username: string
   price: number
   title: string
@@ -63,11 +63,6 @@ export default function ProductCard({ item, onBuyPress, story }: ProductCardProp
           <Text style={styles.username}>@{item.username}</Text>
           <Text style={styles.time}>il y a 2h</Text>
         </View>
-        {item.type === 'auction' && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>ENCHÈRE</Text>
-          </View>
-        )}
       </View>
 
       <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
@@ -100,9 +95,7 @@ export default function ProductCard({ item, onBuyPress, story }: ProductCardProp
         <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.condition}>{item.condition}</Text>
         <TouchableOpacity style={styles.buyBtn} onPress={onBuyPress} activeOpacity={0.8}>
-          <Text style={styles.buyBtnText}>
-            {item.type === 'auction' ? 'Enchérir →' : 'Acheter →'}
-          </Text>
+          <Text style={styles.buyBtnText}>Acheter →</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -119,14 +112,7 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1, marginLeft: 10 },
   username: { fontFamily: fontFamily.semiBold, fontSize: 14, color: colors.text },
   time: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
-  badge: {
-    backgroundColor: colors.warning,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeText: { fontFamily: fontFamily.bold, fontSize: 10, color: '#0F0F0F' },
-  image: { width: '100%', aspectRatio: 1 },
+image: { width: '100%', aspectRatio: 1 },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',

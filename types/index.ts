@@ -52,26 +52,6 @@ export interface ShopListing {
   seller?: Profile
 }
 
-export interface Auction {
-  id: string
-  seller_id: string
-  title: string
-  description: string | null
-  images: string[]
-  start_price_chf: number
-  current_price_chf: number
-  bid_increment_chf: number
-  status: 'scheduled' | 'live' | 'ended'
-  ends_at: string | null
-  winner_id: string | null
-  final_price_chf: number | null
-  created_at: string
-  seller?: Profile
-}
-
-export type FeedItem =
-  | { type: 'listing'; data: ShopListing }
-  | { type: 'auction'; data: Auction }
 
 export interface Notification {
   id: string
@@ -88,6 +68,8 @@ export interface Notification {
     | 'top_up'
     | 'auction_ending'
     | 'new_follower'
+    | 'delivery_reminder'
+    | 'delivery_confirmed'
   title: string
   message: string
   payload: Record<string, unknown>

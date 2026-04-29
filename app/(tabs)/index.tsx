@@ -52,10 +52,10 @@ function FeedHeader() {
           <Text style={styles.logoTeal}>«</Text>
         </View>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/messages')}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/inbox')}>
             <Ionicons name="chatbubble-outline" size={24} color={colors.text} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/notifications')}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/inbox')}>
             <Ionicons name="notifications-outline" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
