@@ -450,6 +450,15 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
+          {/* Settings button */}
+          <TouchableOpacity
+            style={styles.settingsIconBtn}
+            onPress={() => router.push('/profile/settings')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+
           {/* Avatar + stats */}
           <View style={styles.topRow}>
             <View style={styles.avatarWrap}>
@@ -694,6 +703,13 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: 16, paddingTop: 16 },
+  settingsIconBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    padding: 4,
+  },
   topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   avatarWrap: {
     width: 80,
