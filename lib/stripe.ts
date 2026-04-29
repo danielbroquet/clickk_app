@@ -99,7 +99,10 @@ export const useStoryPurchase = () => {
         onSuccess?.()
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur paiement'
+      const rawMessage = err instanceof Error ? err.message : 'Erreur paiement'
+      const message = rawMessage === 'cannot_buy_own_story'
+        ? 'Vous ne pouvez pas acheter votre propre article'
+        : rawMessage
       setPurchaseError(message)
       Alert.alert('Erreur', message)
     } finally {

@@ -192,6 +192,29 @@ Deno.serve(async (req: Request) => {
       throw new Error("stripe_not_configured");
     }
 
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+
+    const { data: story, error: storyErr } = await supabaseAdmin
+      .from("stories")
+      .select("id, seller_id")
+      .eq("id", story_id)
+      .maybeSingle();
+
+    if (storyErr) {
+      console.error(`${LOG} story select failed`, storyErr.message);
+      return jsonResponse({ error: storyErr.message }, 500);
+    }
+
+    if (!story) {
+      return jsonResponse({ error: "story_not_found" }, 404);
+    }
+
+    if (story.seller_id === buyerId) {
+      return jsonResponse({ error: "cannot_buy_own_story" }, 403);
+    }
+
     const amountRappen = Math.round(amount_chf * 100);
     const resolvedMode: "instant" | "checkout" = mode === "instant" ? "instant" : "checkout";
 

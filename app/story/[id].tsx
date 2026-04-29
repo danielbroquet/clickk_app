@@ -293,6 +293,7 @@ export default function StoryViewerScreen() {
   )
 
   const currentUserId = session?.user?.id ?? null
+  const isSeller = !!(story && currentUserId && story.seller_id === currentUserId)
   const showConfirmDelivery = !!(
     story &&
     story.status === 'sold' &&
@@ -588,6 +589,10 @@ export default function StoryViewerScreen() {
         {isSold ? (
           <View style={[styles.ctaBtn, styles.ctaBtnSold]}>
             <Text style={styles.ctaBtnSoldText}>{i18n.t('story.viewer.sold')}</Text>
+          </View>
+        ) : isSeller ? (
+          <View style={[styles.ctaBtn, styles.ctaBtnSold]}>
+            <Text style={styles.ctaBtnSoldText}>Votre article</Text>
           </View>
         ) : (
           <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
