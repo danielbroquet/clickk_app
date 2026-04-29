@@ -21,7 +21,6 @@ import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
-import { useStripePayment } from '../../hooks/useStripePayment'
 import i18n from '../../lib/i18n'
 
 const C = {
@@ -143,13 +142,6 @@ export default function StoryViewerScreen() {
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
-
-  const { pay: payWithSheet, isLoading: sheetLoading, error: sheetError } = useStripePayment({
-    amount: snapshotPrice || 0,
-    currency: 'CHF',
-    storyId: id,
-    sellerId: story?.seller_id ?? '',
-  })
 
   const [confirmDelivering, setConfirmDelivering] = useState(false)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
@@ -380,20 +372,6 @@ export default function StoryViewerScreen() {
 
   const onConfirmPurchase = async () => {
     if (!story) return
-    if (Platform.OS !== 'web') {
-      const result = await payWithSheet()
-      if (result) {
-        setModalVisible(false)
-        Alert.alert(
-          i18n.t('story.viewer.purchase_success'),
-          `Order ID: ${result.paymentIntentId}`,
-          [{ text: 'OK', onPress: () => router.back() }]
-        )
-      } else if (sheetError && sheetError !== 'web_not_supported') {
-        Alert.alert('Erreur', sheetError)
-      }
-      return
-    }
     await handlePurchase(story.id, snapshotPrice, () => {
       setModalVisible(false)
       Alert.alert(
@@ -674,11 +652,11 @@ export default function StoryViewerScreen() {
 
           {/* Confirm */}
           <TouchableOpacity
-            style={[styles.confirmBtn, (purchasing || sheetLoading) && { opacity: 0.6 }]}
+            style={[styles.confirmBtn, purchasing && { opacity: 0.6 }]}
             onPress={onConfirmPurchase}
-            disabled={purchasing || sheetLoading}
+            disabled={purchasing}
           >
-            {instantLoading || sheetLoading ? (
+            {instantLoading ? (
               <View style={styles.confirmBtnInner}>
                 <ActivityIndicator color="#0F0F0F" size="small" />
                 <Text style={styles.confirmBtnText}>Achat en cours...</Text>

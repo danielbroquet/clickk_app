@@ -12,7 +12,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View } from 'react-native'
 import { AuthProvider, useAuth } from '../lib/auth'
-import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import { ONBOARDING_KEY } from './onboarding'
@@ -104,14 +103,12 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <StripeWrapper>
-      <AuthProvider>
-        <StatusBar style="light" backgroundColor="#0F0F0F" />
-        <View style={{ flex: 1 }}>
-          <RootRedirector />
-          <NetworkBanner />
-        </View>
-      </AuthProvider>
-    </StripeWrapper>
+    <AuthProvider>
+      <StatusBar style="light" backgroundColor="#0F0F0F" />
+      <View style={{ flex: 1 }}>
+        <RootRedirector />
+        <NetworkBanner />
+      </View>
+    </AuthProvider>
   )
 }

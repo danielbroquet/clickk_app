@@ -12,7 +12,6 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
-  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -24,7 +23,6 @@ import { useAuth } from '../../lib/auth'
 import { Video, ResizeMode } from 'expo-av'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
-import { useStripePayment } from '../../hooks/useStripePayment'
 
 type ListingMediaItemProps = {
   url: string
@@ -98,13 +96,6 @@ export default function ListingDetailScreen() {
   const [instantLoading, setInstantLoading] = useState(false)
   const [orderError, setOrderError] = useState<string | null>(null)
 
-  const { pay: payWithSheet, isLoading: sheetLoading, error: sheetError } = useStripePayment({
-    amount: listing?.price_chf ?? 0,
-    currency: 'CHF',
-    listingId: listing?.id,
-    sellerId: listing?.seller_id ?? '',
-  })
-
   useEffect(() => {
     if (!id) return
     supabase
@@ -161,33 +152,6 @@ export default function ListingDetailScreen() {
       out_of_stock: 'Cet article est en rupture de stock.',
       cannot_buy_own_listing: 'Vous ne pouvez pas acheter votre propre article.',
       listing_not_found: 'Article introuvable.',
-    }
-
-    if (Platform.OS !== 'web') {
-      try {
-        const result = await payWithSheet()
-        if (result) {
-          router.replace({
-            pathname: '/listing/order-confirmation',
-            params: {
-              sessionId: result.paymentIntentId,
-              title: listing.title,
-              price: listing.price_chf.toFixed(2),
-            },
-          })
-        } else if (sheetError && sheetError !== 'web_not_supported') {
-          const msg = errorMap[sheetError] ?? sheetError
-          setOrderError(msg)
-          Alert.alert('Erreur de paiement', msg)
-        }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Une erreur est survenue.'
-        setOrderError(msg)
-        Alert.alert('Erreur de paiement', msg)
-      } finally {
-        setBuying(false)
-      }
-      return
     }
 
     const callEF = async (mode: 'instant' | 'checkout') => {
@@ -449,7 +413,7 @@ export default function ListingDetailScreen() {
             disabled={unavailable || buying}
             activeOpacity={0.85}
           >
-            {instantLoading || sheetLoading ? (
+            {instantLoading ? (
               <View style={styles.buyBtnInner}>
                 <ActivityIndicator size="small" color="#0F0F0F" />
                 <Text style={styles.buyBtnText}>Achat en cours...</Text>
