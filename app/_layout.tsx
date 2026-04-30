@@ -1,3 +1,5 @@
+import 'react-native-gesture-handler'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { useEffect, useRef, useState } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -11,7 +13,6 @@ import {
 } from '@expo-google-fonts/montserrat'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View } from 'react-native'
-import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
