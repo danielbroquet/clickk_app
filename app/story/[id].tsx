@@ -297,7 +297,10 @@ export default function StoryViewerScreen() {
         useNativeDriver: false,
       }).start()
     }
-  }, [progressAnim])
+    if (status.didJustFinish && currentIndex < sellerStoryIds.length - 1) {
+      goToStoryAt(currentIndex + 1)
+    }
+  }, [progressAnim, currentIndex, sellerStoryIds])
 
   const progressWidth = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -476,20 +479,24 @@ export default function StoryViewerScreen() {
         </>
       )}
 
-      {/* ── Seller stories progress segments ── */}
-      {sellerStoryIds.length > 1 && (
-        <View style={[styles.segmentsRow, { top: 50 }]} pointerEvents="none">
-          {sellerStoryIds.map((sid, idx) => (
-            <View
-              key={sid}
-              style={[
-                styles.segment,
-                { opacity: idx === currentIndex ? 1 : 0.3 },
-              ]}
-            />
-          ))}
-        </View>
-      )}
+      {/* ── Seller stories progress segments (Instagram-style) ── */}
+      <View style={[styles.segmentsRow, { top: 50 }]} pointerEvents="none">
+        {sellerStoryIds.map((sid, idx) => {
+          const isCompleted = idx < currentIndex
+          const isCurrent = idx === currentIndex
+          return (
+            <View key={sid} style={styles.segmentTrack}>
+              {isCompleted ? (
+                <View style={styles.segmentFillFull} />
+              ) : isCurrent ? (
+                <Animated.View
+                  style={[styles.segmentFillFull, { width: progressWidth }]}
+                />
+              ) : null}
+            </View>
+          )
+        })}
+      </View>
 
       {/* ── Top overlay ── */}
       <LinearGradient
@@ -497,11 +504,6 @@ export default function StoryViewerScreen() {
         style={[styles.topOverlay, { paddingTop: insets.top + 8 }]}
         pointerEvents="box-none"
       >
-        {/* Progress bar */}
-        <View style={styles.progressTrack}>
-          <Animated.View style={[styles.progressFill, { width: progressWidth }]} />
-        </View>
-
         {/* Seller row */}
         <View style={styles.sellerRow}>
           <View style={styles.sellerLeft}>
@@ -738,7 +740,7 @@ const styles = StyleSheet.create({
   tapLeft: { position: 'absolute', top: 0, left: 0, width: '35%', height: '100%', zIndex: 1 },
   tapRight: { position: 'absolute', top: 0, right: 0, width: '65%', height: '100%', zIndex: 1 },
 
-  // Seller stories progress segments
+  // Seller stories progress segments (Instagram-style)
   segmentsRow: {
     position: 'absolute',
     left: 8,
@@ -747,9 +749,16 @@ const styles = StyleSheet.create({
     gap: 3,
     zIndex: 15,
   },
-  segment: {
+  segmentTrack: {
     flex: 1,
     height: 3,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  segmentFillFull: {
+    height: '100%',
+    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 2,
   },
@@ -762,13 +771,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     zIndex: 10,
   },
-  progressTrack: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: { height: '100%', backgroundColor: C.text, borderRadius: 2 },
   sellerRow: {
     flexDirection: 'row',
     alignItems: 'center',
