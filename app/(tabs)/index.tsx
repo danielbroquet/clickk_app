@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LinearGradient } from 'expo-linear-gradient'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
@@ -23,8 +22,6 @@ import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
 import i18n from '../../lib/i18n'
 import { useGroupedStories, SellerStories } from '../../hooks/useGroupedStories'
-
-const VIEWED_STORIES_KEY = 'viewed_stories'
 
 const PAGE_SIZE = 8
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -67,14 +64,9 @@ function SellerAvatarItem({ group }: { group: SellerStories }) {
     <TouchableOpacity
       style={storyRowStyles.item}
       activeOpacity={0.85}
-      onPress={async () => {
-        const raw = await AsyncStorage.getItem(VIEWED_STORIES_KEY)
-        const viewed: string[] = raw ? JSON.parse(raw) : []
-        const viewedSet = new Set(viewed)
-        const target =
-          group.stories.find((s) => !viewedSet.has(s.id)) ?? group.stories[0]
-        if (target) router.push(`/story/${target.id}`)
-      }}
+      onPress={() =>
+        router.push({ pathname: '/story-viewer' as any, params: { sellerId: group.sellerId } })
+      }
     >
       {group.hasUnviewed ? (
         <LinearGradient
