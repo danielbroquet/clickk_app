@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: story, error: storyErr } = await admin
       .from("stories")
-      .select("id, seller_id, buyer_id, final_price_chf, status")
+      .select("id, seller_id, buyer_id, final_price_chf, status, video_url")
       .eq("id", story_id)
       .maybeSingle();
 
@@ -230,6 +230,30 @@ Deno.serve(async (req: Request) => {
       );
     } catch (err) {
       console.error("[confirm-delivery] push notification error:", err instanceof Error ? err.message : String(err));
+    }
+
+    // Cleanup story video from storage (story orders only, best-effort)
+    try {
+      if (story_id && story.video_url && typeof story.video_url === "string") {
+        const marker = "/storage/v1/object/public/story-videos/";
+        const idx = story.video_url.indexOf(marker);
+        if (idx !== -1) {
+          const path = decodeURIComponent(story.video_url.slice(idx + marker.length));
+          if (path) {
+            const { error: removeErr } = await admin.storage
+              .from("story-videos")
+              .remove([path]);
+            if (removeErr) {
+              console.error("[confirm-delivery] video cleanup failed:", removeErr.message);
+            }
+          }
+        }
+      }
+    } catch (cleanupErr) {
+      console.error(
+        "[confirm-delivery] video cleanup exception:",
+        cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+      );
     }
 
     return jsonResponse({
