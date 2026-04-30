@@ -14,18 +14,22 @@ import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withSpring,
   cancelAnimation,
   Easing as ReaEasing,
   runOnJS,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Video, ResizeMode } from 'expo-av'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Platform } from 'react-native'
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react'
+import { Platform, Dimensions } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -103,7 +107,7 @@ interface PriceDisplayProps {
   priceRatio: number
 }
 
-function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
+const PriceDisplay = memo(function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
   const fadeAnim = useRef(new Animated.Value(1)).current
   const prevIntRef = useRef<number>(Math.floor(price))
 
@@ -129,7 +133,7 @@ function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
       <Text style={[styles.priceBig, { color }]}>{fmt}</Text>
     </Animated.View>
   )
-}
+})
 
 export default function StoryViewerScreen() {
   const params = useLocalSearchParams<{
@@ -221,7 +225,7 @@ export default function StoryViewerScreen() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) > 10 || Math.abs(g.dy) > 10,
+        Math.abs(g.dy) > 10 && Math.abs(g.dy) > Math.abs(g.dx),
       onPanResponderGrant: () => {
         isPausedByLongPress.current = false
         longPressTimer.current = setTimeout(() => {
@@ -241,7 +245,7 @@ export default function StoryViewerScreen() {
         }
         const absX = Math.abs(g.dx)
         const absY = Math.abs(g.dy)
-        // Vertical swipes (dominant axis)
+        // Vertical swipes only (horizontal handled by Gesture.Pan below)
         if (absY > absX && absX < 50) {
           if (g.dy > 80) {
             router.back()
@@ -251,19 +255,6 @@ export default function StoryViewerScreen() {
             openDetailRef.current()
             return
           }
-          return
-        }
-        // Horizontal swipes
-        if (absX < 50) return
-        const sellerId = storyRef.current?.seller_id
-        const ids = allSellerIdsRef.current
-        if (!sellerId || ids.length === 0) return
-        const idx = ids.indexOf(sellerId)
-        if (idx === -1) return
-        if (g.dx < -50) {
-          goToSellerAtRef.current(idx + 1)
-        } else if (g.dx > 50) {
-          goToSellerAtRef.current(idx - 1)
         }
       },
     })
@@ -341,6 +332,122 @@ export default function StoryViewerScreen() {
   const storyProgressStyle = useAnimatedStyle(() => ({
     width: `${Math.min(100, Math.max(0, storyProgress.value * 100))}%`,
   }))
+
+  // ── Horizontal swipe between sellers (Instagram cube fold) ─────────────────
+  const { width: SCREEN_WIDTH } = Dimensions.get('window')
+  const translateX = useSharedValue(0)
+  const panActive = useSharedValue(0)
+  const currentSellerId = story?.seller_id ?? null
+  const currentSellerIdx = useMemo(() => {
+    if (!currentSellerId) return -1
+    return allSellerIds.indexOf(currentSellerId)
+  }, [currentSellerId, allSellerIds])
+
+  const navigateToSellerJS = useCallback((nextSellerIdx: number) => {
+    goToSellerAtRef.current(nextSellerIdx)
+  }, [])
+
+  const resetTranslateJS = useCallback(() => {
+    translateX.value = 0
+  }, [translateX])
+
+  const pan = useMemo(() => {
+    return Gesture.Pan()
+      .activeOffsetX([-12, 12])
+      .failOffsetY([-18, 18])
+      .onBegin(() => {
+        'worklet'
+        panActive.value = 1
+      })
+      .onUpdate((e) => {
+        'worklet'
+        const maxLeft = currentSellerIdx < allSellerIds.length - 1 ? -SCREEN_WIDTH : 0
+        const maxRight = currentSellerIdx > 0 ? SCREEN_WIDTH : 0
+        let tx = e.translationX
+        if (tx < maxLeft) tx = maxLeft + (tx - maxLeft) * 0.25
+        if (tx > maxRight) tx = maxRight + (tx - maxRight) * 0.25
+        translateX.value = tx
+      })
+      .onEnd((e) => {
+        'worklet'
+        const DIST_THRESHOLD = SCREEN_WIDTH * 0.28
+        const VEL_THRESHOLD = 800
+        const goingLeft = e.translationX < 0
+        const passedDistance = Math.abs(e.translationX) > DIST_THRESHOLD
+        const passedVelocity = Math.abs(e.velocityX) > VEL_THRESHOLD
+        const shouldChange = passedDistance || passedVelocity
+
+        if (shouldChange && goingLeft && currentSellerIdx < allSellerIds.length - 1) {
+          translateX.value = withSpring(
+            -SCREEN_WIDTH,
+            { damping: 18, stiffness: 180, mass: 0.8, velocity: e.velocityX },
+            (finished) => {
+              if (finished) {
+                runOnJS(navigateToSellerJS)(currentSellerIdx + 1)
+                runOnJS(resetTranslateJS)()
+              }
+            }
+          )
+        } else if (shouldChange && !goingLeft && currentSellerIdx > 0) {
+          translateX.value = withSpring(
+            SCREEN_WIDTH,
+            { damping: 18, stiffness: 180, mass: 0.8, velocity: e.velocityX },
+            (finished) => {
+              if (finished) {
+                runOnJS(navigateToSellerJS)(currentSellerIdx - 1)
+                runOnJS(resetTranslateJS)()
+              }
+            }
+          )
+        } else {
+          translateX.value = withSpring(0, {
+            damping: 18,
+            stiffness: 180,
+            mass: 0.8,
+            velocity: e.velocityX,
+          })
+        }
+        panActive.value = 0
+      })
+  }, [SCREEN_WIDTH, currentSellerIdx, allSellerIds.length, navigateToSellerJS, resetTranslateJS, panActive, translateX])
+
+  const currentCubeStyle = useAnimatedStyle(() => {
+    const progress = translateX.value / SCREEN_WIDTH
+    const rotateY = interpolate(progress, [-1, 0, 1], [-90, 0, 90], Extrapolation.CLAMP)
+    return {
+      transform: [
+        { perspective: 800 },
+        { translateX: translateX.value },
+        { rotateY: `${rotateY}deg` },
+      ],
+    }
+  })
+
+  const leftCubeStyle = useAnimatedStyle(() => {
+    const progress = translateX.value / SCREEN_WIDTH
+    const rotateY = interpolate(progress, [0, 1], [90, 0], Extrapolation.CLAMP)
+    return {
+      transform: [
+        { perspective: 800 },
+        { translateX: translateX.value - SCREEN_WIDTH },
+        { rotateY: `${rotateY}deg` },
+      ],
+      opacity: translateX.value > 0 ? 1 : 0,
+    }
+  })
+
+  const rightCubeStyle = useAnimatedStyle(() => {
+    const progress = translateX.value / SCREEN_WIDTH
+    const rotateY = interpolate(progress, [-1, 0], [0, -90], Extrapolation.CLAMP)
+    return {
+      transform: [
+        { perspective: 800 },
+        { translateX: translateX.value + SCREEN_WIDTH },
+        { rotateY: `${rotateY}deg` },
+      ],
+      opacity: translateX.value < 0 ? 1 : 0,
+    }
+  })
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -618,9 +725,38 @@ export default function StoryViewerScreen() {
   const savedPct = Math.round((1 - currentPrice / story.start_price_chf) * 100)
   const savedAmt = (story.start_price_chf - currentPrice).toFixed(2)
 
+  const hasLeftNeighbour = currentSellerIdx > 0
+  const hasRightNeighbour = currentSellerIdx >= 0 && currentSellerIdx < allSellerIds.length - 1
+
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container}>
       <StatusBar hidden />
+
+      {/* Left neighbour placeholder (cube fold) */}
+      {hasLeftNeighbour && (
+        <Reanimated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, styles.cubeFace, leftCubeStyle]}
+        >
+          <View style={styles.neighbourPlaceholder} />
+        </Reanimated.View>
+      )}
+
+      {/* Right neighbour placeholder (cube fold) */}
+      {hasRightNeighbour && (
+        <Reanimated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, styles.cubeFace, rightCubeStyle]}
+        >
+          <View style={styles.neighbourPlaceholder} />
+        </Reanimated.View>
+      )}
+
+      <GestureDetector gesture={pan}>
+        <Reanimated.View
+          style={[styles.cubeFace, currentCubeStyle, { flex: 1 }]}
+          {...panResponder.panHandlers}
+        >
 
       {/* ── Video ── */}
       <Video
@@ -988,12 +1124,19 @@ export default function StoryViewerScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+        </Reanimated.View>
+      </GestureDetector>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: C.bg },
+  container: { flex: 1, backgroundColor: C.bg, overflow: 'hidden' },
+  cubeFace: { backfaceVisibility: 'hidden' },
+  neighbourPlaceholder: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   centered: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },
 
   // Tap zones

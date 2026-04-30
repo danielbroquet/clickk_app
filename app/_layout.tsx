@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/montserrat'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { View } from 'react-native'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
@@ -104,14 +105,16 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <StripeWrapper>
-      <AuthProvider>
-        <StatusBar style="light" backgroundColor="#0F0F0F" />
-        <View style={{ flex: 1 }}>
-          <RootRedirector />
-          <NetworkBanner />
-        </View>
-      </AuthProvider>
-    </StripeWrapper>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <StripeWrapper>
+        <AuthProvider>
+          <StatusBar style="light" backgroundColor="#0F0F0F" />
+          <View style={{ flex: 1 }}>
+            <RootRedirector />
+            <NetworkBanner />
+          </View>
+        </AuthProvider>
+      </StripeWrapper>
+    </GestureHandlerRootView>
   )
 }
