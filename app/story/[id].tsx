@@ -10,6 +10,14 @@ import {
   Animated,
   PanResponder,
 } from 'react-native'
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  cancelAnimation,
+  Easing as ReaEasing,
+  runOnJS,
+} from 'react-native-reanimated'
 import { StatusBar } from 'expo-status-bar'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -274,10 +282,65 @@ export default function StoryViewerScreen() {
   const [confirmDelivering, setConfirmDelivering] = useState(false)
   const [deliveryError, setDeliveryError] = useState<string | null>(null)
 
-  const progressAnim = useRef(new Animated.Value(0)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null)
   const progressBarAnim = useRef(new Animated.Value(0)).current
+
+  // Story segment progress — fully UI-thread driven via Reanimated
+  const storyProgress = useSharedValue(0)
+  // Duration (ms) of the current story. Updated once the video metadata is
+  // known; we start with a reasonable default so animation can begin.
+  const storyDurationRef = useRef<number>(15000)
+  const storyProgressStartedAt = useRef<number>(0)
+  const storyProgressElapsed = useRef<number>(0)
+
+  const handleStoryFinished = useCallback(() => {
+    if (currentIndex < sellerStoryIds.length - 1) {
+      goToStoryAt(currentIndex + 1)
+    }
+  }, [currentIndex, sellerStoryIds])
+
+  const startStoryProgress = useCallback((fromElapsedMs: number) => {
+    const total = storyDurationRef.current
+    const remaining = Math.max(0, total - fromElapsedMs)
+    const startRatio = total > 0 ? fromElapsedMs / total : 0
+    cancelAnimation(storyProgress)
+    storyProgress.value = startRatio
+    storyProgressStartedAt.current = Date.now() - fromElapsedMs
+    storyProgress.value = withTiming(
+      1,
+      { duration: remaining, easing: ReaEasing.linear },
+      (finished) => {
+        if (finished) runOnJS(handleStoryFinished)()
+      }
+    )
+  }, [handleStoryFinished, storyProgress])
+
+  const pauseStoryProgress = useCallback(() => {
+    cancelAnimation(storyProgress)
+    storyProgressElapsed.current = Date.now() - storyProgressStartedAt.current
+  }, [storyProgress])
+
+  const resumeStoryProgress = useCallback(() => {
+    startStoryProgress(storyProgressElapsed.current)
+  }, [startStoryProgress])
+
+  // Reset + start on story change
+  useEffect(() => {
+    storyProgressElapsed.current = 0
+    startStoryProgress(0)
+    return () => { cancelAnimation(storyProgress) }
+  }, [id, startStoryProgress, storyProgress])
+
+  // Handle pause/resume via long press
+  useEffect(() => {
+    if (isPaused) pauseStoryProgress()
+    else if (storyProgressElapsed.current > 0) resumeStoryProgress()
+  }, [isPaused, pauseStoryProgress, resumeStoryProgress])
+
+  const storyProgressStyle = useAnimatedStyle(() => ({
+    width: `${Math.min(100, Math.max(0, storyProgress.value * 100))}%`,
+  }))
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -391,27 +454,36 @@ export default function StoryViewerScreen() {
     ? '#F59E0B'
     : '#00D2B8'
 
-  // ── Video progress animation ───────────────────────────────────────────────
+  // ── Video duration sync ────────────────────────────────────────────────────
+  // We drive the progress bar ourselves on the UI thread via Reanimated.
+  // We only use the video status to learn the true duration once, then
+  // restart the timer with the correct duration (preserving elapsed time).
+
+  const videoDurationSynced = useRef(false)
 
   const onPlaybackStatusUpdate = useCallback((status: any) => {
     if (!status.isLoaded) return
-    if (status.isPlaying && status.durationMillis && status.durationMillis > 0) {
-      const p = status.positionMillis / status.durationMillis
-      Animated.timing(progressAnim, {
-        toValue: p,
-        duration: 250,
-        useNativeDriver: false,
-      }).start()
+    if (
+      !videoDurationSynced.current &&
+      status.durationMillis &&
+      status.durationMillis > 0
+    ) {
+      videoDurationSynced.current = true
+      const newDuration = status.durationMillis
+      if (Math.abs(newDuration - storyDurationRef.current) > 50) {
+        const elapsed = Date.now() - storyProgressStartedAt.current
+        storyDurationRef.current = newDuration
+        startStoryProgress(Math.min(elapsed, newDuration))
+      } else {
+        storyDurationRef.current = newDuration
+      }
     }
-    if (status.didJustFinish && currentIndex < sellerStoryIds.length - 1) {
-      goToStoryAt(currentIndex + 1)
-    }
-  }, [progressAnim, currentIndex, sellerStoryIds])
+  }, [startStoryProgress])
 
-  const progressWidth = progressAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  })
+  // Reset video-duration sync flag when story changes
+  useEffect(() => {
+    videoDurationSynced.current = false
+  }, [id])
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -595,8 +667,8 @@ export default function StoryViewerScreen() {
               {isCompleted ? (
                 <View style={styles.segmentFillFull} />
               ) : isCurrent ? (
-                <Animated.View
-                  style={[styles.segmentFillFull, { width: progressWidth }]}
+                <Reanimated.View
+                  style={[styles.segmentFillFull, storyProgressStyle]}
                 />
               ) : null}
             </View>
