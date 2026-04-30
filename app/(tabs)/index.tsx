@@ -15,13 +15,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { LinearGradient } from 'expo-linear-gradient'
 import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
 import i18n from '../../lib/i18n'
-import { useGroupedStories, SellerStories } from '../../hooks/useGroupedStories'
 
 const PAGE_SIZE = 8
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -45,73 +43,6 @@ const LISTING_SELECT = `
   seller:seller_id ( id, username, avatar_url )
 `
 
-function SellerAvatarItem({ group }: { group: SellerStories }) {
-  const initial = (group.username || 'U').charAt(0).toUpperCase()
-  const displayName =
-    group.username.length > 10 ? `${group.username.slice(0, 10)}…` : group.username
-
-  const ringContent = (
-    <View style={storyRowStyles.avatarInner}>
-      {group.avatarUrl ? (
-        <Image source={{ uri: group.avatarUrl }} style={storyRowStyles.avatarImg} />
-      ) : (
-        <Text style={storyRowStyles.avatarInitial}>{initial}</Text>
-      )}
-    </View>
-  )
-
-  return (
-    <TouchableOpacity
-      style={storyRowStyles.item}
-      activeOpacity={0.85}
-      onPress={() =>
-        router.push({ pathname: '/story-viewer' as any, params: { sellerId: group.sellerId } })
-      }
-    >
-      {group.hasUnviewed ? (
-        <LinearGradient
-          colors={['#00D2B8', '#00A89A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={storyRowStyles.ring}
-        >
-          {ringContent}
-        </LinearGradient>
-      ) : (
-        <View style={[storyRowStyles.ring, storyRowStyles.ringSeen]}>{ringContent}</View>
-      )}
-      <Text style={storyRowStyles.username} numberOfLines={1}>
-        {displayName}
-      </Text>
-    </TouchableOpacity>
-  )
-}
-
-function SellerStoriesRow() {
-  const { sellerGroups, loading } = useGroupedStories()
-
-  if (loading && sellerGroups.length === 0) {
-    return (
-      <View style={storyRowStyles.rowLoading}>
-        <ActivityIndicator size="small" color={colors.primary} />
-      </View>
-    )
-  }
-
-  if (sellerGroups.length === 0) return null
-
-  return (
-    <FlatList
-      data={sellerGroups}
-      keyExtractor={(g) => g.sellerId}
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={storyRowStyles.rowContent}
-      renderItem={({ item }) => <SellerAvatarItem group={item} />}
-    />
-  )
-}
-
 function FeedHeader() {
   return (
     <>
@@ -129,12 +60,6 @@ function FeedHeader() {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* Seller stories row (Instagram-style) */}
-      <View style={storyRowStyles.section}>
-        <SellerStoriesRow />
-      </View>
-
       <View style={styles.carouselSection}>
         <Text style={styles.carouselTitle}>{i18n.t('feed.activeAuctions')}</Text>
         <StoryCarousel />
@@ -142,66 +67,6 @@ function FeedHeader() {
     </>
   )
 }
-
-const storyRowStyles = StyleSheet.create({
-  section: {
-    paddingTop: 8,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  rowContent: {
-    paddingHorizontal: 12,
-    gap: 12,
-    paddingVertical: 8,
-  },
-  rowLoading: {
-    height: 90,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  item: {
-    alignItems: 'center',
-    width: 72,
-  },
-  ring: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ringSeen: {
-    backgroundColor: '#333333',
-  },
-  avatarInner: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.bg,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImg: {
-    width: 56,
-    height: 56,
-  },
-  avatarInitial: {
-    fontFamily: fontFamily.bold,
-    fontSize: 20,
-    color: colors.primary,
-  },
-  username: {
-    marginTop: 6,
-    fontFamily: fontFamily.medium,
-    fontSize: 11,
-    color: colors.text,
-    maxWidth: 68,
-  },
-})
 
 const isVideo = (url: string) =>
   ['mp4', 'mov', 'avi', 'webm'].includes(url.split('.').pop()?.toLowerCase() ?? '')
