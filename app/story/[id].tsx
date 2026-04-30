@@ -194,12 +194,32 @@ export default function StoryViewerScreen() {
   const allSellerIdsRef = useRef<string[]>(allSellerIds)
   allSellerIdsRef.current = allSellerIds
 
+  const [isPaused, setIsPaused] = useState(false)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isPausedByLongPress = useRef(false)
+
   const panResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
         Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderGrant: () => {
+        isPausedByLongPress.current = false
+        longPressTimer.current = setTimeout(() => {
+          isPausedByLongPress.current = true
+          setIsPaused(true)
+        }, 200)
+      },
       onPanResponderRelease: (_e, g) => {
+        if (longPressTimer.current !== null) {
+          clearTimeout(longPressTimer.current)
+          longPressTimer.current = null
+        }
+        if (isPausedByLongPress.current) {
+          isPausedByLongPress.current = false
+          setIsPaused(false)
+          return
+        }
         if (Math.abs(g.dx) < 50) return
         const sellerId = storyRef.current?.seller_id
         const ids = allSellerIdsRef.current
@@ -346,7 +366,7 @@ export default function StoryViewerScreen() {
 
   const onPlaybackStatusUpdate = useCallback((status: any) => {
     if (!status.isLoaded) return
-    if (status.durationMillis && status.durationMillis > 0) {
+    if (status.isPlaying && status.durationMillis && status.durationMillis > 0) {
       const p = status.positionMillis / status.durationMillis
       Animated.timing(progressAnim, {
         toValue: p,
@@ -506,7 +526,7 @@ export default function StoryViewerScreen() {
         source={{ uri: story.video_url }}
         style={StyleSheet.absoluteFill}
         resizeMode={ResizeMode.COVER}
-        shouldPlay={!modalVisible}
+        shouldPlay={!modalVisible && !isPaused}
         isLooping={true}
         isMuted={false}
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
