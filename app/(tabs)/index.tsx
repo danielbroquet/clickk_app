@@ -20,6 +20,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
 import i18n from '../../lib/i18n'
+import { useGroupedStories, SellerGroup } from '../../hooks/useGroupedStories'
 
 const PAGE_SIZE = 8
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -43,6 +44,61 @@ const LISTING_SELECT = `
   seller:seller_id ( id, username, avatar_url )
 `
 
+function SellerAvatarItem({ group, viewedIds }: { group: SellerGroup; viewedIds: Set<string> }) {
+  const displayName = group.username.length > 10 ? group.username.slice(0, 10) : group.username
+
+  const handlePress = () => {
+    const firstUnviewed = group.stories.find((s) => !viewedIds.has(s.id))
+    const target = firstUnviewed ?? group.stories[0]
+    if (target) {
+      router.push(`/story/${target.id}`)
+    }
+  }
+
+  return (
+    <TouchableOpacity style={sellerAvatarStyles.item} onPress={handlePress} activeOpacity={0.75}>
+      <View
+        style={[
+          sellerAvatarStyles.ring,
+          group.hasUnviewed ? sellerAvatarStyles.ringUnviewed : sellerAvatarStyles.ringViewed,
+        ]}
+      >
+        {group.avatarUrl ? (
+          <Image source={{ uri: group.avatarUrl }} style={sellerAvatarStyles.avatar} />
+        ) : (
+          <View style={sellerAvatarStyles.avatarFallback}>
+            <Text style={sellerAvatarStyles.avatarInitial}>
+              {group.username.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+      </View>
+      <Text style={sellerAvatarStyles.username} numberOfLines={1}>
+        {displayName}
+      </Text>
+    </TouchableOpacity>
+  )
+}
+
+function SellerAvatarsRow() {
+  const { sellerGroups, viewedIds, loading } = useGroupedStories()
+
+  if (loading || sellerGroups.length === 0) return null
+
+  return (
+    <View style={sellerAvatarStyles.container}>
+      <FlatList
+        data={sellerGroups}
+        keyExtractor={(item) => item.sellerId}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={sellerAvatarStyles.listContent}
+        renderItem={({ item }) => <SellerAvatarItem group={item} viewedIds={viewedIds} />}
+      />
+    </View>
+  )
+}
+
 function FeedHeader() {
   return (
     <>
@@ -60,6 +116,7 @@ function FeedHeader() {
           </TouchableOpacity>
         </View>
       </View>
+      <SellerAvatarsRow />
       <View style={styles.carouselSection}>
         <Text style={styles.carouselTitle}>{i18n.t('feed.activeAuctions')}</Text>
         <StoryCarousel />
@@ -483,4 +540,61 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   footer: { paddingVertical: 16, alignItems: 'center' },
+})
+
+const sellerAvatarStyles = StyleSheet.create({
+  container: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  listContent: {
+    paddingHorizontal: 12,
+    gap: 16,
+  },
+  item: {
+    alignItems: 'center',
+    gap: 5,
+    width: 72,
+  },
+  ring: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ringUnviewed: {
+    borderColor: '#00D2B8',
+  },
+  ringViewed: {
+    borderColor: '#333',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarFallback: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.surfaceHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    fontFamily: fontFamily.bold,
+    fontSize: 20,
+    color: colors.primary,
+  },
+  username: {
+    fontFamily: fontFamily.medium,
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 72,
+  },
 })
