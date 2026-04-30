@@ -35,6 +35,8 @@ interface OrderItem {
   story_id: string | null
   title: string
   thumbnail: string | null
+  // story orders only: true when video_url exists but thumbnail_url is null
+  hasVideo: boolean
   seller: SellerInfo | null
   price: number
   displayStatus: DisplayStatus
@@ -110,6 +112,7 @@ function OrderCard({
   const [confirming, setConfirming] = useState(false)
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
+  const titleInitial  = item.title.charAt(0).toUpperCase()
 
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
@@ -190,9 +193,13 @@ function OrderCard({
         <View style={styles.thumb}>
           {item.thumbnail ? (
             <Image source={{ uri: item.thumbnail }} style={styles.thumbImg} resizeMode="cover" />
+          ) : item.hasVideo ? (
+            <View style={styles.thumbPlaceholder}>
+              <Ionicons name="play-circle-outline" size={28} color={colors.primary} />
+            </View>
           ) : (
             <View style={styles.thumbPlaceholder}>
-              <Ionicons name="image-outline" size={24} color={colors.border} />
+              <Text style={styles.thumbInitial}>{titleInitial}</Text>
             </View>
           )}
         </View>
@@ -313,7 +320,7 @@ export default function OrdersScreen() {
     const [storiesRes, ordersRes] = await Promise.all([
       supabase
         .from('stories')
-        .select('id, created_at, final_price_chf, status, title, video_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
+        .select('id, created_at, final_price_chf, status, title, video_url, thumbnail_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
         .eq('buyer_id', userId)
         .order('created_at', { ascending: false }),
 
@@ -336,7 +343,8 @@ export default function OrdersScreen() {
       type:           'story' as const,
       story_id:       s.id,
       title:          s.title ?? 'Story',
-      thumbnail:      s.video_url ?? null,
+      thumbnail:      s.thumbnail_url ?? null,
+      hasVideo:       !s.thumbnail_url && !!s.video_url,
       seller:         s.seller as SellerInfo | null,
       price:          s.final_price_chf ?? 0,
       displayStatus:  (s.status as DisplayStatus) ?? 'sold',
@@ -352,6 +360,7 @@ export default function OrdersScreen() {
       story_id:       null,
       title:          o.listing?.title ?? 'Article',
       thumbnail:      o.listing?.images?.[0] ?? null,
+      hasVideo:       false,
       seller:         o.listing?.seller as SellerInfo | null,
       price:          o.total_chf ?? 0,
       displayStatus:  resolveListingStatus(o.status, o.delivery_status),
@@ -519,6 +528,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  thumbInitial: {
+    fontFamily: fontFamily.bold,
+    fontSize: 24,
+    color: colors.textSecondary,
   },
 
   cardBody: { flex: 1, gap: 6 },
