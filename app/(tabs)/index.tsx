@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import StoryCarousel from '../../components/feed/StoryCarousel'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
@@ -121,10 +120,6 @@ function FeedHeader() {
         </View>
       </View>
       <SellerAvatarsRow />
-      <View style={styles.carouselSection}>
-        <Text style={styles.carouselTitle}>{i18n.t('feed.activeAuctions')}</Text>
-        <StoryCarousel />
-      </View>
     </>
   )
 }
@@ -417,14 +412,6 @@ const styles = StyleSheet.create({
   logoBlack: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
   logoTeal: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.primary },
   headerIcons: { flexDirection: 'row', gap: 16 },
-  carouselSection: { paddingTop: 16, paddingBottom: 8 },
-  carouselTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: 15,
-    color: colors.text,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
   card: {
     backgroundColor: colors.surface,
     marginBottom: 1,
