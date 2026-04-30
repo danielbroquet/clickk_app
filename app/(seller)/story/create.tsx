@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   View,
   Text,
+  Image,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -16,6 +17,7 @@ import { useRouter } from 'expo-router'
 import { ChevronLeft, Video, X } from 'lucide-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
+import * as VideoThumbnails from 'expo-video-thumbnails'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../../lib/supabase'
@@ -57,6 +59,7 @@ export default function CreateStoryScreen() {
   const router = useRouter()
 
   const [videoUri, setVideoUri] = useState<string | null>(null)
+  const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [startPrice, setStartPrice] = useState('')
@@ -78,6 +81,24 @@ export default function CreateStoryScreen() {
     floorPrice !== '' &&
     !floorGtStart
 
+  const generateThumbnail = async (videoUri: string): Promise<string | null> => {
+    try {
+      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: 0,
+        quality: 0.7,
+      })
+      return uri
+    } catch {
+      return null
+    }
+  }
+
+  const handleVideoSelected = async (uri: string) => {
+    setVideoUri(uri)
+    const thumb = await generateThumbnail(uri)
+    setThumbnailUri(thumb)
+  }
+
   const pickVideo = () => {
     Alert.alert(
       'Ajouter une vidéo',
@@ -98,7 +119,7 @@ export default function CreateStoryScreen() {
               quality: 1,
             })
             if (!result.canceled && result.assets.length > 0) {
-              setVideoUri(result.assets[0].uri)
+              await handleVideoSelected(result.assets[0].uri)
             }
           },
         },
@@ -112,7 +133,7 @@ export default function CreateStoryScreen() {
               quality: 1,
             })
             if (!result.canceled && result.assets.length > 0) {
-              setVideoUri(result.assets[0].uri)
+              await handleVideoSelected(result.assets[0].uri)
             }
           },
         },
@@ -146,11 +167,33 @@ export default function CreateStoryScreen() {
         .from('story-videos')
         .getPublicUrl(path)
 
+      let thumbnailPublicUrl: string | null = null
+      if (thumbnailUri) {
+        try {
+          const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
+          const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, {
+            encoding: 'base64',
+          })
+          const { error: thumbUploadError } = await supabase.storage
+            .from('story-thumbnails')
+            .upload(thumbPath, decode(thumbBase64), { contentType: 'image/jpeg' })
+          if (!thumbUploadError) {
+            const { data: { publicUrl: thumbUrl } } = supabase.storage
+              .from('story-thumbnails')
+              .getPublicUrl(thumbPath)
+            thumbnailPublicUrl = thumbUrl
+          }
+        } catch {
+          thumbnailPublicUrl = null
+        }
+      }
+
       const { error: insertError } = await supabase
         .from('stories')
         .insert({
           seller_id: user.id,
           video_url: publicUrl,
+          thumbnail_url: thumbnailPublicUrl,
           title: title.trim(),
           description: description.trim() || null,
           start_price_chf: parseFloat(startPrice),
@@ -195,24 +238,35 @@ export default function CreateStoryScreen() {
         >
           {/* Video upload zone */}
           {videoUri ? (
-            <View style={s.videoPreviewWrapper}>
-              <AvVideo
-                source={{ uri: videoUri }}
-                style={s.videoPreview}
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                useNativeControls
-              />
-              <TouchableOpacity
-                style={s.clearBtn}
-                onPress={() => setVideoUri(null)}
-              >
-                <X size={14} color="#FFFFFF" />
-              </TouchableOpacity>
-              <View style={s.readyPill}>
-                <Text style={s.readyPillText}>✓ Video ready</Text>
+            <>
+              <View style={s.videoPreviewWrapper}>
+                <AvVideo
+                  source={{ uri: videoUri }}
+                  style={s.videoPreview}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                  useNativeControls
+                />
+                <TouchableOpacity
+                  style={s.clearBtn}
+                  onPress={() => {
+                    setVideoUri(null)
+                    setThumbnailUri(null)
+                  }}
+                >
+                  <X size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+                <View style={s.readyPill}>
+                  <Text style={s.readyPillText}>✓ Video ready</Text>
+                </View>
               </View>
-            </View>
+              {thumbnailUri && (
+                <View style={s.thumbRow}>
+                  <Image source={{ uri: thumbnailUri }} style={s.thumbPreview} />
+                  <Text style={s.thumbLabel}>Thumbnail preview</Text>
+                </View>
+              )}
+            </>
           ) : (
             <TouchableOpacity style={s.uploadZone} onPress={pickVideo} activeOpacity={0.7}>
               <Video size={40} color="#00D2B8" />
@@ -442,6 +496,22 @@ const s = StyleSheet.create({
     color: '#0F0F0F',
     fontSize: 11,
     fontWeight: '700',
+  },
+  thumbRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  thumbPreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#1A1A1A',
+  },
+  thumbLabel: {
+    color: '#717976',
+    fontSize: 12,
   },
 
   // Card
