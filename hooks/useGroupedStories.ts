@@ -84,8 +84,6 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
     let mounted = true
 
     async function fetchAndGroup() {
-      const viewedRaw = await AsyncStorage.getItem(VIEWED_KEY)
-
       const { data, error } = await supabase
         .from('stories')
         .select(`
@@ -102,6 +100,8 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
+      console.log('[useGroupedStories] fetch result', { length: data?.length, error })
+
       if (!mounted) return
 
       if (error) {
@@ -117,11 +117,14 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
 
       let viewedIds: Set<string> = new Set()
       try {
+        const viewedRaw = await AsyncStorage.getItem(VIEWED_KEY)
         const parsed = viewedRaw ? JSON.parse(viewedRaw) : []
         viewedIds = new Set(Array.isArray(parsed) ? parsed : [])
       } catch {
         viewedIds = new Set()
       }
+
+      if (!mounted) return
 
       const stories = (data as unknown as RawStory[]).map(rawToStory)
 

@@ -83,7 +83,11 @@ function SellerAvatarItem({ group, viewedIds }: { group: SellerGroup; viewedIds:
 function SellerAvatarsRow() {
   const { sellerGroups, viewedIds, loading } = useGroupedStories()
 
-  if (loading || sellerGroups.length === 0) return null
+  if (loading) {
+    return <View style={{ height: 80, backgroundColor: 'transparent' }} />
+  }
+
+  if (sellerGroups.length === 0) return null
 
   return (
     <View style={sellerAvatarStyles.container}>
@@ -366,7 +370,7 @@ export default function FeedScreen() {
         data={listings}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        ListHeaderComponent={<FeedHeader />}
+        ListHeaderComponent={FeedHeader}
         ListEmptyComponent={
           !loadingMore ? (
             <View style={styles.emptyState}>
