@@ -14,7 +14,15 @@ import { router } from 'expo-router'
 import { ChevronLeft, CreditCard, Trash2, Plus } from 'lucide-react-native'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { usePaymentMethods, type PaymentMethod } from '../../lib/payment'
-import { useStripe } from '@stripe/stripe-react-native'
+const useStripe: () => {
+  initPaymentSheet: (params: any) => Promise<{ error?: { message: string } }>
+  presentPaymentSheet: () => Promise<{ error?: { code: string; message: string } }>
+} = Platform.OS !== 'web'
+  ? require('@stripe/stripe-react-native').useStripe
+  : () => ({
+      initPaymentSheet: async () => ({}),
+      presentPaymentSheet: async () => ({}),
+    })
 
 function CardRow({
   method,
