@@ -107,10 +107,7 @@ export default function TabLayout() {
           }}
         />
 
-        {/* Hidden — files kept intact, removed from tab bar */}
-        <Tabs.Screen name="notifications" options={{ href: null }} />
-        <Tabs.Screen name="messages" options={{ href: null }} />
-        <Tabs.Screen name="wallet" options={{ href: null }} />
+
       </Tabs>
 
       <Modal
