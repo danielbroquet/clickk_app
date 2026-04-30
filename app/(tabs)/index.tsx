@@ -43,7 +43,15 @@ const LISTING_SELECT = `
   seller:seller_id ( id, username, avatar_url )
 `
 
-function SellerAvatarItem({ group, viewedIds }: { group: SellerGroup; viewedIds: Set<string> }) {
+function SellerAvatarItem({
+  group,
+  viewedIds,
+  allSellerIds,
+}: {
+  group: SellerGroup
+  viewedIds: Set<string>
+  allSellerIds: string[]
+}) {
   const displayName = group.username.length > 10 ? group.username.slice(0, 10) : group.username
 
   const handlePress = () => {
@@ -55,6 +63,7 @@ function SellerAvatarItem({ group, viewedIds }: { group: SellerGroup; viewedIds:
         params: {
           id: target.id,
           sellerStoryIds: JSON.stringify(group.stories.map((s) => s.id)),
+          allSellerIds: JSON.stringify(allSellerIds),
         },
       })
     }
@@ -102,7 +111,13 @@ function SellerAvatarsRow() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={sellerAvatarStyles.listContent}
-        renderItem={({ item }) => <SellerAvatarItem group={item} viewedIds={viewedIds} />}
+        renderItem={({ item }) => (
+          <SellerAvatarItem
+            group={item}
+            viewedIds={viewedIds}
+            allSellerIds={sellerGroups.map((g) => g.sellerId)}
+          />
+        )}
       />
     </View>
   )

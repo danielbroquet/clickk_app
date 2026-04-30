@@ -8,6 +8,7 @@ import {
   Alert,
   Image,
   Animated,
+  PanResponder,
 } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -21,6 +22,7 @@ import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
+import { getSellerStories } from '../../hooks/useGroupedStories'
 import i18n from '../../lib/i18n'
 
 const C = {
@@ -122,7 +124,11 @@ function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
 }
 
 export default function StoryViewerScreen() {
-  const params = useLocalSearchParams<{ id: string; sellerStoryIds?: string }>()
+  const params = useLocalSearchParams<{
+    id: string
+    sellerStoryIds?: string
+    allSellerIds?: string
+  }>()
   const id = params.id
   const sellerStoryIds: string[] = (() => {
     if (!params.sellerStoryIds) return id ? [id] : []
@@ -131,6 +137,15 @@ export default function StoryViewerScreen() {
       return Array.isArray(parsed) && parsed.length > 0 ? parsed : id ? [id] : []
     } catch {
       return id ? [id] : []
+    }
+  })()
+  const allSellerIds: string[] = (() => {
+    if (!params.allSellerIds) return []
+    try {
+      const parsed = JSON.parse(params.allSellerIds)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
     }
   })()
   const currentIndex = Math.max(0, sellerStoryIds.indexOf(id))
@@ -144,6 +159,22 @@ export default function StoryViewerScreen() {
       params: {
         id: sellerStoryIds[nextIdx],
         sellerStoryIds: JSON.stringify(sellerStoryIds),
+        allSellerIds: JSON.stringify(allSellerIds),
+      },
+    })
+  }
+
+  const goToSellerAt = async (nextSellerIdx: number) => {
+    if (nextSellerIdx < 0 || nextSellerIdx >= allSellerIds.length) return
+    const nextSellerId = allSellerIds[nextSellerIdx]
+    const stories = await getSellerStories(nextSellerId)
+    if (stories.length === 0) return
+    router.replace({
+      pathname: '/story/[id]',
+      params: {
+        id: stories[0].id,
+        sellerStoryIds: JSON.stringify(stories.map((s) => s.id)),
+        allSellerIds: JSON.stringify(allSellerIds),
       },
     })
   }
@@ -160,6 +191,32 @@ export default function StoryViewerScreen() {
   const [nearFloor, setNearFloor] = useState(false)
 
   const storyRef = useRef<StoryData | null>(null)
+  const allSellerIdsRef = useRef<string[]>(allSellerIds)
+  allSellerIdsRef.current = allSellerIds
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderRelease: (_e, g) => {
+        if (Math.abs(g.dx) < 50) return
+        const sellerId = storyRef.current?.seller_id
+        const ids = allSellerIdsRef.current
+        if (!sellerId || ids.length === 0) return
+        const idx = ids.indexOf(sellerId)
+        if (idx === -1) return
+        if (g.dx < -50) {
+          goToSellerAtRef.current(idx + 1)
+        } else if (g.dx > 50) {
+          goToSellerAtRef.current(idx - 1)
+        }
+      },
+    })
+  ).current
+
+  const goToSellerAtRef = useRef(goToSellerAt)
+  goToSellerAtRef.current = goToSellerAt
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -441,7 +498,7 @@ export default function StoryViewerScreen() {
   const savedAmt = (story.start_price_chf - currentPrice).toFixed(2)
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <StatusBar hidden />
 
       {/* ── Video ── */}
