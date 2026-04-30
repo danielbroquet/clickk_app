@@ -198,11 +198,22 @@ export default function StoryViewerScreen() {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isPausedByLongPress = useRef(false)
 
+  const [showDetail, setShowDetail] = useState(false)
+  const detailAnim = useRef(new Animated.Value(0)).current
+
+  const openDetail = () => {
+    setShowDetail(true)
+    Animated.spring(detailAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 12 }).start()
+  }
+  const closeDetail = () => {
+    Animated.spring(detailAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 14 }).start(() => setShowDetail(false))
+  }
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+        Math.abs(g.dx) > 10 || Math.abs(g.dy) > 10,
       onPanResponderGrant: () => {
         isPausedByLongPress.current = false
         longPressTimer.current = setTimeout(() => {
@@ -220,7 +231,22 @@ export default function StoryViewerScreen() {
           setIsPaused(false)
           return
         }
-        if (Math.abs(g.dx) < 50) return
+        const absX = Math.abs(g.dx)
+        const absY = Math.abs(g.dy)
+        // Vertical swipes (dominant axis)
+        if (absY > absX && absX < 50) {
+          if (g.dy > 80) {
+            router.back()
+            return
+          }
+          if (g.dy < -80) {
+            openDetailRef.current()
+            return
+          }
+          return
+        }
+        // Horizontal swipes
+        if (absX < 50) return
         const sellerId = storyRef.current?.seller_id
         const ids = allSellerIdsRef.current
         if (!sellerId || ids.length === 0) return
@@ -237,6 +263,9 @@ export default function StoryViewerScreen() {
 
   const goToSellerAtRef = useRef(goToSellerAt)
   goToSellerAtRef.current = goToSellerAt
+
+  const openDetailRef = useRef(openDetail)
+  openDetailRef.current = openDetail
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
@@ -737,6 +766,88 @@ export default function StoryViewerScreen() {
         )}
       </LinearGradient>
 
+      {/* ── Detail overlay ── */}
+      {showDetail && (
+        <>
+          <TouchableOpacity
+            style={styles.detailBackdrop}
+            activeOpacity={1}
+            onPress={closeDetail}
+          />
+          <Animated.View
+            style={[
+              styles.detailSheet,
+              { paddingBottom: insets.bottom + 24 },
+              {
+                transform: [{
+                  translateY: detailAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [600, 0],
+                  }),
+                }],
+              },
+            ]}
+          >
+            {/* Drag handle */}
+            <View style={styles.detailHandle} />
+
+            {/* Header */}
+            <View style={styles.detailHeader}>
+              <Text style={styles.detailTitle} numberOfLines={2}>{story.title}</Text>
+              <TouchableOpacity onPress={closeDetail} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Description */}
+            <Text style={story.description ? styles.detailDescription : styles.detailDescriptionEmpty}>
+              {story.description || 'Aucune description'}
+            </Text>
+
+            {/* Price row */}
+            <View style={styles.detailPriceRow}>
+              <Text style={styles.detailPriceLabel}>CHF</Text>
+              <Text style={styles.detailPriceValue}>{currentFmt}</Text>
+              <View style={[
+                styles.detailSpeedBadge,
+                story.speed_preset === 'FAST' && { backgroundColor: '#EF4444' },
+                story.speed_preset === 'SLOW' && { backgroundColor: '#3B82F6' },
+              ]}>
+                <Text style={styles.detailSpeedText}>
+                  {story.speed_preset === 'FAST' ? 'FLASH' : story.speed_preset === 'SLOW' ? 'RELAX' : 'STANDARD'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Time remaining */}
+            <View style={styles.detailTimeRow}>
+              <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={styles.detailTimeText}>
+                {expiresRemaining > 0
+                  ? `${Math.floor(expiresRemaining / 60)}m ${expiresRemaining % 60}s restantes`
+                  : 'Expiré'}
+              </Text>
+            </View>
+
+            {/* Buy button */}
+            {!isSold && !isSeller && (
+              <TouchableOpacity
+                style={styles.detailBuyBtn}
+                onPress={() => {
+                  closeDetail()
+                  setSnapshotPrice(currentPrice)
+                  setModalVisible(true)
+                }}
+              >
+                <Text style={styles.detailBuyBtnText}>
+                  Acheter · CHF {currentFmt}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </>
+      )}
+
       {/* ── Buy modal ── */}
       <Modal
         visible={modalVisible}
@@ -1112,5 +1223,109 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 11,
     marginTop: 1,
+  },
+
+  // Detail overlay
+  detailBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    zIndex: 30,
+  },
+  detailSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(10,10,10,0.95)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    paddingHorizontal: 20,
+    zIndex: 31,
+  },
+  detailHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 12,
+  },
+  detailTitle: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+  },
+  detailDescription: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  detailDescriptionEmpty: {
+    color: 'rgba(255,255,255,0.3)',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 20,
+  },
+  detailPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  detailPriceLabel: {
+    color: '#00D2B8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  detailPriceValue: {
+    color: '#00D2B8',
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  detailSpeedBadge: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 4,
+  },
+  detailSpeedText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  detailTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 20,
+  },
+  detailTimeText: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13,
+  },
+  detailBuyBtn: {
+    backgroundColor: '#00D2B8',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  detailBuyBtnText: {
+    color: '#0F0F0F',
+    fontSize: 16,
+    fontWeight: '700',
   },
 })
