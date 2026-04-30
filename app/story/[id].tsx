@@ -122,9 +122,31 @@ function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
 }
 
 export default function StoryViewerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const params = useLocalSearchParams<{ id: string; sellerStoryIds?: string }>()
+  const id = params.id
+  const sellerStoryIds: string[] = (() => {
+    if (!params.sellerStoryIds) return id ? [id] : []
+    try {
+      const parsed = JSON.parse(params.sellerStoryIds)
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : id ? [id] : []
+    } catch {
+      return id ? [id] : []
+    }
+  })()
+  const currentIndex = Math.max(0, sellerStoryIds.indexOf(id))
   const insets = useSafeAreaInsets()
   const { session } = useAuth()
+
+  const goToStoryAt = (nextIdx: number) => {
+    if (nextIdx < 0 || nextIdx >= sellerStoryIds.length) return
+    router.replace({
+      pathname: '/story/[id]',
+      params: {
+        id: sellerStoryIds[nextIdx],
+        sellerStoryIds: JSON.stringify(sellerStoryIds),
+      },
+    })
+  }
 
   const [story, setStory] = useState<StoryData | null>(null)
   const [seller, setSeller] = useState<SellerProfile | null>(null)
@@ -430,20 +452,43 @@ export default function StoryViewerScreen() {
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
       />
 
-      {/* ── Tap zones ── */}
+      {/* ── Tap zones: left = prev story, right = next story ── */}
       {!modalVisible && (
         <>
           <TouchableOpacity
             style={styles.tapLeft}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (currentIndex > 0) {
+                goToStoryAt(currentIndex - 1)
+              }
+            }}
             activeOpacity={1}
           />
           <TouchableOpacity
             style={styles.tapRight}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (currentIndex < sellerStoryIds.length - 1) {
+                goToStoryAt(currentIndex + 1)
+              }
+            }}
             activeOpacity={1}
           />
         </>
+      )}
+
+      {/* ── Seller stories progress segments ── */}
+      {sellerStoryIds.length > 1 && (
+        <View style={[styles.segmentsRow, { top: 50 }]} pointerEvents="none">
+          {sellerStoryIds.map((sid, idx) => (
+            <View
+              key={sid}
+              style={[
+                styles.segment,
+                { opacity: idx === currentIndex ? 1 : 0.3 },
+              ]}
+            />
+          ))}
+        </View>
       )}
 
       {/* ── Top overlay ── */}
@@ -692,6 +737,22 @@ const styles = StyleSheet.create({
   // Tap zones
   tapLeft: { position: 'absolute', top: 0, left: 0, width: '35%', height: '100%', zIndex: 1 },
   tapRight: { position: 'absolute', top: 0, right: 0, width: '65%', height: '100%', zIndex: 1 },
+
+  // Seller stories progress segments
+  segmentsRow: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 3,
+    zIndex: 15,
+  },
+  segment: {
+    flex: 1,
+    height: 3,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 2,
+  },
 
   // Top overlay
   topOverlay: {

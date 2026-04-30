@@ -75,6 +75,28 @@ function rawToStory(r: RawStory): Story {
   }
 }
 
+export async function getSellerStories(sellerId: string): Promise<Story[]> {
+  const { data, error } = await supabase
+    .from('stories')
+    .select(`
+      id, seller_id, title, description,
+      video_url, start_price_chf, floor_price_chf,
+      current_price_chf, price_drop_seconds,
+      status, expires_at, speed_preset,
+      buyer_id, final_price_chf, last_drop_at,
+      video_duration_seconds, duration_hours,
+      created_at, updated_at,
+      profiles:seller_id (id, username, avatar_url)
+    `)
+    .eq('seller_id', sellerId)
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: true })
+
+  if (error || !data) return []
+  return (data as unknown as RawStory[]).map(rawToStory)
+}
+
 export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: Set<string>; loading: boolean } {
   const [sellerGroups, setSellerGroups] = useState<SellerGroup[]>([])
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set())

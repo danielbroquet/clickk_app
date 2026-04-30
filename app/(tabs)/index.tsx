@@ -50,7 +50,13 @@ function SellerAvatarItem({ group, viewedIds }: { group: SellerGroup; viewedIds:
     const firstUnviewed = group.stories.find((s) => !viewedIds.has(s.id))
     const target = firstUnviewed ?? group.stories[0]
     if (target) {
-      router.push(`/story/${target.id}`)
+      router.push({
+        pathname: '/story/[id]',
+        params: {
+          id: target.id,
+          sellerStoryIds: JSON.stringify(group.stories.map((s) => s.id)),
+        },
+      })
     }
   }
 
