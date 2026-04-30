@@ -84,28 +84,33 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
     let mounted = true
 
     async function fetchAndGroup() {
-      const [{ data, error }, viewedRaw] = await Promise.all([
-        supabase
-          .from('stories')
-          .select(`
-            id, seller_id, title, description,
-            video_url, start_price_chf, floor_price_chf,
-            current_price_chf, price_drop_seconds,
-            status, expires_at, speed_preset,
-            buyer_id, final_price_chf, last_drop_at,
-            video_duration_seconds, duration_hours,
-            created_at, updated_at,
-            profiles:seller_id (id, username, avatar_url)
-          `)
-          .eq('status', 'active')
-          .gt('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false }),
-        AsyncStorage.getItem(VIEWED_KEY),
-      ])
+      const viewedRaw = await AsyncStorage.getItem(VIEWED_KEY)
+
+      const { data, error } = await supabase
+        .from('stories')
+        .select(`
+          id, seller_id, title, description,
+          video_url, start_price_chf, floor_price_chf,
+          current_price_chf, price_drop_seconds,
+          status, expires_at, speed_preset,
+          buyer_id, final_price_chf, last_drop_at,
+          video_duration_seconds, duration_hours,
+          created_at, updated_at,
+          profiles:seller_id (id, username, avatar_url)
+        `)
+        .eq('status', 'active')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
 
       if (!mounted) return
 
-      if (error || !data) {
+      if (error) {
+        console.error('[useGroupedStories] fetch error:', error.message)
+        setLoading(false)
+        return
+      }
+
+      if (!data) {
         setLoading(false)
         return
       }
@@ -151,5 +156,6 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
     }
   }, [])
 
+  console.log('[useGroupedStories]', sellerGroups.length)
   return { sellerGroups, viewedIds, loading }
 }
