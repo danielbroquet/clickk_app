@@ -35,6 +35,7 @@ import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import { getSellerStories } from '../../hooks/useGroupedStories'
 import i18n from '../../lib/i18n'
+import ReportModal from '../../components/ui/ReportModal'
 
 const C = {
   bg: '#0F0F0F',
@@ -383,6 +384,7 @@ export default function StoryViewerScreen() {
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
+  const [reportVisible, setReportVisible] = useState(false)
 
   // Funnel buy-modal visibility through the single isPaused state so the
   // story progress bar pauses in sync with the video.
@@ -1236,6 +1238,16 @@ export default function StoryViewerScreen() {
               {story.description || 'Aucune description'}
             </Text>
 
+            {!isSeller && (
+              <TouchableOpacity
+                style={styles.reportBtn}
+                onPress={() => setReportVisible(true)}
+              >
+                <Ionicons name="flag-outline" size={14} color={C.muted} />
+                <Text style={styles.reportBtnText}>Signaler</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Price row */}
             <View style={styles.detailPriceRow}>
               <Text style={styles.detailPriceLabel}>CHF</Text>
@@ -1273,6 +1285,14 @@ export default function StoryViewerScreen() {
           </Animated.View>
         </>
       )}
+
+      {/* ── Report modal ── */}
+      <ReportModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        targetType="story"
+        targetId={story.id}
+      />
 
       {/* ── Buy modal ── */}
       <Modal
@@ -1765,5 +1785,16 @@ const styles = StyleSheet.create({
     color: '#0F0F0F',
     fontSize: 16,
     fontWeight: '700',
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+  },
+  reportBtnText: {
+    color: C.muted,
+    fontSize: 12,
   },
 })
