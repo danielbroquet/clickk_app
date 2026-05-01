@@ -8,20 +8,17 @@ import {
   Alert,
   Image,
   Animated,
-  TextInput,
 } from 'react-native'
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
-  useAnimatedProps,
-  useDerivedValue,
+  useAnimatedReaction,
   withTiming,
   withSpring,
   cancelAnimation,
   Easing as ReaEasing,
   runOnJS,
   interpolate,
-  interpolateColor,
   Extrapolation,
   type SharedValue,
 } from 'react-native-reanimated'
@@ -104,32 +101,60 @@ function computeExpiry(story: StoryData): number {
   return Math.max(0, (new Date(story.expires_at).getTime() - Date.now()) / 1000)
 }
 
-// Reanimated-powered text component so value changes don't re-render React
-const AnimatedTextInput = Reanimated.createAnimatedComponent(TextInput)
-
 function formatPriceFR(n: number) {
-  'worklet'
-  // toLocaleString is not available in a worklet; format manually
-  const fixed = n.toFixed(2)
-  const [whole, frac] = fixed.split('.')
-  let out = ''
-  for (let i = 0; i < whole.length; i++) {
-    if (i > 0 && (whole.length - i) % 3 === 0) out += "'"
-    out += whole[i]
+  return n.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const THROTTLE_MS = 250
+
+// Subscribe React state to a SharedValue, rate-limited to THROTTLE_MS.
+function useThrottledSharedValue<T>(
+  sv: SharedValue<T>,
+  map: (v: T) => T = (v) => v,
+): T {
+  const [value, setValue] = useState<T>(() => map(sv.value))
+  const lastAtRef = useRef<number>(0)
+  const pendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useAnimatedReaction(
+    () => sv.value,
+    (curr, prev) => {
+      if (curr === prev) return
+      runOnJS(scheduleUpdate)(curr)
+    },
+    [],
+  )
+
+  function scheduleUpdate(curr: T) {
+    const now = Date.now()
+    const elapsed = now - lastAtRef.current
+    const mapped = map(curr)
+    if (elapsed >= THROTTLE_MS) {
+      lastAtRef.current = now
+      setValue(mapped)
+      if (pendingRef.current) {
+        clearTimeout(pendingRef.current)
+        pendingRef.current = null
+      }
+    } else if (!pendingRef.current) {
+      pendingRef.current = setTimeout(() => {
+        pendingRef.current = null
+        lastAtRef.current = Date.now()
+        setValue(map(sv.value))
+      }, THROTTLE_MS - elapsed)
+    }
   }
-  return `${out}.${frac}`
+
+  useEffect(() => {
+    return () => {
+      if (pendingRef.current) clearTimeout(pendingRef.current)
+    }
+  }, [])
+
+  return value
 }
 
-function formatHHMMSSWorklet(seconds: number) {
-  'worklet'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-  const pad = (x: number) => (x < 10 ? `0${x}` : `${x}`)
-  return `${pad(h)}:${pad(m)}:${pad(s)}`
-}
-
-// ── Price display driven by shared values (UI thread) ─────────────────────
+// ── Price display driven by shared values via throttled React state ────────
 
 interface PriceDisplayProps {
   priceSV: SharedValue<number>
@@ -137,25 +162,13 @@ interface PriceDisplayProps {
 }
 
 const PriceDisplay = memo(function PriceDisplay({ priceSV, priceRatioSV }: PriceDisplayProps) {
-  const animatedProps = useAnimatedProps(() => {
-    return { text: formatPriceFR(priceSV.value) } as any
-  })
-  const textStyle = useAnimatedStyle(() => {
-    const r = priceRatioSV.value
-    const color = r > 0.6 ? '#00D2B8' : r > 0.3 ? '#F59E0B' : '#EF4444'
-    return { color }
-  })
-  const initial = formatPriceFR(priceSV.value)
+  const price = useThrottledSharedValue(priceSV)
+  const priceRatio = useThrottledSharedValue(priceRatioSV)
+  const color = priceRatio > 0.6 ? '#00D2B8' : priceRatio > 0.3 ? '#F59E0B' : '#EF4444'
   return (
     <View style={{ alignItems: 'center' }}>
       <Text style={styles.priceChfLabel}>CHF</Text>
-      <AnimatedTextInput
-        editable={false}
-        defaultValue={initial}
-        // @ts-ignore animated text prop
-        animatedProps={animatedProps}
-        style={[styles.priceBig, styles.priceBigInput, textStyle]}
-      />
+      <Text style={[styles.priceBig, { color }]}>{formatPriceFR(price)}</Text>
     </View>
   )
 })
@@ -167,22 +180,14 @@ const SavingsRow = memo(function SavingsRow({
   priceSV: SharedValue<number>
   startPrice: number
 }) {
-  const pctProps = useAnimatedProps(() => {
-    const pct = Math.round((1 - priceSV.value / startPrice) * 100)
-    return { text: `-${pct}%` } as any
-  })
-  const startFmt = startPrice.toLocaleString('fr-CH')
+  const price = useThrottledSharedValue(priceSV)
+  const pct = Math.round((1 - price / startPrice) * 100)
+  if (pct <= 0) return null
   return (
     <View style={styles.savingsRow}>
-      <Text style={styles.savingsStrike}>CHF {startFmt}</Text>
+      <Text style={styles.savingsStrike}>CHF {startPrice.toLocaleString('fr-CH')}</Text>
       <View style={styles.savingsBadge}>
-        <AnimatedTextInput
-          editable={false}
-          defaultValue=""
-          // @ts-ignore animated text prop
-          animatedProps={pctProps}
-          style={[styles.savingsBadgeText, styles.badgeTextInput]}
-        />
+        <Text style={styles.savingsBadgeText}>-{pct}%</Text>
       </View>
     </View>
   )
@@ -209,22 +214,14 @@ const ExpiryRow = memo(function ExpiryRow({
 }: {
   expiresRemainingSV: SharedValue<number>
 }) {
-  const textProps = useAnimatedProps(() => {
-    return { text: `${i18n.t('story.viewer.expires_in')} ${formatHHMMSSWorklet(expiresRemainingSV.value)}` } as any
-  })
-  const textStyle = useAnimatedStyle(() => {
-    return { color: expiresRemainingSV.value < 3600 ? C.danger : C.muted }
-  })
+  const expiresRemaining = useThrottledSharedValue(expiresRemainingSV)
+  const color = expiresRemaining < 3600 ? C.danger : C.muted
   return (
     <View style={styles.expiryRow}>
-      <Ionicons name="time-outline" size={12} color={C.muted} />
-      <AnimatedTextInput
-        editable={false}
-        defaultValue=""
-        // @ts-ignore animated text prop
-        animatedProps={textProps}
-        style={[styles.expiryText, styles.expiryTextInput, textStyle]}
-      />
+      <Ionicons name="time-outline" size={12} color={color} />
+      <Text style={[styles.expiryText, { color }]}>
+        {i18n.t('story.viewer.expires_in')} {formatHHMMSS(expiresRemaining)}
+      </Text>
     </View>
   )
 })
@@ -238,18 +235,8 @@ const CtaLabel = memo(function CtaLabel({
   prefix: string
   style: any
 }) {
-  const props = useAnimatedProps(() => {
-    return { text: `${prefix}${formatPriceFR(priceSV.value)}` } as any
-  })
-  return (
-    <AnimatedTextInput
-      editable={false}
-      defaultValue={`${prefix}${formatPriceFR(priceSV.value)}`}
-      // @ts-ignore animated text prop
-      animatedProps={props}
-      style={[style, styles.textInputReset]}
-    />
-  )
+  const price = useThrottledSharedValue(priceSV)
+  return <Text style={style}>{`${prefix}${formatPriceFR(price)}`}</Text>
 })
 
 const DetailTimeRemaining = memo(function DetailTimeRemaining({
@@ -259,22 +246,11 @@ const DetailTimeRemaining = memo(function DetailTimeRemaining({
   expiresRemainingSV: SharedValue<number>
   style: any
 }) {
-  const props = useAnimatedProps(() => {
-    const s = expiresRemainingSV.value
-    const text = s > 0
-      ? `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s restantes`
-      : 'Expiré'
-    return { text } as any
-  })
-  return (
-    <AnimatedTextInput
-      editable={false}
-      defaultValue=""
-      // @ts-ignore animated text prop
-      animatedProps={props}
-      style={[style, styles.textInputReset]}
-    />
-  )
+  const s = useThrottledSharedValue(expiresRemainingSV)
+  const text = s > 0
+    ? `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s restantes`
+    : 'Expiré'
+  return <Text style={style}>{text}</Text>
 })
 
 const NeighbourPreview = memo(function NeighbourPreview({
@@ -1426,26 +1402,6 @@ const styles = StyleSheet.create({
     fontSize: 56,
     fontWeight: '800',
     letterSpacing: -1,
-  },
-  priceBigInput: {
-    padding: 0,
-    margin: 0,
-    minWidth: 200,
-    textAlign: 'center',
-  },
-  textInputReset: {
-    padding: 0,
-    margin: 0,
-  },
-  badgeTextInput: {
-    padding: 0,
-    margin: 0,
-    minWidth: 42,
-    textAlign: 'center',
-  },
-  expiryTextInput: {
-    padding: 0,
-    margin: 0,
   },
   priceProgressTrack: {
     width: 180,
