@@ -460,6 +460,7 @@ export default function StoryViewerScreen() {
   // ── Horizontal swipe between sellers (Instagram cube fold) ─────────────────
   const { width: SCREEN_WIDTH } = Dimensions.get('window')
   const translateX = useSharedValue(0)
+  const transitionMask = useSharedValue(0)
   const panActive = useSharedValue(0)
   const currentSellerId = story?.seller_id ?? null
   const currentSellerIdx = useMemo(() => {
@@ -546,8 +547,9 @@ export default function StoryViewerScreen() {
             { damping: 18, stiffness: 180, mass: 0.8, velocity: e.velocityX },
             (finished) => {
               if (finished) {
-                runOnJS(resetTranslateJS)()
+                transitionMask.value = 1
                 runOnJS(navigateToSellerJS)(currentSellerIdx + 1)
+                runOnJS(resetTranslateJS)()
               }
             }
           )
@@ -557,6 +559,7 @@ export default function StoryViewerScreen() {
             { damping: 18, stiffness: 180, mass: 0.8, velocity: e.velocityX },
             (finished) => {
               if (finished) {
+                transitionMask.value = 1
                 runOnJS(navigateToSellerJS)(currentSellerIdx - 1)
                 runOnJS(resetTranslateJS)()
               }
@@ -572,7 +575,7 @@ export default function StoryViewerScreen() {
         }
         panActive.value = 0
       })
-  }, [SCREEN_WIDTH, currentSellerIdx, allSellerIds.length, navigateToSellerJS, resetTranslateJS, panActive, translateX])
+  }, [SCREEN_WIDTH, currentSellerIdx, allSellerIds.length, navigateToSellerJS, resetTranslateJS, panActive, translateX, transitionMask])
 
   const verticalPan = useMemo(() => {
     return Gesture.Pan()
@@ -758,23 +761,29 @@ export default function StoryViewerScreen() {
   const videoDurationSynced = useRef(false)
   const [videoFirstFrameReady, setVideoFirstFrameReady] = useState(false)
 
-  // Reset the thumbnail-bridge state whenever the story changes so the
-  // thumbnail masks the black buffer gap on the new video.
+  // Reset the thumbnail-bridge + transition mask whenever the story changes
+  // so they cover the new video until its first frame is playing.
   useEffect(() => {
     setVideoFirstFrameReady(false)
-  }, [story?.id])
+    transitionMask.value = 1
+  }, [story?.id, transitionMask])
 
-  const thumbnailOpacity = useSharedValue(1)
+  const thumbnailOpacity = useSharedValue(0)
   useEffect(() => {
     if (videoFirstFrameReady) {
       thumbnailOpacity.value = withTiming(0, { duration: 250 })
+      transitionMask.value = withTiming(0, { duration: 200 })
     } else {
-      thumbnailOpacity.value = 1
+      thumbnailOpacity.value = withTiming(1, { duration: 50 })
     }
-  }, [videoFirstFrameReady, thumbnailOpacity])
+  }, [videoFirstFrameReady, thumbnailOpacity, transitionMask])
 
   const thumbnailBridgeStyle = useAnimatedStyle(() => ({
     opacity: thumbnailOpacity.value,
+  }))
+
+  const transitionMaskStyle = useAnimatedStyle(() => ({
+    opacity: transitionMask.value,
   }))
 
   // Prefetch neighbour thumbnails so they show instantly after navigation.
@@ -991,6 +1000,14 @@ export default function StoryViewerScreen() {
           />
         </Reanimated.View>
       )}
+
+      {/* ── Transition mask: black overlay that covers the 1-frame gap between
+            slide completion and the new story mounting, and the buffer delay
+            before the new video starts playing. */}
+      <Reanimated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: '#000' }, transitionMaskStyle]}
+      />
 
       {/* ── Tap zones: left = prev story, right = next story ── */}
       {!modalVisible && (
