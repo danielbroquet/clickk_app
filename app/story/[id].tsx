@@ -355,10 +355,14 @@ export default function StoryViewerScreen() {
 
   const openDetail = () => {
     setShowDetail(true)
+    setIsPaused(true)
     Animated.spring(detailAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 12 }).start()
   }
   const closeDetail = () => {
-    Animated.spring(detailAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 14 }).start(() => setShowDetail(false))
+    Animated.spring(detailAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 14 }).start(() => {
+      setShowDetail(false)
+      setIsPaused(false)
+    })
   }
 
   const goToSellerAtRef = useRef(goToSellerAt)
@@ -369,6 +373,13 @@ export default function StoryViewerScreen() {
 
   const [modalVisible, setModalVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
+
+  // Funnel buy-modal visibility through the single isPaused state so the
+  // story progress bar pauses in sync with the video.
+  useEffect(() => {
+    if (modalVisible) setIsPaused(true)
+    else setIsPaused(false)
+  }, [modalVisible])
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
 
   const [confirmDelivering, setConfirmDelivering] = useState(false)
@@ -425,8 +436,9 @@ export default function StoryViewerScreen() {
     return () => { cancelAnimation(storyProgress) }
   }, [id, startStoryProgress, storyProgress])
 
-  // Handle pause/resume via long press
+  // Handle pause/resume for long press, modal, and detail sheet
   useEffect(() => {
+    console.log('[story] isPaused ->', isPaused)
     if (isPaused) pauseStoryProgress()
     else if (storyProgressElapsed.current > 0) resumeStoryProgress()
   }, [isPaused, pauseStoryProgress, resumeStoryProgress])
@@ -941,7 +953,7 @@ export default function StoryViewerScreen() {
         source={{ uri: story.video_url }}
         style={StyleSheet.absoluteFill}
         resizeMode={ResizeMode.COVER}
-        shouldPlay={!modalVisible && !isPaused}
+        shouldPlay={!isPaused}
         isLooping={true}
         isMuted={false}
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
