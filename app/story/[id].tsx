@@ -596,14 +596,24 @@ export default function StoryViewerScreen() {
     [horizontalPan, verticalPan, longPress]
   )
 
+  // Cube fold transforms: rotate around the seam shared with the neighbour,
+  // not around the panel centre. We emulate transform-origin by sandwiching
+  // the rotation between two translateX's equal to half the panel width.
+  const HALF = SCREEN_WIDTH / 2
+
   const currentCubeStyle = useAnimatedStyle(() => {
     const progress = translateX.value / SCREEN_WIDTH
     const rotateY = interpolate(progress, [-1, 0, 1], [-90, 0, 90], Extrapolation.CLAMP)
+    // Pivot on the edge that is leaving the screen:
+    //   swiping left  (translateX < 0) -> pivot on LEFT edge  -> pre -HALF / post +HALF
+    //   swiping right (translateX > 0) -> pivot on RIGHT edge -> pre +HALF / post -HALF
+    const pivot = translateX.value >= 0 ? HALF : -HALF
     return {
       transform: [
-        { perspective: 800 },
-        { translateX: translateX.value },
+        { perspective: 1000 },
+        { translateX: translateX.value + pivot },
         { rotateY: `${rotateY}deg` },
+        { translateX: -pivot },
       ],
     }
   })
@@ -611,11 +621,13 @@ export default function StoryViewerScreen() {
   const leftCubeStyle = useAnimatedStyle(() => {
     const progress = translateX.value / SCREEN_WIDTH
     const rotateY = interpolate(progress, [0, 1], [90, 0], Extrapolation.CLAMP)
+    // Left neighbour pivots on its RIGHT edge (the seam with the current panel).
     return {
       transform: [
-        { perspective: 800 },
-        { translateX: translateX.value - SCREEN_WIDTH },
+        { perspective: 1000 },
+        { translateX: translateX.value - SCREEN_WIDTH + HALF },
         { rotateY: `${rotateY}deg` },
+        { translateX: -HALF },
       ],
       opacity: translateX.value > 0 ? 1 : 0,
     }
@@ -624,11 +636,13 @@ export default function StoryViewerScreen() {
   const rightCubeStyle = useAnimatedStyle(() => {
     const progress = translateX.value / SCREEN_WIDTH
     const rotateY = interpolate(progress, [-1, 0], [0, -90], Extrapolation.CLAMP)
+    // Right neighbour pivots on its LEFT edge (the seam with the current panel).
     return {
       transform: [
-        { perspective: 800 },
-        { translateX: translateX.value + SCREEN_WIDTH },
+        { perspective: 1000 },
+        { translateX: translateX.value + SCREEN_WIDTH - HALF },
         { rotateY: `${rotateY}deg` },
+        { translateX: HALF },
       ],
       opacity: translateX.value < 0 ? 1 : 0,
     }
@@ -1300,7 +1314,7 @@ export default function StoryViewerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg, overflow: 'hidden' },
-  cubeFace: { backfaceVisibility: 'hidden' },
+  cubeFace: {},
   neighbourPlaceholder: {
     flex: 1,
     backgroundColor: '#000',
