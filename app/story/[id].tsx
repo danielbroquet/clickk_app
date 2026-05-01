@@ -18,8 +18,6 @@ import Reanimated, {
   cancelAnimation,
   Easing as ReaEasing,
   runOnJS,
-  interpolate,
-  Extrapolation,
   type SharedValue,
 } from 'react-native-reanimated'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -608,57 +606,20 @@ export default function StoryViewerScreen() {
     [horizontalPan, verticalPan, longPress]
   )
 
-  // Cube fold transforms: rotate around the seam shared with the neighbour,
-  // not around the panel centre. We emulate transform-origin by sandwiching
-  // the rotation between two translateX's equal to half the panel width.
-  const HALF = SCREEN_WIDTH / 2
+  // Simple horizontal slide (Instagram/TikTok style).
+  const currentCubeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }))
 
-  const currentCubeStyle = useAnimatedStyle(() => {
-    const progress = translateX.value / SCREEN_WIDTH
-    const rotateY = interpolate(progress, [-1, 0, 1], [-90, 0, 90], Extrapolation.CLAMP)
-    // Pivot on the edge that is leaving the screen:
-    //   swiping left  (translateX < 0) -> pivot on LEFT edge  -> pre -HALF / post +HALF
-    //   swiping right (translateX > 0) -> pivot on RIGHT edge -> pre +HALF / post -HALF
-    const pivot = translateX.value >= 0 ? HALF : -HALF
-    return {
-      transform: [
-        { perspective: 1000 },
-        { translateX: translateX.value + pivot },
-        { rotateY: `${rotateY}deg` },
-        { translateX: -pivot },
-      ],
-    }
-  })
+  const leftCubeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value - SCREEN_WIDTH }],
+    opacity: translateX.value > 0 ? 1 : 0,
+  }))
 
-  const leftCubeStyle = useAnimatedStyle(() => {
-    const progress = translateX.value / SCREEN_WIDTH
-    const rotateY = interpolate(progress, [0, 1], [90, 0], Extrapolation.CLAMP)
-    // Left neighbour pivots on its RIGHT edge (the seam with the current panel).
-    return {
-      transform: [
-        { perspective: 1000 },
-        { translateX: translateX.value - SCREEN_WIDTH + HALF },
-        { rotateY: `${rotateY}deg` },
-        { translateX: -HALF },
-      ],
-      opacity: translateX.value > 0 ? 1 : 0,
-    }
-  })
-
-  const rightCubeStyle = useAnimatedStyle(() => {
-    const progress = translateX.value / SCREEN_WIDTH
-    const rotateY = interpolate(progress, [-1, 0], [0, -90], Extrapolation.CLAMP)
-    // Right neighbour pivots on its LEFT edge (the seam with the current panel).
-    return {
-      transform: [
-        { perspective: 1000 },
-        { translateX: translateX.value + SCREEN_WIDTH - HALF },
-        { rotateY: `${rotateY}deg` },
-        { translateX: HALF },
-      ],
-      opacity: translateX.value < 0 ? 1 : 0,
-    }
-  })
+  const rightCubeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value + SCREEN_WIDTH }],
+    opacity: translateX.value < 0 ? 1 : 0,
+  }))
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -806,7 +767,7 @@ export default function StoryViewerScreen() {
   const thumbnailOpacity = useSharedValue(1)
   useEffect(() => {
     if (videoFirstFrameReady) {
-      thumbnailOpacity.value = withTiming(0, { duration: 200 })
+      thumbnailOpacity.value = withTiming(0, { duration: 250 })
     } else {
       thumbnailOpacity.value = 1
     }
@@ -826,7 +787,7 @@ export default function StoryViewerScreen() {
 
   const onPlaybackStatusUpdate = useCallback((status: any) => {
     if (!status.isLoaded) return
-    if (status.positionMillis > 0) {
+    if (status.isPlaying) {
       setVideoFirstFrameReady((prev) => (prev ? prev : true))
     }
     if (
