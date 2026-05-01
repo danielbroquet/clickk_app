@@ -8,7 +8,6 @@ import {
   Alert,
   Image,
   Animated,
-  PanResponder,
 } from 'react-native'
 import Reanimated, {
   useSharedValue,
@@ -207,8 +206,6 @@ export default function StoryViewerScreen() {
   allSellerIdsRef.current = allSellerIds
 
   const [isPaused, setIsPaused] = useState(false)
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const isPausedByLongPress = useRef(false)
 
   const [showDetail, setShowDetail] = useState(false)
   const detailAnim = useRef(new Animated.Value(0)).current
@@ -220,45 +217,6 @@ export default function StoryViewerScreen() {
   const closeDetail = () => {
     Animated.spring(detailAnim, { toValue: 0, useNativeDriver: true, tension: 80, friction: 14 }).start(() => setShowDetail(false))
   }
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dy) > 10 && Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderGrant: () => {
-        isPausedByLongPress.current = false
-        longPressTimer.current = setTimeout(() => {
-          isPausedByLongPress.current = true
-          setIsPaused(true)
-        }, 200)
-      },
-      onPanResponderRelease: (_e, g) => {
-        if (longPressTimer.current !== null) {
-          clearTimeout(longPressTimer.current)
-          longPressTimer.current = null
-        }
-        if (isPausedByLongPress.current) {
-          isPausedByLongPress.current = false
-          setIsPaused(false)
-          return
-        }
-        const absX = Math.abs(g.dx)
-        const absY = Math.abs(g.dy)
-        // Vertical swipes only (horizontal handled by Gesture.Pan below)
-        if (absY > absX && absX < 50) {
-          if (g.dy > 80) {
-            router.back()
-            return
-          }
-          if (g.dy < -80) {
-            openDetailRef.current()
-            return
-          }
-        }
-      },
-    })
-  ).current
 
   const goToSellerAtRef = useRef(goToSellerAt)
   goToSellerAtRef.current = goToSellerAt
@@ -351,7 +309,11 @@ export default function StoryViewerScreen() {
     translateX.value = 0
   }, [translateX])
 
-  const pan = useMemo(() => {
+  const setIsPausedJS = useCallback((v: boolean) => setIsPaused(v), [])
+  const routerBackJS = useCallback(() => router.back(), [])
+  const openDetailJS = useCallback(() => openDetailRef.current(), [])
+
+  const horizontalPan = useMemo(() => {
     return Gesture.Pan()
       .activeOffsetX([-12, 12])
       .failOffsetY([-18, 18])
@@ -410,6 +372,38 @@ export default function StoryViewerScreen() {
         panActive.value = 0
       })
   }, [SCREEN_WIDTH, currentSellerIdx, allSellerIds.length, navigateToSellerJS, resetTranslateJS, panActive, translateX])
+
+  const verticalPan = useMemo(() => {
+    return Gesture.Pan()
+      .activeOffsetY([-12, 12])
+      .failOffsetX([-18, 18])
+      .onEnd((e) => {
+        'worklet'
+        if (e.translationY > 80) {
+          runOnJS(routerBackJS)()
+        } else if (e.translationY < -80) {
+          runOnJS(openDetailJS)()
+        }
+      })
+  }, [routerBackJS, openDetailJS])
+
+  const longPress = useMemo(() => {
+    return Gesture.LongPress()
+      .minDuration(200)
+      .onStart(() => {
+        'worklet'
+        runOnJS(setIsPausedJS)(true)
+      })
+      .onFinalize(() => {
+        'worklet'
+        runOnJS(setIsPausedJS)(false)
+      })
+  }, [setIsPausedJS])
+
+  const pan = useMemo(
+    () => Gesture.Race(horizontalPan, verticalPan, longPress),
+    [horizontalPan, verticalPan, longPress]
+  )
 
   const currentCubeStyle = useAnimatedStyle(() => {
     const progress = translateX.value / SCREEN_WIDTH
@@ -755,7 +749,6 @@ export default function StoryViewerScreen() {
       <GestureDetector gesture={pan}>
         <Reanimated.View
           style={[styles.cubeFace, currentCubeStyle, { flex: 1 }]}
-          {...panResponder.panHandlers}
         >
 
       {/* ── Video ── */}
