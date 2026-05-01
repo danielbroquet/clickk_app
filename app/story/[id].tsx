@@ -8,17 +8,22 @@ import {
   Alert,
   Image,
   Animated,
+  TextInput,
 } from 'react-native'
 import Reanimated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
+  useDerivedValue,
   withTiming,
   withSpring,
   cancelAnimation,
   Easing as ReaEasing,
   runOnJS,
   interpolate,
+  interpolateColor,
   Extrapolation,
+  type SharedValue,
 } from 'react-native-reanimated'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
@@ -99,38 +104,176 @@ function computeExpiry(story: StoryData): number {
   return Math.max(0, (new Date(story.expires_at).getTime() - Date.now()) / 1000)
 }
 
-// ── Price display with fade animation on integer change ────────────────────
+// Reanimated-powered text component so value changes don't re-render React
+const AnimatedTextInput = Reanimated.createAnimatedComponent(TextInput)
 
-interface PriceDisplayProps {
-  price: number
-  priceRatio: number
+function formatPriceFR(n: number) {
+  'worklet'
+  // toLocaleString is not available in a worklet; format manually
+  const fixed = n.toFixed(2)
+  const [whole, frac] = fixed.split('.')
+  let out = ''
+  for (let i = 0; i < whole.length; i++) {
+    if (i > 0 && (whole.length - i) % 3 === 0) out += "'"
+    out += whole[i]
+  }
+  return `${out}.${frac}`
 }
 
-const PriceDisplay = memo(function PriceDisplay({ price, priceRatio }: PriceDisplayProps) {
-  const fadeAnim = useRef(new Animated.Value(1)).current
-  const prevIntRef = useRef<number>(Math.floor(price))
+function formatHHMMSSWorklet(seconds: number) {
+  'worklet'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  const pad = (x: number) => (x < 10 ? `0${x}` : `${x}`)
+  return `${pad(h)}:${pad(m)}:${pad(s)}`
+}
 
-  useEffect(() => {
-    const intPart = Math.floor(price)
-    if (intPart !== prevIntRef.current) {
-      prevIntRef.current = intPart
-      fadeAnim.setValue(0.4)
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start()
-    }
-  }, [Math.floor(price)])
+// ── Price display driven by shared values (UI thread) ─────────────────────
 
-  const color = priceRatio > 0.6 ? '#00D2B8' : priceRatio > 0.3 ? '#F59E0B' : '#EF4444'
-  const fmt = price.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+interface PriceDisplayProps {
+  priceSV: SharedValue<number>
+  priceRatioSV: SharedValue<number>
+}
 
+const PriceDisplay = memo(function PriceDisplay({ priceSV, priceRatioSV }: PriceDisplayProps) {
+  const animatedProps = useAnimatedProps(() => {
+    return { text: formatPriceFR(priceSV.value) } as any
+  })
+  const textStyle = useAnimatedStyle(() => {
+    const r = priceRatioSV.value
+    const color = r > 0.6 ? '#00D2B8' : r > 0.3 ? '#F59E0B' : '#EF4444'
+    return { color }
+  })
+  const initial = formatPriceFR(priceSV.value)
   return (
-    <Animated.View style={{ opacity: fadeAnim, alignItems: 'center' }}>
+    <View style={{ alignItems: 'center' }}>
       <Text style={styles.priceChfLabel}>CHF</Text>
-      <Text style={[styles.priceBig, { color }]}>{fmt}</Text>
-    </Animated.View>
+      <AnimatedTextInput
+        editable={false}
+        defaultValue={initial}
+        // @ts-ignore animated text prop
+        animatedProps={animatedProps}
+        style={[styles.priceBig, styles.priceBigInput, textStyle]}
+      />
+    </View>
+  )
+})
+
+const SavingsRow = memo(function SavingsRow({
+  priceSV,
+  startPrice,
+}: {
+  priceSV: SharedValue<number>
+  startPrice: number
+}) {
+  const pctProps = useAnimatedProps(() => {
+    const pct = Math.round((1 - priceSV.value / startPrice) * 100)
+    return { text: `-${pct}%` } as any
+  })
+  const startFmt = startPrice.toLocaleString('fr-CH')
+  return (
+    <View style={styles.savingsRow}>
+      <Text style={styles.savingsStrike}>CHF {startFmt}</Text>
+      <View style={styles.savingsBadge}>
+        <AnimatedTextInput
+          editable={false}
+          defaultValue=""
+          // @ts-ignore animated text prop
+          animatedProps={pctProps}
+          style={[styles.savingsBadgeText, styles.badgeTextInput]}
+        />
+      </View>
+    </View>
+  )
+})
+
+const ProgressBarFill = memo(function ProgressBarFill({
+  progressSV,
+}: {
+  progressSV: SharedValue<number>
+}) {
+  const style = useAnimatedStyle(() => {
+    const r = progressSV.value
+    const color = r > 0.6 ? '#EF4444' : r > 0.3 ? '#F59E0B' : '#00D2B8'
+    return {
+      width: `${Math.min(100, Math.max(0, r * 100))}%`,
+      backgroundColor: color,
+    }
+  })
+  return <Reanimated.View style={[styles.priceProgressFill, style]} />
+})
+
+const ExpiryRow = memo(function ExpiryRow({
+  expiresRemainingSV,
+}: {
+  expiresRemainingSV: SharedValue<number>
+}) {
+  const textProps = useAnimatedProps(() => {
+    return { text: `${i18n.t('story.viewer.expires_in')} ${formatHHMMSSWorklet(expiresRemainingSV.value)}` } as any
+  })
+  const textStyle = useAnimatedStyle(() => {
+    return { color: expiresRemainingSV.value < 3600 ? C.danger : C.muted }
+  })
+  return (
+    <View style={styles.expiryRow}>
+      <Ionicons name="time-outline" size={12} color={C.muted} />
+      <AnimatedTextInput
+        editable={false}
+        defaultValue=""
+        // @ts-ignore animated text prop
+        animatedProps={textProps}
+        style={[styles.expiryText, styles.expiryTextInput, textStyle]}
+      />
+    </View>
+  )
+})
+
+const CtaLabel = memo(function CtaLabel({
+  priceSV,
+  prefix,
+  style,
+}: {
+  priceSV: SharedValue<number>
+  prefix: string
+  style: any
+}) {
+  const props = useAnimatedProps(() => {
+    return { text: `${prefix}${formatPriceFR(priceSV.value)}` } as any
+  })
+  return (
+    <AnimatedTextInput
+      editable={false}
+      defaultValue={`${prefix}${formatPriceFR(priceSV.value)}`}
+      // @ts-ignore animated text prop
+      animatedProps={props}
+      style={[style, styles.textInputReset]}
+    />
+  )
+})
+
+const DetailTimeRemaining = memo(function DetailTimeRemaining({
+  expiresRemainingSV,
+  style,
+}: {
+  expiresRemainingSV: SharedValue<number>
+  style: any
+}) {
+  const props = useAnimatedProps(() => {
+    const s = expiresRemainingSV.value
+    const text = s > 0
+      ? `${Math.floor(s / 60)}m ${Math.floor(s % 60)}s restantes`
+      : 'Expiré'
+    return { text } as any
+  })
+  return (
+    <AnimatedTextInput
+      editable={false}
+      defaultValue=""
+      // @ts-ignore animated text prop
+      animatedProps={props}
+      style={[style, styles.textInputReset]}
+    />
   )
 })
 
@@ -213,10 +356,16 @@ export default function StoryViewerScreen() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
 
-  const [currentPrice, setCurrentPrice] = useState<number>(0)
-  const [expiresRemaining, setExpiresRemaining] = useState(0)
+  // UI-thread driven price/time state — no React re-render per tick
+  const currentPriceSV = useSharedValue(0)
+  const expiresRemainingSV = useSharedValue(0)
   // timeRatio: 0 = just started (full price), 1 = expired (floor)
-  const [timeRatio, setTimeRatio] = useState(0)
+  const timeRatioSV = useSharedValue(0)
+  // priceRatio: 1 = at start price, 0 = at floor
+  const priceRatioSV = useSharedValue(1)
+  const nearFloorSV = useSharedValue(0) // 0 | 1, as number for worklet use
+  // Mirror a few values to React state only when they actually matter
+  // for re-rendering (e.g. gating CTA label / showing the floor banner).
   const [nearFloor, setNearFloor] = useState(false)
 
   const storyRef = useRef<StoryData | null>(null)
@@ -251,7 +400,8 @@ export default function StoryViewerScreen() {
 
   const pulseAnim = useRef(new Animated.Value(1)).current
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null)
-  const progressBarAnim = useRef(new Animated.Value(0)).current
+  // Progress bar animated on UI thread
+  const progressBarSV = useSharedValue(0)
 
   // Story segment progress — fully UI-thread driven via Reanimated
   const storyProgress = useSharedValue(0)
@@ -517,10 +667,23 @@ export default function StoryViewerScreen() {
       const s = storyFields as StoryData
       storyRef.current = s
       setStory(s)
-      setCurrentPrice(computePrice(s))
-      setTimeRatio(computeRatio(s))
-      setNearFloor(computePrice(s) <= s.floor_price_chf * 1.15)
-      setExpiresRemaining(computeExpiry(s))
+      const initPrice = computePrice(s)
+      const initRatio = computeRatio(s)
+      const initExpiry = computeExpiry(s)
+      const initNear = initPrice <= s.floor_price_chf * 1.15
+      const priceSpan = s.start_price_chf - s.floor_price_chf
+      const initPriceRatio = priceSpan > 0
+        ? Math.max(0, Math.min(1, (initPrice - s.floor_price_chf) / priceSpan))
+        : 1
+      currentPriceSV.value = initPrice
+      timeRatioSV.value = initRatio
+      priceRatioSV.value = initPriceRatio
+      expiresRemainingSV.value = initExpiry
+      nearFloorSV.value = initNear ? 1 : 0
+      progressBarSV.value = initRatio
+      currentPriceRef.current = initPrice
+      expiresRemainingRef.current = initExpiry
+      setNearFloor(initNear)
       setSeller(profiles as SellerProfile)
       setLoading(false)
     })()
@@ -558,6 +721,11 @@ export default function StoryViewerScreen() {
 
   const prevIntPriceRef = useRef<number | null>(null)
 
+  const prevNearFloorRef = useRef<boolean>(false)
+  // Latest values for imperative reads (CTA onPress, snapshot price, etc.)
+  const currentPriceRef = useRef<number>(0)
+  const expiresRemainingRef = useRef<number>(0)
+
   useEffect(() => {
     const tick = () => {
       const s = storyRef.current
@@ -566,11 +734,31 @@ export default function StoryViewerScreen() {
       const price = computePrice(s)
       const ratio = computeRatio(s)
       const expiry = computeExpiry(s)
+      const priceSpan = s.start_price_chf - s.floor_price_chf
+      const pRatio = priceSpan > 0
+        ? Math.max(0, Math.min(1, (price - s.floor_price_chf) / priceSpan))
+        : 1
+      const near = price <= s.floor_price_chf * 1.15
 
-      setCurrentPrice(price)
-      setTimeRatio(ratio)
-      setNearFloor(price <= s.floor_price_chf * 1.15)
-      setExpiresRemaining(expiry)
+      currentPriceSV.value = price
+      timeRatioSV.value = ratio
+      priceRatioSV.value = pRatio
+      expiresRemainingSV.value = expiry
+      nearFloorSV.value = near ? 1 : 0
+      currentPriceRef.current = price
+      expiresRemainingRef.current = expiry
+
+      // Progress bar: animate on UI thread, no layout churn
+      progressBarSV.value = withTiming(ratio, {
+        duration: 800,
+        easing: ReaEasing.linear,
+      })
+
+      // Only re-render when the gating flag actually flips
+      if (near !== prevNearFloorRef.current) {
+        prevNearFloorRef.current = near
+        setNearFloor(near)
+      }
 
       // Haptic only when integer part changes
       const intPrice = Math.floor(price)
@@ -586,27 +774,6 @@ export default function StoryViewerScreen() {
     const handle = setInterval(tick, 1000)
     return () => clearInterval(handle)
   }, [])
-
-  // ── Progress bar animation ─────────────────────────────────────────────────
-
-  useEffect(() => {
-    Animated.timing(progressBarAnim, {
-      toValue: timeRatio,
-      duration: 800,
-      useNativeDriver: false,
-    }).start()
-  }, [timeRatio])
-
-  const progressBarWidth = progressBarAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0%', '100%'],
-  })
-
-  const progressBarColor = timeRatio > 0.6
-    ? '#EF4444'
-    : timeRatio > 0.3
-    ? '#F59E0B'
-    : '#00D2B8'
 
   // ── Video duration sync ────────────────────────────────────────────────────
   // We drive the progress bar ourselves on the UI thread via Reanimated.
@@ -658,17 +825,10 @@ export default function StoryViewerScreen() {
     story.buyer_id === currentUserId
   )
 
-  // priceRatio: 1 = at start price (full), 0 = at floor price
-  const priceRatio = story
-    ? (story.start_price_chf - story.floor_price_chf) > 0
-      ? Math.max(0, Math.min(1, (currentPrice - story.floor_price_chf) / (story.start_price_chf - story.floor_price_chf)))
-      : 1
-    : 1
-
   // ── Pulse when near floor ──────────────────────────────────────────────────
 
   useEffect(() => {
-    if (priceRatio < 0.3 && !isSold) {
+    if (nearFloor && !isSold) {
       pulseLoopRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.03, duration: 400, useNativeDriver: true }),
@@ -681,7 +841,7 @@ export default function StoryViewerScreen() {
       pulseAnim.setValue(1)
     }
     return () => { pulseLoopRef.current?.stop() }
-  }, [priceRatio < 0.3, isSold])
+  }, [nearFloor, isSold])
 
   // ── Confirm delivery ───────────────────────────────────────────────────────
 
@@ -764,13 +924,9 @@ export default function StoryViewerScreen() {
     )
   }
 
-  const currentFmt = currentPrice.toLocaleString('fr-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const startFmt = story.start_price_chf.toLocaleString('fr-CH')
   const floorFmt = story.floor_price_chf.toLocaleString('fr-CH')
   const initials = seller.username.charAt(0).toUpperCase()
-
-  const savedPct = Math.round((1 - currentPrice / story.start_price_chf) * 100)
-  const savedAmt = (story.start_price_chf - currentPrice).toFixed(2)
 
   const hasLeftNeighbour = currentSellerIdx > 0
   const hasRightNeighbour = currentSellerIdx >= 0 && currentSellerIdx < allSellerIds.length - 1
@@ -922,39 +1078,21 @@ export default function StoryViewerScreen() {
       {/* ── Mid-screen price overlay ── */}
       {!isSold && (
         <View style={styles.priceOverlay} pointerEvents="none">
-          <PriceDisplay price={currentPrice} priceRatio={priceRatio} />
+          <PriceDisplay priceSV={currentPriceSV} priceRatioSV={priceRatioSV} />
 
-          {/* Savings row */}
-          {savedPct > 0 && (
-            <View style={styles.savingsRow}>
-              <Text style={styles.savingsStrike}>CHF {story.start_price_chf.toLocaleString('fr-CH')}</Text>
-              <View style={styles.savingsBadge}>
-                <Text style={styles.savingsBadgeText}>-{savedPct}%</Text>
-              </View>
-            </View>
-          )}
+          {/* Savings row (shared-value driven) */}
+          <SavingsRow
+            priceSV={currentPriceSV}
+            startPrice={story.start_price_chf}
+          />
 
-          {/* Progress bar: visual of how close to floor */}
+          {/* Progress bar: animated on UI thread */}
           <View style={styles.priceProgressTrack}>
-            <Animated.View
-              style={[
-                styles.priceProgressFill,
-                { width: progressBarWidth, backgroundColor: progressBarColor },
-              ]}
-            />
+            <ProgressBarFill progressSV={progressBarSV} />
           </View>
 
           {/* Expiry */}
-          <View style={styles.expiryRow}>
-            <Ionicons
-              name="time-outline"
-              size={12}
-              color={expiresRemaining < 3600 ? C.danger : C.muted}
-            />
-            <Text style={[styles.expiryText, { color: expiresRemaining < 3600 ? C.danger : C.muted }]}>
-              {i18n.t('story.viewer.expires_in')} {formatHHMMSS(expiresRemaining)}
-            </Text>
-          </View>
+          <ExpiryRow expiresRemainingSV={expiresRemainingSV} />
         </View>
       )}
 
@@ -1006,15 +1144,17 @@ export default function StoryViewerScreen() {
             <TouchableOpacity
               style={[styles.ctaBtn, nearFloor && { backgroundColor: '#EF4444' }]}
               onPress={() => {
-                setSnapshotPrice(currentPrice)
+                setSnapshotPrice(currentPriceRef.current)
                 setModalVisible(true)
               }}
             >
-              <Text style={styles.ctaBtnText}>
-                {nearFloor
-                  ? `DERNIÈRE BAISSE — CHF ${currentFmt}`
-                  : `${i18n.t('story.viewer.buy_now')} — CHF ${currentFmt}`}
-              </Text>
+              <CtaLabel
+                priceSV={currentPriceSV}
+                prefix={nearFloor
+                  ? 'DERNIÈRE BAISSE — CHF '
+                  : `${i18n.t('story.viewer.buy_now')} — CHF `}
+                style={styles.ctaBtnText}
+              />
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -1061,7 +1201,7 @@ export default function StoryViewerScreen() {
             {/* Price row */}
             <View style={styles.detailPriceRow}>
               <Text style={styles.detailPriceLabel}>CHF</Text>
-              <Text style={styles.detailPriceValue}>{currentFmt}</Text>
+              <CtaLabel priceSV={currentPriceSV} prefix="" style={styles.detailPriceValue} />
               <View style={[
                 styles.detailSpeedBadge,
                 story.speed_preset === 'FAST' && { backgroundColor: '#EF4444' },
@@ -1076,11 +1216,7 @@ export default function StoryViewerScreen() {
             {/* Time remaining */}
             <View style={styles.detailTimeRow}>
               <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.5)" />
-              <Text style={styles.detailTimeText}>
-                {expiresRemaining > 0
-                  ? `${Math.floor(expiresRemaining / 60)}m ${expiresRemaining % 60}s restantes`
-                  : 'Expiré'}
-              </Text>
+              <DetailTimeRemaining expiresRemainingSV={expiresRemainingSV} style={styles.detailTimeText} />
             </View>
 
             {/* Buy button */}
@@ -1089,13 +1225,11 @@ export default function StoryViewerScreen() {
                 style={styles.detailBuyBtn}
                 onPress={() => {
                   closeDetail()
-                  setSnapshotPrice(currentPrice)
+                  setSnapshotPrice(currentPriceRef.current)
                   setModalVisible(true)
                 }}
               >
-                <Text style={styles.detailBuyBtnText}>
-                  Acheter · CHF {currentFmt}
-                </Text>
+                <CtaLabel priceSV={currentPriceSV} prefix="Acheter · CHF " style={styles.detailBuyBtnText} />
               </TouchableOpacity>
             )}
           </Animated.View>
@@ -1292,6 +1426,26 @@ const styles = StyleSheet.create({
     fontSize: 56,
     fontWeight: '800',
     letterSpacing: -1,
+  },
+  priceBigInput: {
+    padding: 0,
+    margin: 0,
+    minWidth: 200,
+    textAlign: 'center',
+  },
+  textInputReset: {
+    padding: 0,
+    margin: 0,
+  },
+  badgeTextInput: {
+    padding: 0,
+    margin: 0,
+    minWidth: 42,
+    textAlign: 'center',
+  },
+  expiryTextInput: {
+    padding: 0,
+    margin: 0,
   },
   priceProgressTrack: {
     width: 180,
