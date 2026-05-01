@@ -277,17 +277,19 @@ export default function StoryViewerScreen() {
     sellerStoryIds?: string
     allSellerIds?: string
   }>()
-  const id = params.id
-  const sellerStoryIds: string[] = (() => {
-    if (!params.sellerStoryIds) return id ? [id] : []
+  const initialId = params.id
+  const initialSellerStoryIds: string[] = useMemo(() => {
+    if (!params.sellerStoryIds) return initialId ? [initialId] : []
     try {
       const parsed = JSON.parse(params.sellerStoryIds)
-      return Array.isArray(parsed) && parsed.length > 0 ? parsed : id ? [id] : []
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : initialId ? [initialId] : []
     } catch {
-      return id ? [id] : []
+      return initialId ? [initialId] : []
     }
-  })()
-  const allSellerIds: string[] = (() => {
+    // initial-only: only derived once, never recomputed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const allSellerIds: string[] = useMemo(() => {
     if (!params.allSellerIds) return []
     try {
       const parsed = JSON.parse(params.allSellerIds)
@@ -295,37 +297,46 @@ export default function StoryViewerScreen() {
     } catch {
       return []
     }
-  })()
-  const currentIndex = Math.max(0, sellerStoryIds.indexOf(id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Internal state — navigation between sellers/stories mutates these
+  // instead of calling router.replace(), so StoryViewerScreen never remounts.
+  const [sellerStoryIds, setSellerStoryIds] = useState<string[]>(initialSellerStoryIds)
+  const [currentIndex, setCurrentIndex] = useState<number>(() =>
+    Math.max(0, initialSellerStoryIds.indexOf(initialId)),
+  )
+  const id = sellerStoryIds[currentIndex] ?? initialId
+
   const insets = useSafeAreaInsets()
   const { session } = useAuth()
 
-  const goToStoryAt = (nextIdx: number) => {
-    if (nextIdx < 0 || nextIdx >= sellerStoryIds.length) return
-    router.replace({
-      pathname: '/story/[id]',
-      params: {
-        id: sellerStoryIds[nextIdx],
-        sellerStoryIds: JSON.stringify(sellerStoryIds),
-        allSellerIds: JSON.stringify(allSellerIds),
-      },
-    })
-  }
+  // Cache full story lists per seller so seller-to-seller nav is instant.
+  const sellerStoriesCacheRef = useRef<Map<string, string[]>>(new Map())
 
-  const goToSellerAt = async (nextSellerIdx: number) => {
+  const goToStoryAt = useCallback((nextIdx: number) => {
+    setSellerStoryIds((prev) => {
+      if (nextIdx < 0 || nextIdx >= prev.length) return prev
+      setCurrentIndex(nextIdx)
+      router.setParams({ id: prev[nextIdx] })
+      return prev
+    })
+  }, [])
+
+  const goToSellerAt = useCallback(async (nextSellerIdx: number) => {
     if (nextSellerIdx < 0 || nextSellerIdx >= allSellerIds.length) return
     const nextSellerId = allSellerIds[nextSellerIdx]
-    const stories = await getSellerStories(nextSellerId)
-    if (stories.length === 0) return
-    router.replace({
-      pathname: '/story/[id]',
-      params: {
-        id: stories[0].id,
-        sellerStoryIds: JSON.stringify(stories.map((s) => s.id)),
-        allSellerIds: JSON.stringify(allSellerIds),
-      },
-    })
-  }
+    let ids = sellerStoriesCacheRef.current.get(nextSellerId)
+    if (!ids) {
+      const stories = await getSellerStories(nextSellerId)
+      if (stories.length === 0) return
+      ids = stories.map((s) => s.id)
+      sellerStoriesCacheRef.current.set(nextSellerId, ids)
+    }
+    setSellerStoryIds(ids)
+    setCurrentIndex(0)
+    router.setParams({ id: ids[0] })
+  }, [allSellerIds])
 
   const [story, setStory] = useState<StoryData | null>(null)
   const [seller, setSeller] = useState<SellerProfile | null>(null)
@@ -402,7 +413,7 @@ export default function StoryViewerScreen() {
     if (currentIndex < sellerStoryIds.length - 1) {
       goToStoryAt(currentIndex + 1)
     }
-  }, [currentIndex, sellerStoryIds])
+  }, [currentIndex, sellerStoryIds, goToStoryAt])
 
   const startStoryProgress = useCallback((fromElapsedMs: number) => {
     const total = storyDurationRef.current
@@ -536,8 +547,8 @@ export default function StoryViewerScreen() {
             { damping: 18, stiffness: 180, mass: 0.8, velocity: e.velocityX },
             (finished) => {
               if (finished) {
-                runOnJS(navigateToSellerJS)(currentSellerIdx + 1)
                 runOnJS(resetTranslateJS)()
+                runOnJS(navigateToSellerJS)(currentSellerIdx + 1)
               }
             }
           )
