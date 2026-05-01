@@ -67,6 +67,7 @@ interface StoryData {
   status: string
   buyer_id: string | null
   video_duration_seconds: number | null
+  thumbnail_url: string | null
 }
 
 interface SellerProfile {
@@ -794,9 +795,40 @@ export default function StoryViewerScreen() {
   // restart the timer with the correct duration (preserving elapsed time).
 
   const videoDurationSynced = useRef(false)
+  const [videoFirstFrameReady, setVideoFirstFrameReady] = useState(false)
+
+  // Reset the thumbnail-bridge state whenever the story changes so the
+  // thumbnail masks the black buffer gap on the new video.
+  useEffect(() => {
+    setVideoFirstFrameReady(false)
+  }, [story?.id])
+
+  const thumbnailOpacity = useSharedValue(1)
+  useEffect(() => {
+    if (videoFirstFrameReady) {
+      thumbnailOpacity.value = withTiming(0, { duration: 200 })
+    } else {
+      thumbnailOpacity.value = 1
+    }
+  }, [videoFirstFrameReady, thumbnailOpacity])
+
+  const thumbnailBridgeStyle = useAnimatedStyle(() => ({
+    opacity: thumbnailOpacity.value,
+  }))
+
+  // Prefetch neighbour thumbnails so they show instantly after navigation.
+  useEffect(() => {
+    const left = leftNeighbourPreview?.thumbnail_url
+    const right = rightNeighbourPreview?.thumbnail_url
+    if (left && Platform.OS !== 'web') Image.prefetch(left).catch(() => {})
+    if (right && Platform.OS !== 'web') Image.prefetch(right).catch(() => {})
+  }, [leftNeighbourPreview?.thumbnail_url, rightNeighbourPreview?.thumbnail_url])
 
   const onPlaybackStatusUpdate = useCallback((status: any) => {
     if (!status.isLoaded) return
+    if (status.positionMillis > 0) {
+      setVideoFirstFrameReady((prev) => (prev ? prev : true))
+    }
     if (
       !videoDurationSynced.current &&
       status.durationMillis &&
@@ -948,31 +980,6 @@ export default function StoryViewerScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Hidden pre-mounted neighbour videos — buffer the first frame so
-          navigation doesn't flash black. One per neighbour (first story only). */}
-      {leftNeighbourPreview?.video_url && (
-        <Video
-          source={{ uri: leftNeighbourPreview.video_url }}
-          style={styles.preloadVideo}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay={false}
-          isMuted={true}
-          isLooping={false}
-          pointerEvents="none"
-        />
-      )}
-      {rightNeighbourPreview?.video_url && (
-        <Video
-          source={{ uri: rightNeighbourPreview.video_url }}
-          style={styles.preloadVideo}
-          resizeMode={ResizeMode.COVER}
-          shouldPlay={false}
-          isMuted={true}
-          isLooping={false}
-          pointerEvents="none"
-        />
-      )}
-
       {/* Left neighbour preview (cube fold) */}
       {hasLeftNeighbour && (
         <Reanimated.View
@@ -1008,6 +1015,21 @@ export default function StoryViewerScreen() {
         isMuted={false}
         onPlaybackStatusUpdate={onPlaybackStatusUpdate}
       />
+
+      {/* ── Thumbnail bridge: masks the video buffer delay so there's no
+            black flash between stories. Fades out when the first frame lands. */}
+      {story.thumbnail_url && (
+        <Reanimated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, thumbnailBridgeStyle]}
+        >
+          <Image
+            source={{ uri: story.thumbnail_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        </Reanimated.View>
+      )}
 
       {/* ── Tap zones: left = prev story, right = next story ── */}
       {!modalVisible && (
@@ -1351,14 +1373,6 @@ export default function StoryViewerScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg, overflow: 'hidden' },
   cubeFace: {},
-  preloadVideo: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0,
-    left: -9999,
-    top: -9999,
-  },
   neighbourPlaceholder: {
     flex: 1,
     backgroundColor: '#000',
