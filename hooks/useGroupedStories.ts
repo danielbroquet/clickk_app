@@ -33,6 +33,7 @@ interface RawStory {
   duration_hours: 24 | 72 | 168 | null
   created_at: string
   updated_at: string
+  thumbnail_url: string | null
   profiles: { id: string; username: string; avatar_url: string | null } | null
 }
 
@@ -56,6 +57,7 @@ function rawToStory(r: RawStory): Story {
     video_duration_seconds: r.video_duration_seconds ?? undefined,
     duration_hours: r.duration_hours ?? undefined,
     created_at: r.created_at,
+    thumbnail_url: r.thumbnail_url ?? null,
     seller: r.profiles
       ? {
           id: r.profiles.id,
@@ -85,7 +87,7 @@ export async function getSellerStories(sellerId: string): Promise<Story[]> {
       status, expires_at, speed_preset,
       buyer_id, final_price_chf, last_drop_at,
       video_duration_seconds, duration_hours,
-      created_at, updated_at,
+      created_at, updated_at, thumbnail_url,
       profiles:seller_id (id, username, avatar_url)
     `)
     .eq('seller_id', sellerId)

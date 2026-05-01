@@ -134,6 +134,24 @@ const PriceDisplay = memo(function PriceDisplay({ price, priceRatio }: PriceDisp
   )
 })
 
+const NeighbourPreview = memo(function NeighbourPreview({
+  preview,
+}: {
+  preview: { thumbnail_url: string | null; video_url: string | null } | null
+}) {
+  const uri = preview?.thumbnail_url ?? null
+  if (!uri) {
+    return <View style={styles.neighbourPlaceholder} />
+  }
+  return (
+    <Image
+      source={{ uri }}
+      style={styles.neighbourPreviewImage}
+      resizeMode="cover"
+    />
+  )
+})
+
 export default function StoryViewerScreen() {
   const params = useLocalSearchParams<{
     id: string
@@ -300,6 +318,41 @@ export default function StoryViewerScreen() {
     if (!currentSellerId) return -1
     return allSellerIds.indexOf(currentSellerId)
   }, [currentSellerId, allSellerIds])
+
+  // Prefetch neighbour seller story previews for the cube-fold
+  const neighbourCacheRef = useRef<Map<string, { thumbnail_url: string | null; video_url: string | null }>>(new Map())
+  const [leftNeighbourPreview, setLeftNeighbourPreview] = useState<{ thumbnail_url: string | null; video_url: string | null } | null>(null)
+  const [rightNeighbourPreview, setRightNeighbourPreview] = useState<{ thumbnail_url: string | null; video_url: string | null } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadNeighbour(sellerId: string | undefined, setter: (p: { thumbnail_url: string | null; video_url: string | null } | null) => void) {
+      if (!sellerId) {
+        setter(null)
+        return
+      }
+      const cached = neighbourCacheRef.current.get(sellerId)
+      if (cached) {
+        setter(cached)
+        return
+      }
+      const stories = await getSellerStories(sellerId)
+      if (cancelled) return
+      const first = stories[0]
+      const preview = first
+        ? { thumbnail_url: first.thumbnail_url ?? null, video_url: first.video_url ?? null }
+        : { thumbnail_url: null, video_url: null }
+      neighbourCacheRef.current.set(sellerId, preview)
+      setter(preview)
+    }
+    const leftId = currentSellerIdx > 0 ? allSellerIds[currentSellerIdx - 1] : undefined
+    const rightId = currentSellerIdx >= 0 && currentSellerIdx < allSellerIds.length - 1
+      ? allSellerIds[currentSellerIdx + 1]
+      : undefined
+    loadNeighbour(leftId, setLeftNeighbourPreview)
+    loadNeighbour(rightId, setRightNeighbourPreview)
+    return () => { cancelled = true }
+  }, [currentSellerIdx, allSellerIds])
 
   const navigateToSellerJS = useCallback((nextSellerIdx: number) => {
     goToSellerAtRef.current(nextSellerIdx)
@@ -726,23 +779,23 @@ export default function StoryViewerScreen() {
     <View style={styles.container}>
       <StatusBar hidden />
 
-      {/* Left neighbour placeholder (cube fold) */}
+      {/* Left neighbour preview (cube fold) */}
       {hasLeftNeighbour && (
         <Reanimated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFillObject, styles.cubeFace, leftCubeStyle]}
         >
-          <View style={styles.neighbourPlaceholder} />
+          <NeighbourPreview preview={leftNeighbourPreview} />
         </Reanimated.View>
       )}
 
-      {/* Right neighbour placeholder (cube fold) */}
+      {/* Right neighbour preview (cube fold) */}
       {hasRightNeighbour && (
         <Reanimated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFillObject, styles.cubeFace, rightCubeStyle]}
         >
-          <View style={styles.neighbourPlaceholder} />
+          <NeighbourPreview preview={rightNeighbourPreview} />
         </Reanimated.View>
       )}
 
@@ -1128,6 +1181,11 @@ const styles = StyleSheet.create({
   cubeFace: { backfaceVisibility: 'hidden' },
   neighbourPlaceholder: {
     flex: 1,
+    backgroundColor: '#000',
+  },
+  neighbourPreviewImage: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#000',
   },
   centered: { flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' },

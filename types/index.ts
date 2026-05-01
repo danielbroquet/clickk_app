@@ -34,6 +34,7 @@ export interface Story {
   video_duration_seconds?: number
   duration_hours?: 24 | 72 | 168
   created_at: string
+  thumbnail_url?: string | null
   seller?: Profile
 }
 
