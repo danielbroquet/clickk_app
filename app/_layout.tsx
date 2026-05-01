@@ -78,6 +78,14 @@ function RootRedirector() {
       <Stack.Screen name="wallet/index" />
       <Stack.Screen name="(seller)/listings" />
       <Stack.Screen name="story/create" />
+      <Stack.Screen
+        name="story/[id]"
+        options={{
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+          gestureDirection: 'vertical',
+        }}
+      />
       <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
       <Stack.Screen name="profile/orders" />
