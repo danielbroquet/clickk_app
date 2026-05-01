@@ -24,6 +24,7 @@ import { useAuth } from '../../lib/auth'
 import { Video, ResizeMode } from 'expo-av'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
+import ReportModal from '../../components/ui/ReportModal'
 
 type ListingMediaItemProps = {
   url: string
@@ -97,6 +98,7 @@ export default function ListingDetailScreen() {
   const [instantLoading, setInstantLoading] = useState(false)
   const [orderError, setOrderError] = useState<string | null>(null)
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [reportVisible, setReportVisible] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -400,6 +402,16 @@ export default function ListingDetailScreen() {
             </View>
           )}
         </View>
+
+        {!isSeller && (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => setReportVisible(true)}
+          >
+            <Ionicons name="flag-outline" size={14} color={colors.textSecondary} />
+            <Text style={styles.reportBtnText}>Signaler cet article</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Bottom bar */}
@@ -430,6 +442,13 @@ export default function ListingDetailScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <ReportModal
+        visible={reportVisible}
+        onClose={() => setReportVisible(false)}
+        targetType="listing"
+        targetId={listing.id}
+      />
 
       {/* Buy confirmation modal */}
       <Modal
@@ -785,5 +804,17 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.medium,
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 16,
+    paddingBottom: 8,
+  },
+  reportBtnText: {
+    color: colors.textSecondary,
+    fontSize: 12,
   },
 })
