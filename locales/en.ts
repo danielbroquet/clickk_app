@@ -13,7 +13,7 @@ export default {
   story: {
     chf: 'CHF %{price}',
     create: {
-      title: 'Create a story',
+      title: 'Create a drop',
       step_video: 'Choose a video',
       step_price: 'Set price',
       step_settings: 'Settings',
@@ -28,7 +28,7 @@ export default {
       floor_price: 'Floor price',
       floor_price_tip: 'Minimum price below which you will not sell',
       price_drop_interval: 'Price drop every',
-      duration: 'Story duration',
+      duration: 'Drop duration',
       duration_72h: '72 hours',
       duration_48h: '48 hours',
       duration_24h: '24 hours',
@@ -36,9 +36,9 @@ export default {
       speed_fast: 'Fast',
       speed_slow: 'Slow',
       preview: 'Preview',
-      publish: 'Publish story',
+      publish: 'Publish drop',
       publishing: 'Publishing...',
-      success: 'Story published! 🎉',
+      success: 'Drop published! 🎉',
       error_video: 'Please choose a video',
       error_title: 'Please add a title',
       error_price: 'Floor price must be lower than starting price',
@@ -54,7 +54,7 @@ export default {
       expires_in: 'Expires in',
       buy_now: 'Buy now',
       sold: 'Sold',
-      auction_ended: 'This auction has ended',
+      auction_ended: 'This drop has ended',
       confirm_purchase: 'Confirm purchase',
       dutch_subtitle: 'Dutch auction · First come, first served',
       confirm_warning: 'This price is only valid for a few seconds. The charged amount will match the price at the time of confirmation.',
@@ -62,7 +62,7 @@ export default {
     },
   },
   feed: {
-    activeAuctions: 'Live Auctions',
+    activeAuctions: 'Live Drops',
   },
   auth: {
     sign_in: 'Sign in',
@@ -83,8 +83,8 @@ export default {
     my_sales: 'My sales',
     become_seller: 'Become a seller',
     sign_out: 'Sign out',
-    new_story: 'New',
-    no_publications: 'No publications',
+    new_story: 'New drop',
+    no_publications: 'No drops yet',
     block: 'Block',
     unblock: 'Unblock',
     block_confirm_title: 'Block this user?',
@@ -95,8 +95,8 @@ export default {
   discover: {
     title: 'Discover',
     search_placeholder: 'Search...',
-    tab_stories: 'Stories',
-    empty_stories: 'No active stories right now.',
+    tab_stories: 'Drops',
+    empty_stories: 'No active drops right now.',
     no_results: 'No results',
   },
   orders: {
@@ -112,7 +112,7 @@ export default {
   },
   sell: {
     modal_title: 'What do you want to sell?',
-    option_story_title: 'Create a Story',
+    option_story_title: 'Create a Drop',
     option_story_sub: 'Dutch auction — descending price',
   },
   report: {

@@ -13,7 +13,7 @@ export default {
   story: {
     chf: 'CHF %{price}',
     create: {
-      title: 'Crea una story',
+      title: 'Crea un drop',
       step_video: 'Scegli un video',
       step_price: 'Imposta il prezzo',
       step_settings: 'Impostazioni',
@@ -28,7 +28,7 @@ export default {
       floor_price: 'Prezzo minimo',
       floor_price_tip: 'Prezzo minimo sotto il quale non vendi',
       price_drop_interval: 'Riduzione di prezzo ogni',
-      duration: 'Durata della story',
+      duration: 'Durata del drop',
       duration_72h: '72 ore',
       duration_48h: '48 ore',
       duration_24h: '24 ore',
@@ -36,9 +36,9 @@ export default {
       speed_fast: 'Veloce',
       speed_slow: 'Lento',
       preview: 'Anteprima',
-      publish: 'Pubblica la story',
+      publish: 'Pubblica il drop',
       publishing: 'Pubblicazione in corso...',
-      success: 'Story pubblicata! 🎉',
+      success: 'Drop pubblicato! 🎉',
       error_video: 'Seleziona un video',
       error_title: 'Aggiungi un titolo',
       error_price: 'Il prezzo minimo deve essere inferiore al prezzo di partenza',
@@ -54,7 +54,7 @@ export default {
       expires_in: 'Scade tra',
       buy_now: 'Acquista ora',
       sold: 'Venduto',
-      auction_ended: 'Questa asta è terminata',
+      auction_ended: 'Questo drop è terminato',
       confirm_purchase: 'Conferma acquisto',
       dutch_subtitle: 'Asta olandese · Primo arrivato, primo servito',
       confirm_warning: 'Questo prezzo è valido solo per pochi secondi. L\'importo addebitato sarà quello al momento della conferma.',
@@ -62,7 +62,7 @@ export default {
     },
   },
   feed: {
-    activeAuctions: 'Aste in corso',
+    activeAuctions: 'Drop in corso',
   },
   auth: {
     sign_in: 'Accedi',
@@ -83,8 +83,8 @@ export default {
     my_sales: 'Le mie vendite',
     become_seller: 'Diventa venditore',
     sign_out: 'Disconnetti',
-    new_story: 'Nuova',
-    no_publications: 'Nessuna pubblicazione',
+    new_story: 'Nuovo drop',
+    no_publications: 'Nessun drop pubblicato',
     block: 'Blocca',
     unblock: 'Sblocca',
     block_confirm_title: 'Bloccare questo utente?',
@@ -95,8 +95,8 @@ export default {
   discover: {
     title: 'Scopri',
     search_placeholder: 'Cerca...',
-    tab_stories: 'Stories',
-    empty_stories: 'Nessuna story attiva al momento.',
+    tab_stories: 'Drops',
+    empty_stories: 'Nessun drop attivo al momento.',
     no_results: 'Nessun risultato',
   },
   orders: {
@@ -112,7 +112,7 @@ export default {
   },
   sell: {
     modal_title: 'Cosa vuoi vendere?',
-    option_story_title: 'Crea una Story',
+    option_story_title: 'Crea un Drop',
     option_story_sub: 'Asta olandese — prezzo decrescente',
   },
   report: {

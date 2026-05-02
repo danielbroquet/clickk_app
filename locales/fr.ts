@@ -13,7 +13,7 @@ export default {
   story: {
     chf: 'CHF %{price}',
     create: {
-      title: 'Créer une story',
+      title: 'Créer un drop',
       step_video: 'Choisir une vidéo',
       step_price: 'Fixer le prix',
       step_settings: 'Paramètres',
@@ -28,7 +28,7 @@ export default {
       floor_price: 'Prix plancher',
       floor_price_tip: 'Prix minimum en dessous duquel tu ne vends pas',
       price_drop_interval: 'Baisse de prix toutes les',
-      duration: 'Durée de la story',
+      duration: 'Durée du drop',
       duration_72h: '72 heures',
       duration_48h: '48 heures',
       duration_24h: '24 heures',
@@ -36,9 +36,9 @@ export default {
       speed_fast: 'Rapide',
       speed_slow: 'Lent',
       preview: 'Aperçu',
-      publish: 'Publier la story',
+      publish: 'Publier le drop',
       publishing: 'Publication en cours...',
-      success: 'Story publiée ! 🎉',
+      success: 'Drop publié ! 🎉',
       error_video: 'Veuillez choisir une vidéo',
       error_title: 'Veuillez ajouter un titre',
       error_price: 'Le prix plancher doit être inférieur au prix de départ',
@@ -54,7 +54,7 @@ export default {
       expires_in: 'Expire dans',
       buy_now: 'Acheter maintenant',
       sold: 'Vendu',
-      auction_ended: 'Cette enchère est terminée',
+      auction_ended: 'Ce drop est terminé',
       confirm_purchase: 'Confirmer l\'achat',
       dutch_subtitle: 'Enchère hollandaise · Premier arrivé, premier servi',
       confirm_warning: 'Ce prix n\'est valable que quelques secondes. Le montant débité sera celui au moment de la confirmation.',
@@ -62,7 +62,7 @@ export default {
     },
   },
   feed: {
-    activeAuctions: 'Enchères en cours',
+    activeAuctions: 'Drops en cours',
   },
   auth: {
     sign_in: 'Se connecter',
@@ -83,8 +83,8 @@ export default {
     my_sales: 'Mes ventes',
     become_seller: 'Devenir vendeur',
     sign_out: 'Se déconnecter',
-    new_story: 'Nouvelle',
-    no_publications: 'Aucune publication',
+    new_story: 'Nouveau drop',
+    no_publications: 'Aucun drop publié',
     block: 'Bloquer',
     unblock: 'Débloquer',
     block_confirm_title: 'Bloquer cet utilisateur ?',
@@ -95,8 +95,8 @@ export default {
   discover: {
     title: 'Découvrir',
     search_placeholder: 'Rechercher...',
-    tab_stories: 'Stories',
-    empty_stories: 'Aucune story active pour le moment.',
+    tab_stories: 'Drops',
+    empty_stories: 'Aucun drop actif pour le moment.',
     no_results: 'Aucun résultat',
   },
   orders: {
@@ -112,7 +112,7 @@ export default {
   },
   sell: {
     modal_title: 'Que veux-tu vendre ?',
-    option_story_title: 'Créer une Story',
+    option_story_title: 'Créer un Drop',
     option_story_sub: 'Enchère hollandaise — prix descendant',
   },
   report: {
