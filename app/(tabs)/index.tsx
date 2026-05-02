@@ -31,7 +31,9 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import { useWatchlist } from '../../hooks/useWatchlist'
+import { useDropPresence } from '../../hooks/useDropPresence'
 import ReportModal from '../../components/ui/ReportModal'
+import { SaleToast, SaleToastPayload } from '../../components/ui/SaleToast'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -117,7 +119,7 @@ function DropItem({
   const videoRef = useRef<Video>(null)
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
-  const [watching] = useState(() => Math.floor(Math.random() * 80) + 5)
+  const viewerCount = useDropPresence(story.id, active && tabFocused)
   const { isWatchlisted, watchlistCount, toggleWatchlist } = useWatchlist(story.id)
   const [menuVisible, setMenuVisible] = useState(false)
   const [reportVisible, setReportVisible] = useState(false)
@@ -272,10 +274,14 @@ function DropItem({
 
       <View style={styles.topRow} pointerEvents="box-none">
         {story.status === 'active' ? <LivePill /> : <View />}
-        <View style={styles.watchingPill}>
-          <Ionicons name="eye-outline" size={12} color="#FFFFFF" />
-          <Text style={styles.watchingText}>{watching} watching</Text>
-        </View>
+        {viewerCount > 1 ? (
+          <View style={styles.watchingPill}>
+            <Ionicons name="eye-outline" size={12} color="#FFFFFF" />
+            <Text style={styles.watchingText}>{viewerCount} watching</Text>
+          </View>
+        ) : (
+          <View />
+        )}
       </View>
 
       <TouchableOpacity
@@ -449,6 +455,7 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const [tabFocused, setTabFocused] = useState(true)
+  const [toast, setToast] = useState<SaleToastPayload | null>(null)
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 })
 
   useFocusEffect(
@@ -477,6 +484,36 @@ export default function FeedScreen() {
   useEffect(() => {
     fetchStories()
   }, [fetchStories])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('drop_sales')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'stories' },
+        async (payload) => {
+          const next = payload.new as FeedStory
+          const prev = payload.old as Partial<FeedStory>
+          if (next.status !== 'sold' || prev.status === 'sold') return
+          if (!next.buyer_id || next.buyer_id === currentUserId) return
+
+          const { data: buyer } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', next.buyer_id)
+            .maybeSingle()
+
+          setToast({
+            id: `${next.id}-${Date.now()}`,
+            username: buyer?.username ?? 'someone',
+            priceChf: next.current_price_chf ?? 0,
+          })
+        }
+      )
+      .subscribe()
+
+    return () => { channel.unsubscribe() }
+  }, [currentUserId])
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -546,6 +583,8 @@ export default function FeedScreen() {
         maxToRenderPerBatch={2}
         removeClippedSubviews
       />
+
+      {toast && <SaleToast key={toast.id} payload={toast} onDismiss={() => setToast(null)} />}
 
       <View style={styles.preloadHidden} pointerEvents="none">
         {preloadStories.map((s) => (
