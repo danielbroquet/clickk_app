@@ -1,6 +1,6 @@
 import 'react-native-gesture-handler'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
@@ -12,7 +12,15 @@ import {
   Montserrat_700Bold,
 } from '@expo-google-fonts/montserrat'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withDelay,
+  runOnJS,
+  Easing,
+} from 'react-native-reanimated'
 import { AuthProvider, useAuth } from '../lib/auth'
 import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
@@ -21,6 +29,50 @@ import { ONBOARDING_KEY } from './onboarding'
 import NetworkBanner from '../components/ui/NetworkBanner'
 
 SplashScreen.preventAutoHideAsync()
+
+const AnimatedSplash = memo(({ onFinished }: { onFinished: () => void }) => {
+  const opacity = useSharedValue(0)
+  const scale = useSharedValue(0.85)
+  const containerOpacity = useSharedValue(1)
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.ease) })
+    scale.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.back(1.1)) })
+
+    containerOpacity.value = withDelay(
+      900,
+      withTiming(0, { duration: 350, easing: Easing.in(Easing.ease) }, (finished) => {
+        if (finished) runOnJS(onFinished)()
+      })
+    )
+  }, [])
+
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }))
+
+  const containerStyle = useAnimatedStyle(() => ({
+    opacity: containerOpacity.value,
+  }))
+
+  return (
+    <Reanimated.View
+      style={[
+        StyleSheet.absoluteFill,
+        { backgroundColor: '#0F0F0F', justifyContent: 'center', alignItems: 'center', zIndex: 999 },
+        containerStyle,
+      ]}
+      pointerEvents="none"
+    >
+      <Reanimated.Image
+        source={require('../assets/images/clickk_logo.png')}
+        style={[{ width: 180, height: 80 }, logoStyle]}
+        resizeMode="contain"
+      />
+    </Reanimated.View>
+  )
+})
 
 function RootRedirector() {
   const { session, loading } = useAuth()
@@ -98,6 +150,8 @@ function RootRedirector() {
 export default function RootLayout() {
   useFrameworkReady()
 
+  const [splashDone, setSplashDone] = useState(false)
+
   const [fontsLoaded, fontError] = useFonts({
     'Montserrat-Regular': Montserrat_400Regular,
     'Montserrat-Medium': Montserrat_500Medium,
@@ -124,6 +178,9 @@ export default function RootLayout() {
           </View>
         </AuthProvider>
       </StripeWrapper>
+      {!splashDone && (
+        <AnimatedSplash onFinished={() => setSplashDone(true)} />
+      )}
     </GestureHandlerRootView>
   )
 }
