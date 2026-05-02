@@ -331,13 +331,15 @@ export default function CreateDropScreen() {
         } catch {}
       }
 
+      const categoryValue = category || 'autre'
+      console.log('[create drop] category value:', categoryValue)
       const { error: insertError } = await supabase.from('stories').insert({
         seller_id: user.id,
         video_url: publicUrl,
         thumbnail_url: thumbnailPublicUrl,
         title: title.trim(),
         description: description.trim() || null,
-        category: category || 'autre',
+        category: categoryValue,
         start_price_chf: sp,
         floor_price_chf: fp,
         current_price_chf: sp,
