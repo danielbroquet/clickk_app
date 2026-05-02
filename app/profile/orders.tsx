@@ -30,12 +30,9 @@ interface SellerInfo {
 
 interface OrderItem {
   id: string
-  type: 'story' | 'listing'
-  // raw story id (without the "story-" prefix) — only set for story type
-  story_id: string | null
+  story_id: string
   title: string
   thumbnail: string | null
-  // story orders only: true when video_url exists but thumbnail_url is null
   hasVideo: boolean
   seller: SellerInfo | null
   price: number
@@ -56,17 +53,6 @@ function formatDate(iso: string | null): string {
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const yyyy = d.getFullYear()
   return `${dd}/${mm}/${yyyy}`
-}
-
-function resolveListingStatus(
-  status: string | null,
-  deliveryStatus: string | null,
-): DisplayStatus {
-  if (deliveryStatus === 'delivered') return 'delivered'
-  if (deliveryStatus === 'shipped')   return 'shipped'
-  if (status === 'refunded')          return 'refunded'
-  if (status === 'paid')              return 'paid'
-  return 'paid'
 }
 
 function relativeTime(dateStr: string): string {
@@ -114,59 +100,22 @@ function OrderCard({
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
   const titleInitial  = item.title.charAt(0).toUpperCase()
 
-  const { session } = useAuth()
-  const currentUserId = session?.user?.id ?? ''
-
   const handleConfirmDelivery = async () => {
     setAwaitingConfirm(false)
     setConfirming(true)
     try {
-      if (item.type === 'listing') {
-        const orderId = item.id.replace('order-', '')
-        const deliveredAt = new Date().toISOString()
+      const { data, error } = await supabase.functions.invoke('confirm-delivery', {
+        body: { story_id: item.story_id },
+      })
 
-        const { data: updatedOrder, error } = await supabase
-          .from('shop_orders')
-          .update({
-            delivery_status: 'delivered',
-            delivered_at: deliveredAt,
-          })
-          .eq('id', orderId)
-          .eq('buyer_id', currentUserId)
-          .select('seller_id, listing:shop_listings!listing_id(title)')
-          .maybeSingle()
+      if (error) {
+        setConfirming(false)
+        return
+      }
 
-        if (error) {
-          setConfirming(false)
-          return
-        }
-
-        // Notify the seller
-        if (updatedOrder?.seller_id) {
-          const listingTitle = (updatedOrder.listing as any)?.title ?? 'Article'
-          await supabase.from('notifications').insert({
-            user_id: updatedOrder.seller_id,
-            type: 'delivery_confirmed',
-            title: 'Livraison confirmée',
-            message: `L'acheteur a confirmé la réception de "${listingTitle}". Les fonds vont être transférés.`,
-            payload: { order_id: orderId },
-          })
-        }
-      } else {
-        const { data, error } = await supabase.functions.invoke('confirm-delivery', {
-          body: { story_id: item.story_id },
-        })
-
-        if (error) {
-          setConfirming(false)
-          return
-        }
-
-        // already_delivered counts as success
-        if (!data?.success && !data?.already_delivered) {
-          setConfirming(false)
-          return
-        }
+      if (!data?.success && !data?.already_delivered) {
+        setConfirming(false)
+        return
       }
 
       if (Platform.OS !== 'web') {
@@ -317,32 +266,20 @@ export default function OrdersScreen() {
     const userId = session?.user?.id
     if (!userId) return
 
-    const [storiesRes, ordersRes] = await Promise.all([
-      supabase
-        .from('stories')
-        .select('id, created_at, final_price_chf, status, title, video_url, thumbnail_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
-        .eq('buyer_id', userId)
-        .order('created_at', { ascending: false }),
-
-      supabase
-        .from('shop_orders')
-        .select('id, created_at, total_chf, status, delivery_status, tracking_number, delivered_at, listing:shop_listings!listing_id(id, title, images, seller:profiles!seller_id(username, avatar_url))')
-        .eq('buyer_id', userId)
-        .order('created_at', { ascending: false }),
-    ])
+    const storiesRes = await supabase
+      .from('stories')
+      .select('id, created_at, final_price_chf, status, title, video_url, thumbnail_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
+      .eq('buyer_id', userId)
+      .order('created_at', { ascending: false })
 
     if (storiesRes.error) {
       console.error('[fetchOrders] stories query failed:', storiesRes.error)
     }
-    if (ordersRes.error) {
-      console.error('[fetchOrders] shop_orders query failed:', ordersRes.error)
-    }
 
     const storyOrders: OrderItem[] = (storiesRes.data ?? []).map((s: any) => ({
       id:             `story-${s.id}`,
-      type:           'story' as const,
       story_id:       s.id,
-      title:          s.title ?? 'Story',
+      title:          s.title ?? 'Drop',
       thumbnail:      s.thumbnail_url ?? null,
       hasVideo:       !s.thumbnail_url && !!s.video_url,
       seller:         s.seller as SellerInfo | null,
@@ -354,27 +291,7 @@ export default function OrdersScreen() {
       created_at:     s.created_at,
     }))
 
-    const listingOrders: OrderItem[] = (ordersRes.data ?? []).map((o: any) => ({
-      id:             `order-${o.id}`,
-      type:           'listing' as const,
-      story_id:       null,
-      title:          o.listing?.title ?? 'Article',
-      thumbnail:      o.listing?.images?.[0] ?? null,
-      hasVideo:       false,
-      seller:         o.listing?.seller as SellerInfo | null,
-      price:          o.total_chf ?? 0,
-      displayStatus:  resolveListingStatus(o.status, o.delivery_status),
-      shipped_at:     null,
-      delivered_at:   o.delivered_at ?? null,
-      tracking_number: o.tracking_number ?? null,
-      created_at:     o.created_at,
-    }))
-
-    const merged = [...storyOrders, ...listingOrders].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    )
-
-    setOrders(merged)
+    setOrders(storyOrders)
   }, [session?.user?.id])
 
   useEffect(() => {

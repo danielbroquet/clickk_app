@@ -23,22 +23,10 @@ function SellButton({ onPress }: { onPress: () => void }) {
   )
 }
 
-interface SellOption {
-  icon: string
-  title: string
-  subtitle: string
-}
-
-const SELL_OPTIONS: SellOption[] = [
-  { icon: '📸', title: i18n.t('sell.option_story_title'), subtitle: i18n.t('sell.option_story_sub') },
-  { icon: '🏪', title: i18n.t('sell.option_listing_title'), subtitle: i18n.t('sell.option_listing_sub') },
-]
-
 export default function TabLayout() {
   const [showSellModal, setShowSellModal] = useState(false)
   const { unreadCount } = useUnreadMessages()
-  const { profile, session } = useAuth()
-  const isSeller = profile?.role === 'seller'
+  const { session } = useAuth()
   const userId = session?.user?.id ?? ''
   const unreadNotifCount = useUnreadNotifCount(userId)
   const totalInboxBadge = unreadCount + unreadNotifCount
@@ -119,41 +107,19 @@ export default function TabLayout() {
         <Pressable style={styles.overlay} onPress={() => setShowSellModal(false)}>
           <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
             <Text style={styles.sheetTitle}>{i18n.t('sell.modal_title')}</Text>
-            {SELL_OPTIONS.map((opt, index) => (
-              <TouchableOpacity
-                key={opt.title}
-                style={styles.option}
-                onPress={() => {
-                  setShowSellModal(false)
-                  if (index === 0) {
-                    router.push('/story/create')
-                  } else {
-                    router.push('/listing/create')
-                  }
-                }}
-              >
-                <Text style={styles.optionIcon}>{opt.icon}</Text>
-                <View style={styles.optionText}>
-                  <Text style={styles.optionTitle}>{opt.title}</Text>
-                  <Text style={styles.optionSub}>{opt.subtitle}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-            {isSeller && (
-              <TouchableOpacity
-                style={styles.option}
-                onPress={() => {
-                  setShowSellModal(false)
-                  router.push('/(seller)/listings')
-                }}
-              >
-                <Ionicons name="list-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
-                <View style={styles.optionText}>
-                  <Text style={styles.optionTitle}>{i18n.t('sell.my_listings')}</Text>
-                  <Text style={styles.optionSub}>{i18n.t('sell.my_listings_sub')}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.option}
+              onPress={() => {
+                setShowSellModal(false)
+                router.push('/story/create')
+              }}
+            >
+              <Ionicons name="videocam-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
+              <View style={styles.optionText}>
+                <Text style={styles.optionTitle}>{i18n.t('sell.option_story_title')}</Text>
+                <Text style={styles.optionSub}>{i18n.t('sell.option_story_sub')}</Text>
+              </View>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.cancelBtn}
               onPress={() => setShowSellModal(false)}
@@ -215,7 +181,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginTop: 12,
   },
-  optionIcon: { fontSize: 24, marginRight: spacing.md },
   optionText: { flex: 1 },
   optionTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },
   optionSub: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.textSecondary, marginTop: 2 },

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
   StyleSheet,
   Alert,
   ActionSheetIOS,
@@ -23,9 +22,6 @@ import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
 import ReportModal from '../../components/ui/ReportModal'
-
-const SCREEN_WIDTH = Dimensions.get('window').width
-const LISTING_CELL = Math.floor((SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2)
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,15 +44,6 @@ interface Story {
   current_price_chf: number
   status: string
   expires_at: string | null
-}
-
-interface Listing {
-  id: string
-  title: string
-  images: string[]
-  price_chf: number
-  category: string | null
-  condition: string | null
 }
 
 // ─── useBlock hook ────────────────────────────────────────────────────────────
@@ -120,31 +107,6 @@ function StoryCard({ story }: { story: Story }) {
   )
 }
 
-function ListingCard({ listing }: { listing: Listing }) {
-  const thumb = listing.images?.[0] ?? null
-  return (
-    <TouchableOpacity
-      style={styles.listingCard}
-      activeOpacity={0.85}
-      onPress={() => router.push(`/listing/${listing.id}`)}
-    >
-      <View style={styles.listingThumbWrap}>
-        {thumb ? (
-          <Image source={{ uri: thumb }} style={styles.listingThumb} resizeMode="cover" />
-        ) : (
-          <View style={[styles.listingThumb, styles.thumbPlaceholder]}>
-            <Ionicons name="image-outline" size={24} color={colors.border} />
-          </View>
-        )}
-      </View>
-      <View style={styles.listingInfo}>
-        <Text style={styles.listingTitle} numberOfLines={1}>{listing.title}</Text>
-        <Text style={styles.listingPrice}>CHF {listing.price_chf.toFixed(2)}</Text>
-      </View>
-    </TouchableOpacity>
-  )
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PublicProfileScreen() {
@@ -154,7 +116,6 @@ export default function PublicProfileScreen() {
 
   const [profile, setProfile]   = useState<Profile | null>(null)
   const [stories, setStories]   = useState<Story[]>([])
-  const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading]   = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [chatLoading, setChatLoading] = useState(false)
@@ -188,21 +149,13 @@ export default function PublicProfileScreen() {
         .eq('seller_id', id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
-
-      supabase
-        .from('shop_listings')
-        .select('id, title, images, price_chf, category, condition')
-        .eq('seller_id', id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false }),
-    ]).then(([profileRes, storiesRes, listingsRes]) => {
+    ]).then(([profileRes, storiesRes]) => {
       if (profileRes.error || !profileRes.data) {
         setFetchError('Profil introuvable')
       } else {
         setProfile(profileRes.data as Profile)
       }
       setStories((storiesRes.data ?? []) as Story[])
-      setListings((listingsRes.data ?? []) as Listing[])
       setLoading(false)
     })
   }, [id])
@@ -407,9 +360,9 @@ export default function PublicProfileScreen() {
         </View>
 
         {/* ── Stories section ─────────────────────────────────────────────── */}
-        {stories.length > 0 && (
+        {stories.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Stories en cours</Text>
+            <Text style={styles.sectionTitle}>Drops en cours</Text>
             <FlatList
               data={stories}
               keyExtractor={s => s.id}
@@ -419,25 +372,10 @@ export default function PublicProfileScreen() {
               renderItem={({ item }) => <StoryCard story={item} />}
             />
           </View>
-        )}
-
-        {/* ── Listings section ────────────────────────────────────────────── */}
-        {listings.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Articles</Text>
-            <View style={styles.listingsGrid}>
-              {listings.map(listing => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Empty state when seller has nothing */}
-        {stories.length === 0 && listings.length === 0 && (
+        ) : (
           <View style={styles.emptySection}>
-            <Ionicons name="storefront-outline" size={44} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>Aucun contenu pour l'instant</Text>
+            <Ionicons name="flash-outline" size={44} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>Aucun drop pour l'instant</Text>
           </View>
         )}
       </ScrollView>
@@ -723,47 +661,10 @@ const styles = StyleSheet.create({
     color: '#0F0F0F',
   },
 
-  // ── Listing grid ──────────────────────────────────────────────────────────
-  listingsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-  },
-  listingCard: {
-    width: LISTING_CELL,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  listingThumbWrap: {
-    width: LISTING_CELL,
-    height: LISTING_CELL,
-  },
-  listingThumb: {
-    width: LISTING_CELL,
-    height: LISTING_CELL,
-  },
   thumbPlaceholder: {
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  listingInfo: {
-    padding: spacing.sm,
-  },
-  listingTitle: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.caption,
-    color: colors.text,
-    marginBottom: 3,
-  },
-  listingPrice: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.caption,
-    color: colors.primary,
   },
 
   // ── Empty ─────────────────────────────────────────────────────────────────

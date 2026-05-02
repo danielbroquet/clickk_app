@@ -39,7 +39,6 @@ interface StripeEventMetadata {
   story_id?: string;
   buyer_id?: string;
   amount_chf?: string;
-  listing_id?: string;
   seller_id?: string;
   type?: string;
 }
@@ -241,142 +240,8 @@ Deno.serve(async (req: Request) => {
       const metadata = event.data.object.metadata ?? {};
       console.log("[WEBHOOK] checkout.session.completed received", {
         session_id: event.data.object.id,
-        listing_id: metadata.listing_id,
         type: metadata.type,
       });
-
-      if (metadata.type === "listing") {
-        const { listing_id, buyer_id, seller_id, amount_chf } = metadata;
-
-        if (
-          !listing_id || !buyer_id || !seller_id || !amount_chf ||
-          !UUID_RE.test(listing_id) || !UUID_RE.test(buyer_id) || !UUID_RE.test(seller_id)
-        ) {
-          console.error("[stripe-webhook] Missing or invalid listing metadata:", metadata);
-          return new Response(JSON.stringify({ received: true, warning: "missing_listing_metadata" }), {
-            status: 400,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        const amountChf = parseFloat(amount_chf);
-        const commissionChf = Math.round(amountChf * 0.08 * 100) / 100;
-        const sellerAmountChf = Math.round(amountChf * 0.92 * 100) / 100;
-        const sessionId = event.data.object.id ?? "";
-
-        // Insert the order FIRST so the buyer's purchase is always recorded,
-        // even if subsequent stock manipulation fails.
-        const { error: orderError } = await supabase
-          .from("shop_orders")
-          .upsert(
-            {
-              session_id: sessionId,
-              listing_id,
-              buyer_id,
-              seller_id,
-              quantity: 1,
-              total_chf: amountChf,
-              commission_chf: commissionChf,
-              seller_amount_chf: sellerAmountChf,
-              status: "paid",
-            },
-            { onConflict: "session_id", ignoreDuplicates: true }
-          );
-
-        if (orderError) {
-          console.error("[stripe-webhook] shop_orders insert failed:", orderError.message);
-          throw new Error(`shop_orders insert failed: ${orderError.message}`);
-        }
-
-        // Fetch current stock then decrement only if > 0 (idempotency via .eq("stock", current))
-        const { data: listingRow, error: fetchErr } = await supabase
-          .from("shop_listings")
-          .select("stock")
-          .eq("id", listing_id)
-          .maybeSingle();
-
-        if (!fetchErr && listingRow && listingRow.stock > 0) {
-          const newStock = listingRow.stock - 1;
-          const { error: updateErr } = await supabase
-            .from("shop_listings")
-            .update({ stock: newStock, is_active: newStock > 0 })
-            .eq("id", listing_id)
-            .eq("stock", listingRow.stock);
-
-          if (updateErr) {
-            console.error("[stripe-webhook] stock decrement failed:", updateErr.message);
-          }
-        } else if (fetchErr) {
-          console.error("[stripe-webhook] stock fetch failed:", fetchErr.message);
-        }
-
-        // Safety: ensure is_active is false whenever stock has reached 0.
-        {
-          const { data: finalStock, error: finalStockErr } = await supabase
-            .from("shop_listings")
-            .select("stock")
-            .eq("id", listing_id)
-            .maybeSingle();
-
-          if (!finalStockErr && finalStock && (finalStock.stock ?? 0) <= 0) {
-            const { error: deactivateErr } = await supabase
-              .from("shop_listings")
-              .update({ is_active: false })
-              .eq("id", listing_id)
-              .lte("stock", 0);
-            if (deactivateErr) {
-              console.error("[stripe-webhook] deactivate listing failed:", deactivateErr.message);
-            }
-          }
-        }
-
-        const { error: notifError } = await supabase.from("notifications").insert([
-          {
-            user_id: buyer_id,
-            type: "purchase",
-            story_id: null,
-            message: "Votre commande a été confirmée",
-            is_read: false,
-          },
-          {
-            user_id: seller_id,
-            type: "story_sold",
-            story_id: null,
-            message: "Vous avez vendu un article",
-            is_read: false,
-          },
-        ]);
-
-        if (notifError) {
-          console.error("[stripe-webhook] listing notifications failed:", notifError.message);
-        }
-
-        console.log(`[stripe-webhook] Listing order created: listing=${listing_id} buyer=${buyer_id}`);
-
-        try {
-          await sendPushNotification(
-            supabase,
-            buyer_id,
-            "Commande confirmée 🎉",
-            "Votre paiement est accepté. Le vendeur va préparer votre commande.",
-            { type: "order_confirmed", orderId: sessionId },
-          );
-          await sendPushNotification(
-            supabase,
-            seller_id,
-            "Nouvelle vente 💰",
-            "Vous avez une nouvelle commande à expédier !",
-            { type: "new_sale", orderId: sessionId },
-          );
-        } catch (err) {
-          console.error("[stripe-webhook] push notification error:", err instanceof Error ? err.message : String(err));
-        }
-
-        return new Response(JSON.stringify({ received: true, listing_id }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
 
       const { story_id, buyer_id, amount_chf } = metadata;
 
@@ -395,10 +260,9 @@ Deno.serve(async (req: Request) => {
       const metadata = pi.metadata ?? {};
       console.log("[WEBHOOK] payment_intent.succeeded received", {
         intent_id: paymentIntentId,
-        listing_id: metadata.listing_id,
         story_id: metadata.story_id,
       });
-      const { story_id, listing_id, buyer_id, seller_id: sellerIdMeta, amount_chf } = metadata;
+      const { story_id, buyer_id, amount_chf } = metadata;
 
       const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
       if (!stripeKey) {
@@ -423,7 +287,15 @@ Deno.serve(async (req: Request) => {
 
       const amountChf = parseFloat(amount_chf);
 
-      if (story_id) {
+      if (!story_id) {
+        console.warn(`${PI_LOG} no story_id in metadata`);
+        return new Response(JSON.stringify({ received: true, warning: "missing_story_id" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      {
         if (!UUID_RE.test(story_id) || !UUID_RE.test(buyer_id)) {
           console.warn(`${PI_LOG} invalid story_id or buyer_id`);
           return new Response(JSON.stringify({ received: true, warning: "invalid_ids" }), {
@@ -540,153 +412,6 @@ Deno.serve(async (req: Request) => {
         }
 
         return new Response(JSON.stringify({ received: true, story_id }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      } else if (listing_id) {
-        if (!UUID_RE.test(listing_id) || !UUID_RE.test(buyer_id)) {
-          console.warn(`${PI_LOG} invalid listing_id or buyer_id`);
-          return new Response(JSON.stringify({ received: true, warning: "invalid_ids" }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        const { data: listing, error: fetchErr } = await supabase
-          .from("shop_listings")
-          .select("id, seller_id, stock, is_active")
-          .eq("id", listing_id)
-          .maybeSingle();
-
-        if (fetchErr) {
-          console.error(`${PI_LOG} listing select failed:`, fetchErr.message);
-          throw new Error(`listing select failed: ${fetchErr.message}`);
-        }
-
-        if (!listing || !listing.is_active || listing.stock <= 0) {
-          console.warn(`${PI_LOG} listing unavailable=${listing_id} — refunding`);
-          if (stripeKey && paymentIntentId) {
-            await refundPaymentIntent(paymentIntentId, stripeKey);
-          }
-          await supabase.from("notifications").insert({
-            user_id: buyer_id,
-            type: "purchase_refunded",
-            title: "Achat remboursé",
-            message: "Cet article n'était plus disponible. Vous avez été remboursé.",
-            is_read: false,
-          });
-          return new Response(JSON.stringify({ received: true, refunded: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-
-        const sellerId = (sellerIdMeta && UUID_RE.test(sellerIdMeta))
-          ? sellerIdMeta
-          : (listing.seller_id as string);
-
-        const piCommissionChf = Math.round(amountChf * 0.08 * 100) / 100;
-        const piSellerAmountChf = Math.round(amountChf * 0.92 * 100) / 100;
-
-        const { error: orderErr } = await supabase
-          .from("shop_orders")
-          .upsert(
-            {
-              session_id: paymentIntentId,
-              listing_id,
-              buyer_id,
-              seller_id: sellerId,
-              quantity: 1,
-              total_chf: amountChf,
-              commission_chf: piCommissionChf,
-              seller_amount_chf: piSellerAmountChf,
-              status: "paid",
-            },
-            { onConflict: "session_id", ignoreDuplicates: true }
-          );
-
-        if (orderErr) {
-          console.error(`${PI_LOG} shop_orders insert failed:`, orderErr.message);
-          throw new Error(`shop_orders insert failed: ${orderErr.message}`);
-        }
-
-        const newStock = listing.stock - 1;
-        const { error: updateErr } = await supabase
-          .from("shop_listings")
-          .update({ stock: newStock, is_active: newStock > 0 })
-          .eq("id", listing_id)
-          .eq("stock", listing.stock);
-
-        if (updateErr) {
-          console.error(`${PI_LOG} listing stock update failed:`, updateErr.message);
-        }
-
-        // Safety: ensure is_active is false whenever stock has reached 0.
-        {
-          const { data: finalStock, error: finalStockErr } = await supabase
-            .from("shop_listings")
-            .select("stock")
-            .eq("id", listing_id)
-            .maybeSingle();
-
-          if (!finalStockErr && finalStock && (finalStock.stock ?? 0) <= 0) {
-            const { error: deactivateErr } = await supabase
-              .from("shop_listings")
-              .update({ is_active: false })
-              .eq("id", listing_id)
-              .lte("stock", 0);
-            if (deactivateErr) {
-              console.error(`${PI_LOG} deactivate listing failed:`, deactivateErr.message);
-            }
-          }
-        }
-
-        const { error: notifErr } = await supabase.from("notifications").insert([
-          {
-            user_id: buyer_id,
-            type: "purchase",
-            story_id: null,
-            message: "Votre commande a été confirmée",
-            is_read: false,
-          },
-          {
-            user_id: sellerId,
-            type: "story_sold",
-            story_id: null,
-            message: "Vous avez vendu un article",
-            is_read: false,
-          },
-        ]);
-        if (notifErr) {
-          console.error(`${PI_LOG} notifications insert failed:`, notifErr.message);
-        }
-
-        try {
-          await sendPushNotification(
-            supabase,
-            buyer_id,
-            "Commande confirmée 🎉",
-            "Votre paiement est accepté. Le vendeur va préparer votre commande.",
-            { type: "order_confirmed", orderId: paymentIntentId },
-          );
-          await sendPushNotification(
-            supabase,
-            sellerId,
-            "Nouvelle vente 💰",
-            "Vous avez une nouvelle commande à expédier !",
-            { type: "new_sale", orderId: paymentIntentId },
-          );
-        } catch (err) {
-          console.error(`${PI_LOG} push notification error:`, err instanceof Error ? err.message : String(err));
-        }
-
-        return new Response(JSON.stringify({ received: true, listing_id }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      } else {
-        console.warn(`${PI_LOG} no story_id or listing_id in metadata`);
-        return new Response(JSON.stringify({ received: true, warning: "missing_target" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });

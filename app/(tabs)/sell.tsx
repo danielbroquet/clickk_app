@@ -45,29 +45,14 @@ export default function SellScreen() {
             <TouchableOpacity
               style={styles.card}
               activeOpacity={0.8}
-              onPress={() => router.push('/listing/create')}
+              onPress={() => router.push('/(seller)/sales')}
             >
               <View style={styles.cardIcon}>
-                <Ionicons name="pricetag-outline" size={48} color={colors.primary} />
+                <Ionicons name="bag-check-outline" size={48} color={colors.primary} />
               </View>
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Article Prix Fixe</Text>
-                <Text style={styles.cardSubtitle}>Photos · Prix fixe · Stock illimité</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.8}
-              onPress={() => router.push('/(seller)/listings')}
-            >
-              <View style={styles.cardIcon}>
-                <Ionicons name="list-outline" size={48} color={colors.primary} />
-              </View>
-              <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Mes annonces</Text>
-                <Text style={styles.cardSubtitle}>Gérer vos stories et articles</Text>
+                <Text style={styles.cardTitle}>Mes ventes</Text>
+                <Text style={styles.cardSubtitle}>Gérer vos drops vendus</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>

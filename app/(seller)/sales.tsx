@@ -26,19 +26,18 @@ import { getOrCreateConversation } from '../../lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface SaleOrder {
+interface StorySale {
   id: string
-  created_at: string
-  total_chf: number
-  commission_chf: number
-  seller_amount_chf: number
+  title: string
+  thumbnail_url: string | null
+  video_url: string | null
+  final_price_chf: number | null
   status: string
-  delivery_status: string
   tracking_number: string | null
+  shipped_at: string | null
   delivered_at: string | null
-  listing_id: string
-  buyer_id: string
-  listing: { title: string; images: string[] } | null
+  created_at: string
+  buyer_id: string | null
   buyer: { id: string; username: string; avatar_url: string | null } | null
 }
 
@@ -94,106 +93,76 @@ const toastStyles = StyleSheet.create({
 
 function ShipModal({
   visible,
-  orderId,
-  listingTitle,
-  currentUserId,
+  storyId,
+  title,
   onClose,
   onSuccess,
 }: {
   visible: boolean
-  orderId: string
-  listingTitle: string
-  currentUserId: string
+  storyId: string | null
+  title: string
   onClose: () => void
-  onSuccess: (trackingNumber: string | null) => void
+  onSuccess: () => void
 }) {
-  const [trackingInput, setTrackingInput] = useState('')
+  const [tracking, setTracking] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const handleClose = () => {
-    if (loading) return
-    setTrackingInput('')
-    setError(null)
-    onClose()
-  }
+  useEffect(() => {
+    if (!visible) setTracking('')
+  }, [visible])
 
-  const handleConfirm = async () => {
-    setError(null)
+  const handleSubmit = async () => {
+    if (!storyId || !tracking.trim()) return
     setLoading(true)
-    const trimmed = trackingInput.trim() || null
-
-    const { error: updateErr } = await supabase
-      .from('shop_orders')
-      .update({
-        delivery_status: 'shipped',
-        tracking_number: trimmed,
+    try {
+      const { error } = await supabase.functions.invoke('mark-shipped', {
+        body: { story_id: storyId, tracking_number: tracking.trim() },
       })
-      .eq('id', orderId)
-      .eq('seller_id', currentUserId)
-
-    if (updateErr) {
-      setError(updateErr.message ?? 'Une erreur est survenue')
+      if (error) {
+        Alert.alert('Erreur', 'Impossible de marquer comme expédié')
+        setLoading(false)
+        return
+      }
+      if (Platform.OS !== 'web') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      }
+      onSuccess()
+      onClose()
+    } finally {
       setLoading(false)
-      return
     }
-
-    if (Platform.OS !== 'web') {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-    }
-
-    setTrackingInput('')
-    setError(null)
-    setLoading(false)
-    onSuccess(trimmed)
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-      <Pressable style={modalStyles.overlay} onPress={handleClose}>
-        <Pressable style={modalStyles.sheet} onPress={e => e.stopPropagation()}>
-          <Text style={modalStyles.title}>Confirmer l'expédition</Text>
-          {listingTitle ? (
-            <Text style={modalStyles.subtitle} numberOfLines={1}>{listingTitle}</Text>
-          ) : null}
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={shipStyles.backdrop} onPress={onClose}>
+        <Pressable style={shipStyles.sheet} onPress={(e) => e.stopPropagation()}>
+          <Text style={shipStyles.title}>Marquer comme expédié</Text>
+          <Text style={shipStyles.subtitle} numberOfLines={1}>{title}</Text>
 
-          <Text style={modalStyles.helper}>
-            Pensez à utiliser la Post-App pour générer votre étiquette avant de confirmer.
-          </Text>
-
-          <Text style={modalStyles.inputLabel}>Numéro de suivi (optionnel)</Text>
+          <Text style={shipStyles.label}>Numéro de suivi</Text>
           <TextInput
-            style={modalStyles.input}
-            value={trackingInput}
-            onChangeText={setTrackingInput}
-            placeholder="99.00.123456.78901234"
+            value={tracking}
+            onChangeText={setTracking}
+            style={shipStyles.input}
+            placeholder="CH123456789"
             placeholderTextColor={colors.textSecondary}
-            autoCapitalize="none"
-            maxLength={30}
-            editable={!loading}
+            autoCapitalize="characters"
           />
 
-          {error ? <Text style={modalStyles.errorText}>{error}</Text> : null}
-
-          <View style={modalStyles.btnRow}>
-            <TouchableOpacity
-              style={modalStyles.cancelBtn}
-              onPress={handleClose}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Text style={modalStyles.cancelBtnText}>Annuler</Text>
+          <View style={shipStyles.row}>
+            <TouchableOpacity style={shipStyles.cancelBtn} onPress={onClose}>
+              <Text style={shipStyles.cancelText}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[modalStyles.confirmBtn, loading && modalStyles.confirmBtnDisabled]}
-              onPress={handleConfirm}
-              disabled={loading}
-              activeOpacity={0.8}
+              style={[shipStyles.submitBtn, (!tracking.trim() || loading) && { opacity: 0.6 }]}
+              onPress={handleSubmit}
+              disabled={!tracking.trim() || loading}
             >
               {loading ? (
                 <ActivityIndicator size="small" color="#0F0F0F" />
               ) : (
-                <Text style={modalStyles.confirmBtnText}>Confirmer</Text>
+                <Text style={shipStyles.submitText}>Confirmer</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -203,382 +172,163 @@ function ShipModal({
   )
 }
 
-const modalStyles = StyleSheet.create({
-  overlay: {
+const shipStyles = StyleSheet.create({
+  backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
   },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 16,
     padding: spacing.lg,
-    paddingBottom: 36,
     gap: spacing.sm,
-    borderTopWidth: 1,
-    borderColor: colors.border,
   },
   title: {
     fontFamily: fontFamily.bold,
-    fontSize: fontSize.headline,
+    fontSize: 18,
     color: colors.text,
-    marginBottom: 2,
   },
   subtitle: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.label,
-    color: colors.textSecondary,
-  },
-  helper: {
     fontFamily: fontFamily.regular,
     fontSize: fontSize.caption,
     color: colors.textSecondary,
-    lineHeight: 18,
-    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  inputLabel: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.label,
-    color: colors.text,
-    marginTop: spacing.xs,
+  label: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.caption,
+    color: colors.textSecondary,
   },
   input: {
     backgroundColor: colors.surfaceHigh,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    paddingHorizontal: 12,
     paddingVertical: 12,
-    fontFamily: fontFamily.regular,
+    fontFamily: fontFamily.medium,
     fontSize: fontSize.body,
     color: colors.text,
   },
-  errorText: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.caption,
-    color: colors.error,
-    marginTop: 4,
-  },
-  btnRow: {
+  row: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: 'center',
   },
-  cancelBtnText: {
+  cancelText: {
     fontFamily: fontFamily.semiBold,
     fontSize: fontSize.label,
     color: colors.textSecondary,
   },
-  confirmBtn: {
+  submitBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
     backgroundColor: colors.primary,
-    minHeight: 48,
-    justifyContent: 'center',
+    alignItems: 'center',
   },
-  confirmBtnDisabled: { opacity: 0.6 },
-  confirmBtnText: {
+  submitText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.label,
     color: '#0F0F0F',
   },
 })
 
-// ─── Sale Card ────────────────────────────────────────────────────────────────
+// ─── Status badge ─────────────────────────────────────────────────────────────
 
-function SaleCard({
-  order,
-  currentUserId,
-  onShipped,
-}: {
-  order: SaleOrder
-  currentUserId: string
-  onShipped: (id: string, trackingNumber: string | null) => void
-}) {
-  const [modalVisible, setModalVisible] = useState(false)
-  const [chatLoading, setChatLoading] = useState(false)
-
-  const handleViewProfile = () => {
-    if (order.buyer?.id) router.push(`/profile/${order.buyer.id}`)
+function StatusBadge({ status }: { status: string }) {
+  const cfg: Record<string, { label: string; color: string; bg: string }> = {
+    sold:      { label: "À expédier",   color: '#FFA755', bg: 'rgba(255,167,85,0.12)' },
+    shipped:   { label: 'Expédié',      color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
+    delivered: { label: 'Livré',        color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
   }
-
-  const handleMessage = async () => {
-    if (chatLoading || !order.buyer_id) return
-    setChatLoading(true)
-    try {
-      const convId = await getOrCreateConversation(supabase, currentUserId, order.buyer_id)
-      router.push(`/conversation/${convId}`)
-    } catch {
-      // silently ignore
-    } finally {
-      setChatLoading(false)
-    }
-  }
-  const thumb = order.listing?.images?.[0] ?? null
-
-  const handleShipSuccess = (trackingNumber: string | null) => {
-    setModalVisible(false)
-    onShipped(order.id, trackingNumber)
-  }
-
-  // ── Status badge ──
-  let badgeStyle = styles.badgeGray
-  let badgeTextColor = colors.textSecondary
-  let badgeLabel = 'En attente'
-
-  if (order.delivery_status === 'shipped') {
-    badgeStyle = styles.badgeBlue
-    badgeTextColor = '#3B82F6'
-    badgeLabel = 'Expédié'
-  } else if (order.delivery_status === 'delivered') {
-    badgeStyle = styles.badgeGreen
-    badgeTextColor = colors.success
-    badgeLabel = 'Livré'
-  } else {
-    badgeStyle = styles.badgeAmber
-    badgeTextColor = colors.warning
-    badgeLabel = "En attente d'expédition"
-  }
-
-  const formattedDate = (() => {
-    const d = new Date(order.created_at)
-    if (isNaN(d.getTime())) return '—'
-    return d.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  })()
-
+  const c = cfg[status] ?? cfg.sold
   return (
-    <>
-      <View style={styles.card}>
-        {/* Top row: thumbnail + info */}
-        <View style={styles.cardRow}>
-          <View style={styles.thumb}>
-            {thumb ? (
-              <Image source={{ uri: thumb }} style={styles.thumbImg} resizeMode="cover" />
-            ) : (
-              <View style={[styles.thumbImg, styles.thumbPlaceholder]}>
-                <Ionicons name="image-outline" size={22} color={colors.border} />
-              </View>
-            )}
-          </View>
-
-          <View style={styles.cardInfo}>
-            <View style={styles.titleRow}>
-              <Text style={styles.cardTitle} numberOfLines={2}>
-                {order.listing?.title ?? 'Article supprimé'}
-              </Text>
-            </View>
-
-            {/* Buyer row */}
-            <View style={styles.buyerRow}>
-              <TouchableOpacity
-                style={styles.buyerTouchable}
-                onPress={handleViewProfile}
-                activeOpacity={0.7}
-                disabled={!order.buyer?.id}
-              >
-                {order.buyer?.avatar_url ? (
-                  <Image source={{ uri: order.buyer.avatar_url }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={10} color={colors.textSecondary} />
-                  </View>
-                )}
-                <Text style={styles.buyerName} numberOfLines={1}>
-                  @{order.buyer?.username ?? '—'}
-                </Text>
-              </TouchableOpacity>
-
-              <View style={styles.buyerActions}>
-                <TouchableOpacity
-                  style={styles.msgBtn}
-                  onPress={handleMessage}
-                  disabled={chatLoading}
-                  activeOpacity={0.7}
-                  hitSlop={6}
-                >
-                  {chatLoading ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="chatbubble-outline" size={15} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-                <Text style={styles.dateText}>{formattedDate}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Amounts */}
-        <View style={styles.amountsRow}>
-          <View style={styles.amountBlock}>
-            <Text style={styles.amountLabel}>Total payé</Text>
-            <Text style={styles.amountValue}>CHF {Number(order.total_chf).toFixed(2)}</Text>
-          </View>
-          <View style={styles.amountDivider} />
-          <View style={styles.amountBlock}>
-            <Text style={styles.amountLabel}>Vos gains</Text>
-            <Text style={[styles.amountValue, styles.earningsValue]}>
-              CHF {Number(order.seller_amount_chf).toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.badgeWrapper}>
-            <View style={[styles.badge, badgeStyle]}>
-              <Text style={[styles.badgeText, { color: badgeTextColor }]}>{badgeLabel}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* delivery_status: pending → ship button */}
-        {order.delivery_status === 'pending' && (
-          <TouchableOpacity
-            style={styles.shipBtn}
-            onPress={() => setModalVisible(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="send-outline" size={15} color="#0F0F0F" />
-            <Text style={styles.shipBtnText}>Marquer comme expédié</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* delivery_status: shipped → tracking info */}
-        {order.delivery_status === 'shipped' && (
-          <View style={styles.shippedInfo}>
-            {order.tracking_number ? (
-              <View style={styles.trackingRow}>
-                <Ionicons name="barcode-outline" size={14} color={colors.textSecondary} />
-                <Text style={styles.trackingText} numberOfLines={1}>
-                  {order.tracking_number}
-                </Text>
-              </View>
-            ) : null}
-            <Text style={styles.awaitingText}>
-              En attente de confirmation acheteur
-            </Text>
-          </View>
-        )}
-
-        {/* delivery_status: delivered */}
-        {order.delivery_status === 'delivered' && (
-          <View style={styles.shippedInfo}>
-            <Text style={styles.deliveredText}>Livré — paiement viré</Text>
-            {order.delivered_at ? (
-              <Text style={styles.metaText}>
-                {new Date(order.delivered_at).toLocaleDateString('fr-CH', {
-                  day: '2-digit', month: '2-digit', year: '2-digit',
-                })}
-              </Text>
-            ) : null}
-          </View>
-        )}
-      </View>
-
-      <ShipModal
-        visible={modalVisible}
-        orderId={order.id}
-        listingTitle={order.listing?.title ?? ''}
-        currentUserId={currentUserId}
-        onClose={() => setModalVisible(false)}
-        onSuccess={handleShipSuccess}
-      />
-    </>
+    <View style={[salesStyles.badge, { backgroundColor: c.bg }]}>
+      <Text style={[salesStyles.badgeText, { color: c.color }]}>{c.label}</Text>
+    </View>
   )
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function SellerSalesScreen() {
+export default function SalesScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
-  const { show: showToast, ToastView } = useToast()
 
-  const [orders, setOrders] = useState<SaleOrder[]>([])
+  const [sales, setSales] = useState<StorySale[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [shipModal, setShipModal] = useState<{ id: string; title: string } | null>(null)
+  const { show, ToastView } = useToast()
 
-  const fetchOrders = useCallback(async () => {
+  const fetchSales = useCallback(async () => {
     if (!currentUserId) return
-
     const { data, error } = await supabase
-      .from('shop_orders')
-      .select(`
-        id,
-        created_at,
-        total_chf,
-        commission_chf,
-        seller_amount_chf,
-        status,
-        delivery_status,
-        tracking_number,
-        delivered_at,
-        listing_id,
-        buyer_id,
-        listing:shop_listings!listing_id(title, images),
-        buyer:profiles!buyer_id(id, username, avatar_url)
-      `)
+      .from('stories')
+      .select('id, title, thumbnail_url, video_url, final_price_chf, status, tracking_number, shipped_at, delivered_at, created_at, buyer_id, buyer:profiles!buyer_id(id, username, avatar_url)')
       .eq('seller_id', currentUserId)
+      .in('status', ['sold', 'shipped', 'delivered'])
       .order('created_at', { ascending: false })
 
     if (error) {
-      Alert.alert('Erreur', error.message)
+      console.error('[fetchSales] failed:', error)
       return
     }
-
-    setOrders((data ?? []) as unknown as SaleOrder[])
+    setSales((data ?? []) as unknown as StorySale[])
   }, [currentUserId])
 
   useEffect(() => {
     setLoading(true)
-    fetchOrders().finally(() => setLoading(false))
-  }, [fetchOrders])
+    fetchSales().finally(() => setLoading(false))
+  }, [fetchSales])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
-    await fetchOrders()
+    await fetchSales()
     setRefreshing(false)
-  }, [fetchOrders])
+  }, [fetchSales])
 
-  const handleShipped = useCallback((id: string, trackingNumber: string | null) => {
-    setOrders(prev =>
-      prev.map(o =>
-        o.id === id
-          ? { ...o, delivery_status: 'shipped', tracking_number: trackingNumber }
-          : o
-      )
-    )
-    showToast('Expédition confirmée')
-  }, [showToast])
+  const handleMessage = useCallback(
+    async (buyerId: string | null) => {
+      if (!buyerId || !currentUserId) return
+      try {
+        const convId = await getOrCreateConversation(supabase, buyerId, currentUserId)
+        router.push(`/conversation/${convId}`)
+      } catch {
+        show("Impossible d'ouvrir la conversation")
+      }
+    },
+    [currentUserId, show],
+  )
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={8} activeOpacity={0.7}>
+    <SafeAreaView style={salesStyles.safe} edges={['top']}>
+      <View style={salesStyles.header}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes ventes</Text>
+        <Text style={salesStyles.headerTitle}>Mes ventes</Text>
         <View style={{ width: 24 }} />
       </View>
 
       {loading ? (
-        <View style={styles.centered}>
+        <View style={salesStyles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
-          data={orders}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.list}
+          data={sales}
+          keyExtractor={(s) => s.id}
+          contentContainerStyle={sales.length === 0 ? salesStyles.emptyContainer : salesStyles.list}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -587,62 +337,141 @@ export default function SellerSalesScreen() {
               colors={[colors.primary]}
             />
           }
-          renderItem={({ item }) => (
-            <SaleCard
-              order={item}
-              currentUserId={currentUserId}
-              onShipped={handleShipped}
-            />
-          )}
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="receipt-outline" size={44} color={colors.border} />
-              <Text style={styles.emptyText}>Aucune vente pour le moment</Text>
+            <View style={salesStyles.emptyState}>
+              <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
+              <Text style={salesStyles.emptyText}>Aucune vente</Text>
+              <Text style={salesStyles.emptySubtext}>Vos drops vendus apparaîtront ici.</Text>
             </View>
           }
+          renderItem={({ item }) => {
+            const buyerInitial = (item.buyer?.username ?? 'A').charAt(0).toUpperCase()
+            return (
+              <View style={salesStyles.card}>
+                <View style={salesStyles.cardRow}>
+                  <View style={salesStyles.thumb}>
+                    {item.thumbnail_url ? (
+                      <Image source={{ uri: item.thumbnail_url }} style={salesStyles.thumbImg} />
+                    ) : (
+                      <View style={salesStyles.thumbPlaceholder}>
+                        <Ionicons name="play-circle-outline" size={24} color={colors.primary} />
+                      </View>
+                    )}
+                  </View>
+                  <View style={salesStyles.body}>
+                    <Text style={salesStyles.title} numberOfLines={2}>{item.title}</Text>
+
+                    <TouchableOpacity
+                      style={salesStyles.buyerRow}
+                      onPress={() => handleMessage(item.buyer_id)}
+                      activeOpacity={0.7}
+                    >
+                      {item.buyer?.avatar_url ? (
+                        <Image source={{ uri: item.buyer.avatar_url }} style={salesStyles.buyerAvatar} />
+                      ) : (
+                        <View style={salesStyles.buyerAvatarFallback}>
+                          <Text style={salesStyles.buyerAvatarText}>{buyerInitial}</Text>
+                        </View>
+                      )}
+                      <Text style={salesStyles.buyerName}>
+                        @{item.buyer?.username ?? 'acheteur'}
+                      </Text>
+                      <Ionicons name="chatbubble-outline" size={14} color={colors.textSecondary} />
+                    </TouchableOpacity>
+
+                    <View style={salesStyles.bottomRow}>
+                      <StatusBadge status={item.status} />
+                      <Text style={salesStyles.price}>
+                        CHF {Number(item.final_price_chf ?? 0).toFixed(2)}
+                      </Text>
+                    </View>
+
+                    {item.status === 'sold' && (
+                      <TouchableOpacity
+                        style={salesStyles.shipBtn}
+                        onPress={() => setShipModal({ id: item.id, title: item.title })}
+                        activeOpacity={0.85}
+                      >
+                        <Ionicons name="send-outline" size={15} color="#0F0F0F" />
+                        <Text style={salesStyles.shipBtnText}>Marquer comme expédié</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {item.status === 'shipped' && item.tracking_number && (
+                      <View style={salesStyles.trackingRow}>
+                        <Ionicons name="barcode-outline" size={13} color={colors.textSecondary} />
+                        <Text style={salesStyles.trackingText} numberOfLines={1}>
+                          {item.tracking_number}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </View>
+            )
+          }}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         />
       )}
+
+      <ShipModal
+        visible={!!shipModal}
+        storyId={shipModal?.id ?? null}
+        title={shipModal?.title ?? ''}
+        onClose={() => setShipModal(null)}
+        onSuccess={() => {
+          show('Colis marqué comme expédié')
+          fetchSales()
+        }}
+      />
 
       {ToastView}
     </SafeAreaView>
   )
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
+const salesStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   headerTitle: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.body,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
     color: colors.text,
   },
-
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    gap: spacing.sm,
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  list: { padding: spacing.md },
+  emptyContainer: { flexGrow: 1, padding: spacing.md },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 80,
   },
-
+  emptyText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
+    color: colors.text,
+    marginTop: spacing.md,
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: spacing.md,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    gap: spacing.sm,
+    padding: spacing.md,
   },
   cardRow: {
     flexDirection: 'row',
@@ -651,189 +480,89 @@ const styles = StyleSheet.create({
   thumb: {
     width: 72,
     height: 72,
-    borderRadius: 10,
+    borderRadius: 8,
     overflow: 'hidden',
-    flexShrink: 0,
   },
   thumbImg: { width: 72, height: 72 },
   thumbPlaceholder: {
+    width: 72,
+    height: 72,
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardInfo: {
-    flex: 1,
-    gap: 6,
-    justifyContent: 'center',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  cardTitle: {
+  body: { flex: 1, gap: 6 },
+  title: {
     fontFamily: fontFamily.semiBold,
-    fontSize: fontSize.label,
+    fontSize: 14,
     color: colors.text,
-    flex: 1,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   buyerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: 6,
   },
-  buyerTouchable: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-    minWidth: 0,
-  },
-  buyerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  msgBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,210,184,0.1)',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatar: {
+  buyerAvatar: { width: 18, height: 18, borderRadius: 9 },
+  buyerAvatarFallback: {
     width: 18,
     height: 18,
     borderRadius: 9,
-  },
-  avatarPlaceholder: {
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  buyerAvatarText: { fontSize: 9, color: colors.textSecondary, fontFamily: fontFamily.bold },
   buyerName: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.caption,
-    color: colors.primary,
-    flex: 1,
-  },
-  dateText: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.caption,
+    fontSize: 12,
     color: colors.textSecondary,
+    fontFamily: fontFamily.regular,
   },
-
-  amountsRow: {
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: spacing.sm,
-  },
-  amountBlock: {
-    gap: 2,
-  },
-  amountLabel: {
-    fontFamily: fontFamily.regular,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  amountValue: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.label,
-    color: colors.text,
-  },
-  earningsValue: {
-    color: colors.primary,
-  },
-  amountDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
-  },
-  badgeWrapper: {
-    flex: 1,
-    alignItems: 'flex-end',
+    justifyContent: 'space-between',
   },
   badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: 'flex-start',
   },
-  badgeAmber:  { backgroundColor: 'rgba(245,158,11,0.12)' },
-  badgeBlue:   { backgroundColor: 'rgba(59,130,246,0.12)' },
-  badgeGreen:  { backgroundColor: 'rgba(16,185,129,0.12)' },
-  badgeGray:   { backgroundColor: colors.surfaceHigh },
   badgeText: {
-    fontFamily: fontFamily.medium,
     fontSize: 11,
+    fontFamily: fontFamily.semiBold,
   },
-
+  price: {
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
+    color: colors.primary,
+  },
   shipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 7,
+    gap: 6,
     backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 12,
-    marginTop: spacing.xs,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 6,
   },
   shipBtnText: {
     fontFamily: fontFamily.bold,
     fontSize: fontSize.label,
     color: '#0F0F0F',
   },
-
-  shippedInfo: {
-    gap: 4,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
   trackingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+    marginTop: 4,
   },
   trackingText: {
     fontFamily: fontFamily.medium,
     fontSize: fontSize.caption,
     color: colors.text,
     flex: 1,
-  },
-  awaitingText: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.caption,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-  },
-  deliveredText: {
-    fontFamily: fontFamily.semiBold,
-    fontSize: fontSize.caption,
-    color: colors.success,
-  },
-  metaText: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.caption,
-    color: colors.textSecondary,
-  },
-
-  emptyState: {
-    paddingTop: 80,
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  emptyText: {
-    fontFamily: fontFamily.medium,
-    fontSize: fontSize.body,
-    color: colors.textSecondary,
   },
 })

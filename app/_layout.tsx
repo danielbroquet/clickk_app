@@ -128,7 +128,6 @@ function RootRedirector() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="become-seller" />
       <Stack.Screen name="wallet/index" />
-      <Stack.Screen name="(seller)/listings" />
       <Stack.Screen name="story/create" />
       <Stack.Screen
         name="story/[id]"
@@ -138,7 +137,6 @@ function RootRedirector() {
           gestureDirection: 'vertical',
         }}
       />
-      <Stack.Screen name="listing/create" />
       <Stack.Screen name="profile/payment-methods" />
       <Stack.Screen name="profile/orders" />
       <Stack.Screen name="profile/about" />

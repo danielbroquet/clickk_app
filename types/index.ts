@@ -38,22 +38,6 @@ export interface Story {
   seller?: Profile
 }
 
-export interface ShopListing {
-  id: string
-  seller_id: string
-  title: string
-  description: string | null
-  price_chf: number
-  images: string[]
-  category: string | null
-  condition: 'new' | 'like_new' | 'good' | 'fair' | null
-  stock: number
-  is_active: boolean
-  created_at: string
-  seller?: Profile
-}
-
-
 export interface Notification {
   id: string
   user_id: string

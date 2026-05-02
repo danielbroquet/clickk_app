@@ -18,28 +18,28 @@ import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
-import i18n from '../../lib/i18n'
 import { useGroupedStories, SellerGroup } from '../../hooks/useGroupedStories'
 
 const PAGE_SIZE = 8
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-interface RawListing {
+interface RawStory {
   id: string
   title: string
-  price_chf: number
-  images: string[]
-  category: string | null
-  condition: string | null
-  stock: number
+  current_price_chf: number
+  start_price_chf: number
+  floor_price_chf: number
+  video_url: string
+  thumbnail_url: string | null
+  status: string
   created_at: string
   seller_id: string
   seller: { id: string; username: string; avatar_url: string | null } | null
 }
 
-const LISTING_SELECT = `
-  id, title, price_chf, images, category,
-  condition, stock, created_at, seller_id,
+const STORY_SELECT = `
+  id, title, current_price_chf, start_price_chf, floor_price_chf,
+  video_url, thumbnail_url, status, created_at, seller_id,
   seller:seller_id ( id, username, avatar_url )
 `
 
@@ -145,124 +145,62 @@ function FeedHeader() {
   )
 }
 
-const isVideo = (url: string) =>
-  ['mp4', 'mov', 'avi', 'webm'].includes(url.split('.').pop()?.toLowerCase() ?? '')
-
-function ListingCard({
-  listing,
+function StoryCard({
+  story,
   currentUserId,
   isCardVisible,
 }: {
-  listing: RawListing
+  story: RawStory
   currentUserId: string
   isCardVisible: boolean
 }) {
-  const [chatLoading, setChatLoading] = useState(false)
-  const [activeIndex, setActiveIndex] = useState(0)
   const videoRef = useRef<any>(null)
-  const username = listing.seller?.username ?? 'vendeur'
-  const avatar = listing.seller?.avatar_url
-  const isSeller = currentUserId === listing.seller_id
-  const images = listing.images?.length > 0 ? listing.images : []
-  const multiImage = images.length > 1
+  const username = story.seller?.username ?? 'vendeur'
+  const avatar = story.seller?.avatar_url
+  const isSeller = currentUserId === story.seller_id
+  const mediaUrl = story.video_url
 
-  const handleChat = async () => {
-    if (isSeller || chatLoading) return
-    setChatLoading(true)
-    try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .upsert(
-          { buyer_id: currentUserId, seller_id: listing.seller_id, story_id: listing.id },
-          { onConflict: 'buyer_id,seller_id,story_id', ignoreDuplicates: false }
-        )
-        .select('id')
-        .single()
-      if (!error && data) router.push(`/conversation/${data.id}`)
-    } finally {
-      setChatLoading(false)
-    }
+  const openStory = () => {
+    router.push({
+      pathname: '/story/[id]',
+      params: { id: story.id },
+    })
   }
 
   return (
     <View style={styles.card}>
-      {/* Swipeable image area */}
-      {images.length > 0 ? (
-        <View>
-          <FlatList
-            data={images}
-            keyExtractor={(url, i) => `${listing.id}-img-${i}`}
-            horizontal={true}
-            pagingEnabled={true}
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={true}
-            nestedScrollEnabled={true}
-            decelerationRate="fast"
-            snapToAlignment="center"
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(
-                e.nativeEvent.contentOffset.x /
-                e.nativeEvent.layoutMeasurement.width
-              )
-              setActiveIndex(index)
-            }}
-            renderItem={({ item: url, index: itemIndex }) => (
-              <TouchableOpacity
-                activeOpacity={0.92}
-                onPress={() => router.push(`/listing/${listing.id}`)}
-              >
-                {isVideo(url) ? (
-                  <Video
-                    ref={itemIndex === activeIndex ? videoRef : undefined}
-                    source={{ uri: url }}
-                    style={styles.cardImage}
-                    resizeMode={ResizeMode.COVER}
-                    shouldPlay={isCardVisible && activeIndex === itemIndex}
-                    isLooping={true}
-                    isMuted={true}
-                    useNativeControls={false}
-                  />
-                ) : (
-                  <Image source={{ uri: url }} style={styles.cardImage} resizeMode="cover" />
-                )}
-              </TouchableOpacity>
-            )}
+      <TouchableOpacity activeOpacity={0.92} onPress={openStory}>
+        {mediaUrl ? (
+          <Video
+            ref={videoRef}
+            source={{ uri: mediaUrl }}
+            style={styles.cardImage}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={isCardVisible}
+            isLooping
+            isMuted
+            useNativeControls={false}
+            posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
+            usePoster={!!story.thumbnail_url}
           />
-          {multiImage && (
-            <View style={styles.dotsRow}>
-              {images.map((_, i) => (
-                <View
-                  key={i}
-                  style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={0.92}
-          onPress={() => router.push(`/listing/${listing.id}`)}
-        >
+        ) : (
           <View style={styles.cardImagePlaceholder}>
             <Ionicons name="image-outline" size={36} color={colors.border} />
           </View>
-        </TouchableOpacity>
-      )}
+        )}
+      </TouchableOpacity>
 
-      {/* Info block */}
       <View style={styles.cardBody}>
-        {/* Seller row */}
         <View style={styles.sellerRow}>
           <TouchableOpacity
             style={styles.sellerLeft}
             activeOpacity={0.7}
             onPress={() => {
-              if (listing.seller?.id && listing.seller.id !== currentUserId) {
-                router.push(`/profile/${listing.seller.id}`)
+              if (story.seller?.id && story.seller.id !== currentUserId) {
+                router.push(`/profile/${story.seller.id}`)
               }
             }}
-            disabled={!listing.seller?.id || listing.seller.id === currentUserId}
+            disabled={!story.seller?.id || story.seller.id === currentUserId}
           >
             {avatar ? (
               <Image source={{ uri: avatar }} style={styles.avatar} />
@@ -273,51 +211,34 @@ function ListingCard({
             )}
             <Text style={styles.username}>@{username}</Text>
           </TouchableOpacity>
-          <View style={styles.rowRight}>
-            {listing.category ? (
-              <View style={styles.categoryPill}>
-                <Text style={styles.categoryText}>{listing.category}</Text>
-              </View>
-            ) : null}
-            {!isSeller && (
-              <TouchableOpacity
-                onPress={handleChat}
-                disabled={chatLoading}
-                hitSlop={8}
-                activeOpacity={0.7}
-              >
-                {chatLoading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Ionicons name="chatbubble-outline" size={22} color={colors.textSecondary} />
-                )}
-              </TouchableOpacity>
-            )}
+          <View style={styles.dropBadge}>
+            <Ionicons name="flash" size={12} color={colors.primary} />
+            <Text style={styles.dropBadgeText}>Drop</Text>
           </View>
         </View>
 
-        {/* Title */}
-        <Text style={styles.cardTitle} numberOfLines={2}>{listing.title}</Text>
+        <Text style={styles.cardTitle} numberOfLines={2}>{story.title}</Text>
 
-        {/* Price */}
-        <Text style={styles.cardPrice}>CHF {listing.price_chf.toFixed(2)}</Text>
-
-        {/* Condition */}
-        {listing.condition ? (
-          <Text style={styles.cardCondition}>{listing.condition}</Text>
-        ) : null}
+        <View style={styles.priceRow}>
+          <Text style={styles.cardPrice}>CHF {Number(story.current_price_chf).toFixed(2)}</Text>
+          {!isSeller && (
+            <TouchableOpacity style={styles.viewBtn} onPress={openStory} activeOpacity={0.85}>
+              <Text style={styles.viewBtnText}>Voir le drop</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   )
 }
 
-const keyExtractor = (item: RawListing) => item.id
+const keyExtractor = (item: RawStory) => item.id
 
 export default function FeedScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
 
-  const [listings, setListings] = useState<RawListing[]>([])
+  const [stories, setStories] = useState<RawStory[]>([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [hasMore, setHasMore] = useState(true)
@@ -329,18 +250,18 @@ export default function FeedScreen() {
     const from = page * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
     const { data, error } = await supabase
-      .from('shop_listings')
-      .select(LISTING_SELECT)
-      .eq('is_active', true)
-      .gt('stock', 0)
+      .from('stories')
+      .select(STORY_SELECT)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .range(from, to)
 
     if (error) return
-    const rows = (data as unknown as RawListing[]) ?? []
+    const rows = (data as unknown as RawStory[]) ?? []
     setHasMore(rows.length === PAGE_SIZE)
-    if (replace) setListings(rows)
-    else setListings(prev => [...prev, ...rows])
+    if (replace) setStories(rows)
+    else setStories(prev => [...prev, ...rows])
   }, [])
 
   useEffect(() => {
@@ -369,10 +290,10 @@ export default function FeedScreen() {
     setVisibleIds(ids)
   }, [])
 
-  const renderItem: ListRenderItem<RawListing> = useCallback(
+  const renderItem: ListRenderItem<RawStory> = useCallback(
     ({ item }) => (
-      <ListingCard
-        listing={item}
+      <StoryCard
+        story={item}
         currentUserId={currentUserId}
         isCardVisible={visibleIds.has(item.id)}
       />
@@ -383,15 +304,15 @@ export default function FeedScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <FlatList
-        data={listings}
+        data={stories}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListHeaderComponent={FeedHeader}
         ListEmptyComponent={
           !loadingMore ? (
             <View style={styles.emptyState}>
-              <Ionicons name="bag-outline" size={40} color={colors.border} />
-              <Text style={styles.emptyText}>Aucun article disponible</Text>
+              <Ionicons name="flash-outline" size={40} color={colors.border} />
+              <Text style={styles.emptyText}>Aucun drop actif</Text>
             </View>
           ) : null
         }
@@ -449,26 +370,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 8,
-    backgroundColor: colors.surface,
-  },
-  dot: {
-    height: 6,
-    borderRadius: 3,
-  },
-  dotActive: {
-    width: 12,
-    backgroundColor: '#00D2B8',
-  },
-  dotInactive: {
-    width: 6,
-    backgroundColor: '#555',
-  },
   cardBody: {
     padding: 14,
   },
@@ -483,11 +384,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
-  },
-  rowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   avatar: {
     width: 32,
@@ -512,34 +408,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  categoryPill: {
+  dropBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
     backgroundColor: colors.surfaceHigh,
   },
-  categoryText: {
-    fontFamily: fontFamily.medium,
+  dropBadgeText: {
+    fontFamily: fontFamily.semiBold,
     fontSize: 11,
-    color: colors.textSecondary,
+    color: colors.primary,
   },
   cardTitle: {
     fontFamily: fontFamily.bold,
     fontSize: 15,
     color: colors.text,
-    marginBottom: 4,
+    marginBottom: 6,
     lineHeight: 21,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   cardPrice: {
     fontFamily: fontFamily.bold,
-    fontSize: 16,
+    fontSize: 18,
     color: colors.primary,
-    marginBottom: 4,
   },
-  cardCondition: {
-    fontFamily: fontFamily.regular,
+  viewBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  viewBtnText: {
+    fontFamily: fontFamily.bold,
     fontSize: 13,
-    color: colors.textSecondary,
+    color: '#0F0F0F',
   },
   emptyState: {
     paddingTop: 60,
