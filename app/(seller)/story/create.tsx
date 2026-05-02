@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -11,86 +11,232 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  Dimensions,
+  Pressable,
+  Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import { ChevronLeft, Video, X } from 'lucide-react-native'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
 import { decode } from 'base64-arraybuffer'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withSequence,
+  withRepeat,
+  Easing,
+  runOnJS,
+} from 'react-native-reanimated'
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
+import { colors, fontFamily, spacing, fontSize } from '../../../lib/theme'
+
+const { width: SW } = Dimensions.get('window')
+
+// ─── Types & constants ────────────────────────────────────────────────────────
 
 type SpeedPreset = 'FLASH' | 'STANDARD' | 'RELAX'
 
-const DURATION: Record<SpeedPreset, { hours: number; ms: number }> = {
-  FLASH:    { hours: 1,  ms: 1  * 60 * 60 * 1000 },
-  STANDARD: { hours: 6,  ms: 6  * 60 * 60 * 1000 },
-  RELAX:    { hours: 24, ms: 24 * 60 * 60 * 1000 },
+const DURATION: Record<SpeedPreset, { label: string; hours: number; ms: number }> = {
+  FLASH:    { label: '1h',     hours: 1,   ms: 1   * 60 * 60 * 1000 },
+  STANDARD: { label: '24h',   hours: 24,  ms: 24  * 60 * 60 * 1000 },
+  RELAX:    { label: '7 jours', hours: 168, ms: 7 * 24 * 60 * 60 * 1000 },
 }
 
-const PRESETS: { key: SpeedPreset; emoji: string; label: string; sub: string }[] = [
-  { key: 'FLASH',    emoji: '⚡', label: 'Flash',    sub: '1h'  },
-  { key: 'STANDARD', emoji: '🕐', label: 'Standard', sub: '6h'  },
-  { key: 'RELAX',    emoji: '🌿', label: 'Relax',    sub: '24h' },
+const PRESETS: { key: SpeedPreset; emoji: string; label: string; tagline: string }[] = [
+  { key: 'FLASH',    emoji: '⚡', label: 'FLASH',    tagline: '1h · chute rapide'    },
+  { key: 'STANDARD', emoji: '🎯', label: 'STANDARD', tagline: '24h · équilibré'      },
+  { key: 'RELAX',    emoji: '🌙', label: 'RELAX',    tagline: '7 jours · lente'      },
 ]
 
-const PRESET_COLORS: Record<SpeedPreset, { bg: string; text: string }> = {
-  FLASH:    { bg: '#FFA755', text: '#0F0F0F' },
-  STANDARD: { bg: '#00D2B8', text: '#0F0F0F' },
-  RELAX:    { bg: '#A9F7E1', text: '#0F0F0F' },
+const CATEGORIES = [
+  'Sneakers', 'Mode', 'Tech', 'Montres', 'Art', 'Sport', 'Maison', 'Autre',
+]
+
+const PRESET_ACCENT: Record<SpeedPreset, string> = {
+  FLASH:    '#FF6B35',
+  STANDARD: '#00D2B8',
+  RELAX:    '#A9F7E1',
 }
 
-function formatDate(ts: number): string {
-  const d = new Date(ts)
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const day = days[d.getDay()]
-  const date = String(d.getDate()).padStart(2, '0')
-  const month = months[d.getMonth()]
-  const year = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${day} ${date} ${month} ${year} · ${hh}:${mm}`
+const TOTAL_STEPS = 4
+
+// ─── Price curve chart ────────────────────────────────────────────────────────
+
+function PriceCurve({
+  startPrice,
+  floorPrice,
+  preset,
+}: {
+  startPrice: number
+  floorPrice: number
+  preset: SpeedPreset
+}) {
+  const W = SW - 64
+  const H = 80
+  const pts = 40
+  const sp = Math.max(startPrice, 0.01)
+  const fp = Math.min(floorPrice, sp)
+
+  const points = Array.from({ length: pts }, (_, i) => {
+    const t = i / (pts - 1)
+    const price = sp - (sp - fp) * t
+    const x = (i / (pts - 1)) * W
+    const y = H - ((price - fp) / (sp - fp + 0.001)) * (H - 10) - 5
+    return `${x},${y}`
+  })
+
+  const linePath = `M ${points.join(' L ')}`
+  const fillPath = `${linePath} L ${W},${H} L 0,${H} Z`
+  const accent = PRESET_ACCENT[preset]
+
+  return (
+    <Svg width={W} height={H}>
+      <Defs>
+        <SvgGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={accent} stopOpacity="0.35" />
+          <Stop offset="1" stopColor={accent} stopOpacity="0.02" />
+        </SvgGradient>
+      </Defs>
+      <Path d={fillPath} fill="url(#grad)" />
+      <Path d={linePath} stroke={accent} strokeWidth="2.5" fill="none" strokeLinecap="round" />
+    </Svg>
+  )
 }
 
-export default function CreateStoryScreen() {
+// ─── Progress bar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ step }: { step: number }) {
+  return (
+    <View style={s.progressRow}>
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+        <View key={i} style={s.progressSegmentOuter}>
+          <Animated.View
+            style={[
+              s.progressSegment,
+              { backgroundColor: i < step ? colors.primary : colors.surfaceHigh },
+            ]}
+          />
+        </View>
+      ))}
+    </View>
+  )
+}
+
+// ─── Success check animation ──────────────────────────────────────────────────
+
+function SuccessCheck({ onDone }: { onDone: () => void }) {
+  const scale = useSharedValue(0)
+  const opacity = useSharedValue(0)
+
+  useEffect(() => {
+    scale.value = withSpring(1, { damping: 12, stiffness: 180 })
+    opacity.value = withTiming(1, { duration: 250 })
+    const t = setTimeout(() => runOnJS(onDone)(), 1600)
+    return () => clearTimeout(t)
+  }, [scale, opacity, onDone])
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }))
+
+  return (
+    <View style={s.successWrap}>
+      <Animated.View style={[s.successCircle, animStyle]}>
+        <Ionicons name="checkmark" size={52} color="#0F0F0F" />
+      </Animated.View>
+      <Text style={s.successTitle}>Drop publié !</Text>
+      <Text style={s.successSub}>Votre enchère est maintenant en ligne.</Text>
+    </View>
+  )
+}
+
+// ─── Category picker ──────────────────────────────────────────────────────────
+
+function CategoryPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (c: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <TouchableOpacity style={s.catTrigger} onPress={() => setOpen(true)} activeOpacity={0.8}>
+        <Text style={[s.catTriggerText, !value && { color: colors.textSecondary }]}>
+          {value || 'Choisir une catégorie'}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+      </TouchableOpacity>
+      <Modal transparent visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+        <Pressable style={s.catBackdrop} onPress={() => setOpen(false)} />
+        <View style={s.catSheet}>
+          <View style={s.catHandle} />
+          <Text style={s.catSheetTitle}>Catégorie</Text>
+          {CATEGORIES.map((c) => (
+            <TouchableOpacity
+              key={c}
+              style={[s.catItem, value === c && s.catItemActive]}
+              onPress={() => { onChange(c); setOpen(false) }}
+            >
+              <Text style={[s.catItemText, value === c && s.catItemTextActive]}>{c}</Text>
+              {value === c && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Modal>
+    </>
+  )
+}
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
+export default function CreateDropScreen() {
   const router = useRouter()
 
+  // Step state
+  const [step, setStep] = useState(1)
+  const [success, setSuccess] = useState(false)
+
+  // Step 1
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
+
+  // Step 2
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [category, setCategory] = useState('')
+
+  // Step 3
   const [startPrice, setStartPrice] = useState('')
   const [floorPrice, setFloorPrice] = useState('')
-  const [selectedPreset, setSelectedPreset] = useState<SpeedPreset>('STANDARD')
+  const [preset, setPreset] = useState<SpeedPreset>('STANDARD')
+
+  // Step 4
   const [loading, setLoading] = useState(false)
 
-  const { hours: durationHours, ms: durationMs } = DURATION[selectedPreset]
+  const { hours: durationHours, ms: durationMs, label: durationLabel } = DURATION[preset]
 
-  const floorGtStart =
-    startPrice !== '' &&
-    floorPrice !== '' &&
-    parseFloat(floorPrice) > parseFloat(startPrice)
+  const sp = parseFloat(startPrice) || 0
+  const fp = parseFloat(floorPrice) || 0
+  const floorGtStart = startPrice !== '' && floorPrice !== '' && fp > sp
+  const dropPerMin = durationMs > 0 ? ((sp - fp) / (durationMs / 60000)).toFixed(2) : '0.00'
 
-  const canPublish =
-    videoUri !== null &&
-    title.trim() !== '' &&
-    startPrice !== '' &&
-    floorPrice !== '' &&
-    !floorGtStart
+  // ── video helpers ──────────────────────────────────────────────────────────
 
-  const generateThumbnail = async (videoUri: string): Promise<string | null> => {
+  const generateThumbnail = async (uri: string): Promise<string | null> => {
     try {
-      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
-        time: 0,
-        quality: 0.7,
-      })
-      return uri
-    } catch {
-      return null
-    }
+      const { uri: t } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0, quality: 0.7 })
+      return t
+    } catch { return null }
   }
 
   const handleVideoSelected = async (uri: string) => {
@@ -99,52 +245,52 @@ export default function CreateStoryScreen() {
     setThumbnailUri(thumb)
   }
 
-  const pickVideo = () => {
+  const launchCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Accès refusé', "Autorisez l'accès à la caméra dans les réglages.")
+      return
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      videoMaxDuration: 60,
+      quality: 1,
+    })
+    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0].uri)
+  }
+
+  const launchGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      allowsEditing: true,
+      videoMaxDuration: 60,
+      quality: 1,
+    })
+    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0].uri)
+  }
+
+  // ── navigation ─────────────────────────────────────────────────────────────
+
+  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS))
+  const goPrev = () => setStep((s) => Math.max(s - 1, 1))
+
+  const handleCancel = () => {
     Alert.alert(
-      'Ajouter une vidéo',
-      undefined,
+      'Annuler ?',
+      'Vos modifications seront perdues.',
       [
-        {
-          text: 'Filmer',
-          onPress: async () => {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync()
-            if (status !== 'granted') {
-              Alert.alert("Accès refusé", "Autorisez l'accès à la caméra dans les réglages de votre téléphone")
-              return
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-              allowsEditing: true,
-              videoMaxDuration: 60,
-              quality: 1,
-            })
-            if (!result.canceled && result.assets.length > 0) {
-              await handleVideoSelected(result.assets[0].uri)
-            }
-          },
-        },
-        {
-          text: 'Choisir dans la galerie',
-          onPress: async () => {
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-              allowsEditing: true,
-              videoMaxDuration: 60,
-              quality: 1,
-            })
-            if (!result.canceled && result.assets.length > 0) {
-              await handleVideoSelected(result.assets[0].uri)
-            }
-          },
-        },
-        { text: 'Annuler', style: 'cancel' },
+        { text: 'Continuer', style: 'cancel' },
+        { text: 'Annuler le drop', style: 'destructive', onPress: () => router.back() },
       ]
     )
   }
 
+  // ── publish ────────────────────────────────────────────────────────────────
+
   const handlePublish = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return Alert.alert('Error', 'Not authenticated')
+    if (!user) return Alert.alert('Erreur', 'Non authentifié')
 
     setLoading(true)
     try {
@@ -155,484 +301,807 @@ export default function CreateStoryScreen() {
         await FileSystem.copyAsync({ from: localUri, to: cacheUri })
         localUri = cacheUri
       }
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: 'base64',
-      })
+      const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
       const { error: uploadError } = await supabase.storage
         .from('story-videos')
         .upload(path, decode(base64), { contentType: 'video/mp4' })
       if (uploadError) throw uploadError
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('story-videos')
-        .getPublicUrl(path)
+      const { data: { publicUrl } } = supabase.storage.from('story-videos').getPublicUrl(path)
 
       let thumbnailPublicUrl: string | null = null
       if (thumbnailUri) {
         try {
           const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
-          const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, {
-            encoding: 'base64',
-          })
-          const { error: thumbUploadError } = await supabase.storage
+          const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
+          const { error: te } = await supabase.storage
             .from('story-thumbnails')
             .upload(thumbPath, decode(thumbBase64), { contentType: 'image/jpeg' })
-          if (!thumbUploadError) {
-            const { data: { publicUrl: thumbUrl } } = supabase.storage
-              .from('story-thumbnails')
-              .getPublicUrl(thumbPath)
-            thumbnailPublicUrl = thumbUrl
+          if (!te) {
+            const { data: { publicUrl: tu } } = supabase.storage.from('story-thumbnails').getPublicUrl(thumbPath)
+            thumbnailPublicUrl = tu
           }
-        } catch {
-          thumbnailPublicUrl = null
-        }
+        } catch {}
       }
 
-      const { error: insertError } = await supabase
-        .from('stories')
-        .insert({
-          seller_id: user.id,
-          video_url: publicUrl,
-          thumbnail_url: thumbnailPublicUrl,
-          title: title.trim(),
-          description: description.trim() || null,
-          start_price_chf: parseFloat(startPrice),
-          floor_price_chf: parseFloat(floorPrice),
-          current_price_chf: parseFloat(startPrice),
-          price_drop_seconds: 5,
-          last_drop_at: new Date().toISOString(),
-          speed_preset: selectedPreset,
-          duration_hours: durationHours,
-          expires_at: new Date(Date.now() + durationMs).toISOString(),
-          status: 'active',
-        })
+      const { error: insertError } = await supabase.from('stories').insert({
+        seller_id: user.id,
+        video_url: publicUrl,
+        thumbnail_url: thumbnailPublicUrl,
+        title: title.trim(),
+        description: description.trim() || null,
+        category: category || null,
+        start_price_chf: sp,
+        floor_price_chf: fp,
+        current_price_chf: sp,
+        price_drop_seconds: 5,
+        last_drop_at: new Date().toISOString(),
+        speed_preset: preset,
+        duration_hours: durationHours,
+        expires_at: new Date(Date.now() + durationMs).toISOString(),
+        status: 'active',
+      })
       if (insertError) throw insertError
 
-      router.replace('/(tabs)')  // ← une seule ligne
+      setLoading(false)
+      setSuccess(true)
     } catch (err: any) {
-      Alert.alert('Error', err.message ?? 'Something went wrong')
-    } finally {
+      Alert.alert('Erreur', err.message ?? 'Une erreur est survenue')
       setLoading(false)
     }
   }
 
+  // ── success screen ─────────────────────────────────────────────────────────
+
+  if (success) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <SuccessCheck onDone={() => router.replace('/(tabs)')} />
+      </View>
+    )
+  }
+
+  // ── can advance? ───────────────────────────────────────────────────────────
+
+  const canNext =
+    (step === 1 && videoUri !== null) ||
+    (step === 2 && title.trim().length > 0) ||
+    (step === 3 && startPrice !== '' && floorPrice !== '' && !floorGtStart) ||
+    step === TOTAL_STEPS
+
+  // ─── render ────────────────────────────────────────────────────────────────
+
   return (
-    <SafeAreaView style={s.safe}>
+    <SafeAreaView style={s.safe} edges={['top']}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={handleCancel} style={s.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="close" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={s.headerCenter}>
+          <Text style={s.headerStep}>{step} / {TOTAL_STEPS}</Text>
+          <Text style={s.headerTitle}>{STEP_TITLES[step - 1]}</Text>
+        </View>
+        <View style={s.headerBtn} />
+      </View>
+
+      {/* Progress bar */}
+      <ProgressBar step={step} />
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
-        {/* Header */}
-        <View style={s.header}>
-          <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <ChevronLeft size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={s.headerTitle}>New Story</Text>
-          <View style={{ width: 40 }} />
-        </View>
-
         <ScrollView
           contentContainerStyle={s.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Video upload zone */}
-          {videoUri ? (
-            <>
-              <View style={s.videoPreviewWrapper}>
-                <AvVideo
-                  source={{ uri: videoUri }}
-                  style={s.videoPreview}
-                  resizeMode={ResizeMode.COVER}
-                  shouldPlay={false}
-                  useNativeControls
-                />
-                <TouchableOpacity
-                  style={s.clearBtn}
-                  onPress={() => {
-                    setVideoUri(null)
-                    setThumbnailUri(null)
-                  }}
-                >
-                  <X size={14} color="#FFFFFF" />
-                </TouchableOpacity>
-                <View style={s.readyPill}>
-                  <Text style={s.readyPillText}>✓ Video ready</Text>
-                </View>
-              </View>
-              {thumbnailUri && (
-                <View style={s.thumbRow}>
-                  <Image source={{ uri: thumbnailUri }} style={s.thumbPreview} />
-                  <Text style={s.thumbLabel}>Thumbnail preview</Text>
-                </View>
-              )}
-            </>
-          ) : (
-            <TouchableOpacity style={s.uploadZone} onPress={pickVideo} activeOpacity={0.7}>
-              <Video size={40} color="#00D2B8" />
-              <Text style={s.uploadLabel}>Record or pick a video</Text>
-              <Text style={s.uploadSub}>Max 30 seconds</Text>
-            </TouchableOpacity>
+          {step === 1 && (
+            <Step1
+              videoUri={videoUri}
+              thumbnailUri={thumbnailUri}
+              onCamera={launchCamera}
+              onGallery={launchGallery}
+              onClear={() => { setVideoUri(null); setThumbnailUri(null) }}
+            />
           )}
-
-          {/* Form fields */}
-          <View style={s.card}>
-            {/* Title */}
-            <View>
-              <Text style={s.fieldLabel}>Title</Text>
-              <TextInput
-                style={s.input}
-                placeholder="What are you selling?"
-                placeholderTextColor="#717976"
-                value={title}
-                onChangeText={setTitle}
-                maxLength={60}
-                returnKeyType="next"
-              />
-              <Text style={s.counter}>{title.length}/60</Text>
-            </View>
-
-            {/* Description */}
-            <View style={{ marginTop: 16 }}>
-              <Text style={s.fieldLabel}>Description</Text>
-              <TextInput
-                style={[s.input, { height: 96, textAlignVertical: 'top' }]}
-                placeholder="Describe your item…"
-                placeholderTextColor="#717976"
-                value={description}
-                onChangeText={setDescription}
-                maxLength={300}
-                multiline
-                numberOfLines={4}
-              />
-              <Text style={s.counter}>{description.length}/300</Text>
-            </View>
-          </View>
-
-          {/* Pricing */}
-          <View style={[s.card, { marginTop: 12 }]}>
-            <Text style={s.sectionLabel}>Pricing</Text>
-            <View style={s.priceRow}>
-              {/* Starting price */}
-              <View style={{ flex: 1 }}>
-                <Text style={s.priceLabel}>Starting price</Text>
-                <View style={s.priceInputWrapper}>
-                  <TextInput
-                    style={s.priceInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    placeholderTextColor="#717976"
-                    value={startPrice}
-                    onChangeText={setStartPrice}
-                  />
-                  <Text style={s.currencyTag}>CHF</Text>
-                </View>
-              </View>
-
-              {/* Floor price */}
-              <View style={{ flex: 1 }}>
-                <Text style={s.priceLabel}>Floor price</Text>
-                <View style={s.priceInputWrapper}>
-                  <TextInput
-                    style={s.priceInput}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    placeholderTextColor="#717976"
-                    value={floorPrice}
-                    onChangeText={setFloorPrice}
-                  />
-                  <Text style={s.currencyTag}>CHF</Text>
-                </View>
-                <Text style={s.minNote}>Minimum accepted</Text>
-              </View>
-            </View>
-
-            {floorGtStart && (
-              <Text style={s.priceError}>Floor price must be ≤ starting price</Text>
-            )}
-          </View>
-
-          {/* Speed preset */}
-          <View style={[s.card, { marginTop: 12 }]}>
-            <Text style={s.sectionLabel}>Sale speed</Text>
-            <View style={s.pillRow}>
-              {PRESETS.map(p => {
-                const active = selectedPreset === p.key
-                const colors = PRESET_COLORS[p.key]
-                return (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={[
-                      s.pill,
-                      { backgroundColor: active ? colors.bg : '#2A2A2A' },
-                    ]}
-                    onPress={() => setSelectedPreset(p.key)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={{ fontSize: 16 }}>{p.emoji}</Text>
-                    <Text
-                      style={[
-                        s.pillLabel,
-                        { color: active ? colors.text : '#717976' },
-                      ]}
-                    >
-                      {p.label}
-                    </Text>
-                    <Text
-                      style={[
-                        s.pillSub,
-                        { color: active ? colors.text : '#717976' },
-                      ]}
-                    >
-                      {p.sub}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </View>
-            <Text style={s.dropNote}>Prix baisse toutes les 5s</Text>
-            <Text style={s.endsOn}>
-              Ends on {formatDate(Date.now() + durationMs)}
-            </Text>
-          </View>
-
-          {/* Publish button */}
-          <TouchableOpacity
-            style={[s.publishBtn, (!canPublish || loading) && { opacity: 0.4 }]}
-            onPress={handlePublish}
-            disabled={!canPublish || loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#0F0F0F" />
-            ) : (
-              <Text style={s.publishText}>Publish Story</Text>
-            )}
-          </TouchableOpacity>
+          {step === 2 && (
+            <Step2
+              title={title} onTitle={setTitle}
+              description={description} onDescription={setDescription}
+              category={category} onCategory={setCategory}
+              thumbnailUri={thumbnailUri}
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              startPrice={startPrice} onStart={setStartPrice}
+              floorPrice={floorPrice} onFloor={setFloorPrice}
+              preset={preset} onPreset={setPreset}
+              floorGtStart={floorGtStart}
+              sp={sp} fp={fp}
+              dropPerMin={dropPerMin}
+              durationLabel={durationLabel}
+            />
+          )}
+          {step === 4 && (
+            <Step4
+              title={title}
+              thumbnailUri={thumbnailUri}
+              sp={sp} fp={fp}
+              preset={preset}
+              durationLabel={durationLabel}
+              loading={loading}
+              onPublish={handlePublish}
+            />
+          )}
         </ScrollView>
+
+        {/* Bottom navigation */}
+        {step < TOTAL_STEPS ? (
+          <View style={s.navRow}>
+            {step > 1 ? (
+              <TouchableOpacity style={s.prevBtn} onPress={goPrev} activeOpacity={0.8}>
+                <Ionicons name="chevron-back" size={18} color={colors.text} />
+                <Text style={s.prevText}>Précédent</Text>
+              </TouchableOpacity>
+            ) : <View style={s.prevBtn} />}
+
+            <TouchableOpacity
+              style={[s.nextBtn, !canNext && s.nextBtnDisabled]}
+              onPress={goNext}
+              disabled={!canNext}
+              activeOpacity={0.85}
+            >
+              <Text style={[s.nextText, !canNext && s.nextTextDisabled]}>Suivant</Text>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={canNext ? '#0F0F0F' : colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
 
+const STEP_TITLES = ['Vidéo', 'Détails', 'Tarification', 'Publier']
+
+// ─── Step 1: Capture / Upload ─────────────────────────────────────────────────
+
+function Step1({
+  videoUri,
+  thumbnailUri,
+  onCamera,
+  onGallery,
+  onClear,
+}: {
+  videoUri: string | null
+  thumbnailUri: string | null
+  onCamera: () => void
+  onGallery: () => void
+  onClear: () => void
+}) {
+  if (videoUri) {
+    return (
+      <View>
+        <View style={s.videoWrap}>
+          <AvVideo
+            source={{ uri: videoUri }}
+            style={s.videoPreview}
+            resizeMode={ResizeMode.COVER}
+            shouldPlay={false}
+            useNativeControls
+            isLooping
+          />
+          <TouchableOpacity style={s.clearBtn} onPress={onClear}>
+            <Ionicons name="close" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={s.readyPill}>
+            <Ionicons name="checkmark-circle" size={13} color="#0F0F0F" />
+            <Text style={s.readyText}>Vidéo prête</Text>
+          </View>
+        </View>
+        {thumbnailUri && (
+          <View style={s.thumbRow}>
+            <Image source={{ uri: thumbnailUri }} style={s.thumbImg} />
+            <View>
+              <Text style={s.thumbLabel}>Miniature générée</Text>
+              <Text style={s.thumbSub}>Aperçu automatique depuis ta vidéo</Text>
+            </View>
+          </View>
+        )}
+        <Text style={s.hintText}>Appuie sur "Suivant" pour continuer →</Text>
+      </View>
+    )
+  }
+
+  return (
+    <View style={s.captureWrap}>
+      <Text style={s.captureTitle}>Ajoute une vidéo</Text>
+      <Text style={s.captureSub}>Max 60 secondes · Format vertical recommandé</Text>
+
+      <TouchableOpacity style={s.captureBtn} onPress={onCamera} activeOpacity={0.85}>
+        <View style={s.captureBtnIcon}>
+          <Ionicons name="videocam" size={32} color="#0F0F0F" />
+        </View>
+        <View style={s.captureBtnText}>
+          <Text style={s.captureBtnTitle}>Filmer</Text>
+          <Text style={s.captureBtnSub}>Ouvrir la caméra</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <TouchableOpacity style={s.captureBtn} onPress={onGallery} activeOpacity={0.85}>
+        <View style={[s.captureBtnIcon, { backgroundColor: colors.surfaceHigh }]}>
+          <Ionicons name="images" size={32} color={colors.primary} />
+        </View>
+        <View style={s.captureBtnText}>
+          <Text style={s.captureBtnTitle}>Importer</Text>
+          <Text style={s.captureBtnSub}>Depuis la galerie</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+// ─── Step 2: Details ──────────────────────────────────────────────────────────
+
+function Step2({
+  title, onTitle,
+  description, onDescription,
+  category, onCategory,
+  thumbnailUri,
+}: {
+  title: string; onTitle: (s: string) => void
+  description: string; onDescription: (s: string) => void
+  category: string; onCategory: (s: string) => void
+  thumbnailUri: string | null
+}) {
+  return (
+    <View style={s.formWrap}>
+      {thumbnailUri && (
+        <Image source={{ uri: thumbnailUri }} style={s.detailThumb} />
+      )}
+
+      <Text style={s.fieldLabel}>Titre *</Text>
+      <TextInput
+        style={s.titleInput}
+        placeholder="Ex: Nike Air Max 90 Taille 42"
+        placeholderTextColor={colors.textSecondary}
+        value={title}
+        onChangeText={(t) => onTitle(t.slice(0, 80))}
+        returnKeyType="next"
+        autoFocus
+      />
+      <Text style={s.counter}>{title.length}/80</Text>
+
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
+      <TextInput
+        style={s.descInput}
+        placeholder="État, détails, défauts éventuels..."
+        placeholderTextColor={colors.textSecondary}
+        value={description}
+        onChangeText={(t) => onDescription(t.slice(0, 300))}
+        multiline
+        numberOfLines={4}
+        textAlignVertical="top"
+      />
+      <Text style={s.counter}>{description.length}/300</Text>
+
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Catégorie</Text>
+      <CategoryPicker value={category} onChange={onCategory} />
+    </View>
+  )
+}
+
+// ─── Step 3: Pricing ──────────────────────────────────────────────────────────
+
+function Step3({
+  startPrice, onStart,
+  floorPrice, onFloor,
+  preset, onPreset,
+  floorGtStart,
+  sp, fp,
+  dropPerMin,
+  durationLabel,
+}: {
+  startPrice: string; onStart: (s: string) => void
+  floorPrice: string; onFloor: (s: string) => void
+  preset: SpeedPreset; onPreset: (p: SpeedPreset) => void
+  floorGtStart: boolean
+  sp: number; fp: number
+  dropPerMin: string
+  durationLabel: string
+}) {
+  const hasPrices = sp > 0 && fp >= 0 && sp > fp
+
+  return (
+    <View style={s.formWrap}>
+      {/* Price inputs */}
+      <View style={s.priceRow}>
+        <View style={s.priceCol}>
+          <Text style={s.priceColLabel}>Prix de départ</Text>
+          <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
+            <Text style={s.chfTag}>CHF</Text>
+            <TextInput
+              style={s.priceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              value={startPrice}
+              onChangeText={onStart}
+            />
+          </View>
+        </View>
+        <View style={s.priceArrow}>
+          <Ionicons name="arrow-forward" size={18} color={colors.textSecondary} />
+        </View>
+        <View style={s.priceCol}>
+          <Text style={s.priceColLabel}>Prix plancher</Text>
+          <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
+            <Text style={s.chfTag}>CHF</Text>
+            <TextInput
+              style={s.priceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              value={floorPrice}
+              onChangeText={onFloor}
+            />
+          </View>
+          <Text style={s.floorHint}>Minimum accepté</Text>
+        </View>
+      </View>
+
+      {floorGtStart && (
+        <Text style={s.priceError}>Le prix plancher doit être inférieur au prix de départ</Text>
+      )}
+
+      {/* Speed presets */}
+      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>Vitesse de vente</Text>
+      <View style={s.presetRow}>
+        {PRESETS.map((p) => {
+          const active = preset === p.key
+          const accent = PRESET_ACCENT[p.key]
+          return (
+            <TouchableOpacity
+              key={p.key}
+              style={[s.presetCard, active && { borderColor: accent, backgroundColor: `${accent}18` }]}
+              onPress={() => onPreset(p.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={s.presetEmoji}>{p.emoji}</Text>
+              <Text style={[s.presetLabel, active && { color: accent }]}>{p.label}</Text>
+              <Text style={s.presetTagline}>{p.tagline}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      {/* Live chart preview */}
+      {hasPrices && (
+        <View style={s.chartCard}>
+          <View style={s.chartHeader}>
+            <Text style={s.chartTitle}>Aperçu de la descente</Text>
+            <View style={s.chartPricePills}>
+              <Text style={s.chartPriceFrom}>CHF {sp.toFixed(0)}</Text>
+              <Ionicons name="arrow-forward" size={12} color={colors.textSecondary} />
+              <Text style={s.chartPriceTo}>CHF {fp.toFixed(0)}</Text>
+            </View>
+          </View>
+          <PriceCurve startPrice={sp} floorPrice={fp} preset={preset} />
+          <Text style={s.chartSummary}>
+            Le prix passera de{' '}
+            <Text style={s.chartBold}>CHF {sp.toFixed(2)}</Text>
+            {' '}à{' '}
+            <Text style={s.chartBold}>CHF {fp.toFixed(2)}</Text>
+            {' '}en{' '}
+            <Text style={s.chartBold}>{durationLabel}</Text>
+            {', '}−CHF{' '}
+            <Text style={s.chartBold}>{dropPerMin}</Text>
+            /min
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+}
+
+// ─── Step 4: Publish ──────────────────────────────────────────────────────────
+
+function Step4({
+  title, thumbnailUri, sp, fp, preset, durationLabel, loading, onPublish,
+}: {
+  title: string
+  thumbnailUri: string | null
+  sp: number
+  fp: number
+  preset: SpeedPreset
+  durationLabel: string
+  loading: boolean
+  onPublish: () => void
+}) {
+  const accent = PRESET_ACCENT[preset]
+  const presetMeta = PRESETS.find((p) => p.key === preset)!
+
+  return (
+    <View style={s.publishWrap}>
+      <Text style={s.publishHeadline}>Prêt à publier ?</Text>
+      <Text style={s.publishSub}>Vérifiez les informations avant de lancer l'enchère.</Text>
+
+      {/* Summary card */}
+      <View style={s.summaryCard}>
+        {thumbnailUri ? (
+          <Image source={{ uri: thumbnailUri }} style={s.summaryThumb} />
+        ) : (
+          <View style={[s.summaryThumb, s.summaryThumbFallback]}>
+            <Ionicons name="videocam-outline" size={28} color={colors.border} />
+          </View>
+        )}
+        <View style={s.summaryInfo}>
+          <Text style={s.summaryTitle} numberOfLines={2}>{title}</Text>
+          <View style={s.summaryRow}>
+            <Text style={s.summaryPrice}>CHF {sp.toFixed(2)}</Text>
+            <Ionicons name="arrow-down" size={12} color={colors.textSecondary} />
+            <Text style={s.summaryFloor}>CHF {fp.toFixed(2)}</Text>
+          </View>
+          <View style={[s.summaryBadge, { backgroundColor: `${accent}22` }]}>
+            <Text style={[s.summaryBadgeText, { color: accent }]}>
+              {presetMeta.emoji} {presetMeta.label} · {durationLabel}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Publish button */}
+      <TouchableOpacity
+        style={[s.publishBtn, loading && { opacity: 0.6 }]}
+        onPress={onPublish}
+        disabled={loading}
+        activeOpacity={0.85}
+      >
+        {loading ? (
+          <View style={s.publishLoading}>
+            <ActivityIndicator color="#0F0F0F" />
+            <Text style={s.publishBtnText}>Publication en cours…</Text>
+          </View>
+        ) : (
+          <>
+            <Ionicons name="rocket" size={20} color="#0F0F0F" style={{ marginRight: 8 }} />
+            <Text style={s.publishBtnText}>Publier le drop</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <Text style={s.publishDisclaimer}>
+        En publiant, votre enchère sera immédiatement visible par tous les utilisateurs.
+      </Text>
+    </View>
+  )
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#0F0F0F',
-  },
+  safe: { flex: 1, backgroundColor: colors.bg },
+
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  scroll: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
+  headerBtn: { width: 36, height: 36, justifyContent: 'center' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  headerStep: { fontFamily: fontFamily.medium, fontSize: 11, color: colors.textSecondary, letterSpacing: 0.5 },
+  headerTitle: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.text, marginTop: 2 },
 
-  // Video zone
-  uploadZone: {
-    aspectRatio: 9 / 16,
-    width: '100%',
-    backgroundColor: '#1A1A1A',
-    borderWidth: 2,
-    borderColor: '#00D2B8',
-    borderStyle: 'dashed',
+  // Progress
+  progressRow: { flexDirection: 'row', gap: 4, paddingHorizontal: spacing.md, paddingVertical: 10 },
+  progressSegmentOuter: { flex: 1, height: 3, borderRadius: 2, overflow: 'hidden' },
+  progressSegment: { flex: 1, borderRadius: 2 },
+
+  // Scroll
+  scroll: { paddingHorizontal: spacing.md, paddingBottom: 100 },
+
+  // Nav
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.bg,
+  },
+  prevBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 4 },
+  prevText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.text },
+  nextBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
     borderRadius: 12,
+  },
+  nextBtnDisabled: { backgroundColor: colors.surfaceHigh },
+  nextText: { fontFamily: fontFamily.bold, fontSize: 15, color: '#0F0F0F' },
+  nextTextDisabled: { color: colors.textSecondary },
+
+  // Step 1 – capture
+  captureWrap: { paddingTop: spacing.lg },
+  captureTitle: { fontFamily: fontFamily.bold, fontSize: 22, color: colors.text, marginBottom: 6 },
+  captureSub: { fontFamily: fontFamily.regular, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.xl },
+  captureBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    gap: 14,
+  },
+  captureBtnIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
   },
-  uploadLabel: {
-    color: '#717976',
-    fontSize: 13,
-    marginTop: 4,
-  },
-  uploadSub: {
-    color: '#717976',
-    fontSize: 11,
-  },
-  videoPreviewWrapper: {
-    aspectRatio: 9 / 16,
-    width: '100%',
-    borderRadius: 12,
+  captureBtnText: { flex: 1 },
+  captureBtnTitle: { fontFamily: fontFamily.semiBold, fontSize: 16, color: colors.text },
+  captureBtnSub: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+
+  // Step 1 – video preview
+  videoWrap: {
+    marginTop: spacing.md,
+    borderRadius: 16,
     overflow: 'hidden',
-    position: 'relative',
+    aspectRatio: 9 / 16,
+    backgroundColor: '#000',
   },
-  videoPreview: {
-    width: '100%',
-    height: '100%',
-  },
+  videoPreview: { width: '100%', height: '100%' },
   clearBtn: {
     position: 'absolute',
     top: 10,
     right: 10,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 999,
-    padding: 4,
+    padding: 6,
   },
   readyPill: {
     position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: '#00D2B8',
+    bottom: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
     borderRadius: 999,
-    paddingVertical: 4,
+    paddingVertical: 5,
     paddingHorizontal: 10,
   },
-  readyPillText: {
-    color: '#0F0F0F',
-    fontSize: 11,
-    fontWeight: '700',
-  },
+  readyText: { fontFamily: fontFamily.bold, fontSize: 11, color: '#0F0F0F' },
   thumbRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 10,
-  },
-  thumbPreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#1A1A1A',
-  },
-  thumbLabel: {
-    color: '#717976',
-    fontSize: 12,
-  },
-
-  // Card
-  card: {
-    backgroundColor: '#1A1A1A',
+    gap: 12,
+    marginTop: 14,
+    backgroundColor: colors.surface,
     borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
+    padding: 12,
+  },
+  thumbImg: { width: 52, height: 52, borderRadius: 8, backgroundColor: colors.surfaceHigh },
+  thumbLabel: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.text },
+  thumbSub: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  hintText: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
+
+  // Step 2
+  formWrap: { paddingTop: spacing.md },
+  detailThumb: {
+    width: '100%',
+    height: 180,
+    borderRadius: 14,
+    marginBottom: spacing.lg,
+    backgroundColor: colors.surfaceHigh,
   },
   fieldLabel: {
-    color: '#FFFFFF',
+    fontFamily: fontFamily.semiBold,
     fontSize: 13,
-    fontWeight: '500',
+    color: colors.textSecondary,
     marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  input: {
-    backgroundColor: '#0F0F0F',
+  titleInput: {
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 8,
-    padding: 12,
-    color: '#FFFFFF',
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    color: colors.text,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 17,
+  },
+  descInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: 14,
+    color: colors.text,
+    fontFamily: fontFamily.regular,
     fontSize: 14,
+    height: 100,
   },
   counter: {
-    color: '#717976',
+    fontFamily: fontFamily.regular,
     fontSize: 11,
+    color: colors.textSecondary,
     textAlign: 'right',
     marginTop: 4,
   },
 
-  // Pricing
-  sectionLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  priceLabel: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  priceInputWrapper: {
+  // Category
+  catTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F0F0F',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  priceInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    paddingVertical: 12,
-  },
-  currencyTag: {
-    color: '#717976',
-    fontSize: 13,
-  },
-  minNote: {
-    color: '#717976',
-    fontSize: 10,
-    marginTop: 4,
-  },
-  priceError: {
-    color: '#FF4444',
-    fontSize: 12,
-    marginTop: 8,
-  },
-
-  // Speed presets
-  pillRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  pill: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    gap: 2,
-  },
-  pillLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  pillSub: {
-    fontSize: 10,
-  },
-  dropNote: {
-    color: '#00D2B8',
-    fontSize: 11,
-    marginTop: 10,
-  },
-  endsOn: {
-    color: '#717976',
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-
-  // Publish
-  publishBtn: {
-    height: 52,
-    backgroundColor: '#00D2B8',
+    borderColor: colors.border,
     borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  catTriggerText: { fontFamily: fontFamily.medium, fontSize: 15, color: colors.text },
+  catBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  catSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  catHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginVertical: 10 },
+  catSheetTitle: { fontFamily: fontFamily.bold, fontSize: 17, color: colors.text, marginBottom: 12 },
+  catItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  catItemActive: {},
+  catItemText: { fontFamily: fontFamily.medium, fontSize: 15, color: colors.text },
+  catItemTextActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
+
+  // Step 3 – prices
+  priceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: spacing.sm },
+  priceCol: { flex: 1 },
+  priceColLabel: { fontFamily: fontFamily.semiBold, fontSize: 12, color: colors.textSecondary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+  priceBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+  },
+  chfTag: { fontFamily: fontFamily.semiBold, fontSize: 14, color: colors.textSecondary, marginRight: 4 },
+  priceInput: { flex: 1, fontFamily: fontFamily.bold, fontSize: 22, color: colors.text, paddingVertical: 12 },
+  priceArrow: { alignSelf: 'center', marginTop: 24, paddingHorizontal: 2 },
+  floorHint: { fontFamily: fontFamily.regular, fontSize: 10, color: colors.textSecondary, marginTop: 4 },
+  priceError: { fontFamily: fontFamily.medium, fontSize: 12, color: colors.error, marginTop: 8 },
+
+  // Presets
+  presetRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  presetCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 4,
+  },
+  presetEmoji: { fontSize: 22 },
+  presetLabel: { fontFamily: fontFamily.bold, fontSize: 11, color: colors.text, letterSpacing: 0.5 },
+  presetTagline: { fontFamily: fontFamily.regular, fontSize: 10, color: colors.textSecondary, textAlign: 'center' },
+
+  // Chart
+  chartCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  chartHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  chartTitle: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.text },
+  chartPricePills: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chartPriceFrom: { fontFamily: fontFamily.bold, fontSize: 12, color: colors.primary },
+  chartPriceTo: { fontFamily: fontFamily.bold, fontSize: 12, color: colors.textSecondary },
+  chartSummary: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.textSecondary, marginTop: 12, lineHeight: 18 },
+  chartBold: { fontFamily: fontFamily.semiBold, color: colors.text },
+
+  // Step 4
+  publishWrap: { paddingTop: spacing.lg, alignItems: 'center' },
+  publishHeadline: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text, marginBottom: 6, textAlign: 'center' },
+  publishSub: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.xl },
+
+  summaryCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    width: '100%',
+    gap: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    marginBottom: spacing.xl,
+  },
+  summaryThumb: { width: 80, height: 100, borderRadius: 10, backgroundColor: colors.surfaceHigh },
+  summaryThumbFallback: { justifyContent: 'center', alignItems: 'center' },
+  summaryInfo: { flex: 1, justifyContent: 'space-between' },
+  summaryTitle: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text, lineHeight: 20 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  summaryPrice: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.primary },
+  summaryFloor: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.textSecondary },
+  summaryBadge: { alignSelf: 'flex-start', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, marginTop: 8 },
+  summaryBadgeText: { fontFamily: fontFamily.semiBold, fontSize: 11 },
+
+  publishBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: 56,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  publishLoading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  publishBtnText: { fontFamily: fontFamily.bold, fontSize: 17, color: '#0F0F0F' },
+  publishDisclaimer: {
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: spacing.lg,
+  },
+
+  // Success
+  successWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg, gap: 16 },
+  successCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 40,
   },
-  publishText: {
-    color: '#0F0F0F',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  successTitle: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
+  successSub: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
 })
