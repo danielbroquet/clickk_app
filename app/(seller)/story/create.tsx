@@ -332,8 +332,7 @@ export default function CreateDropScreen() {
       }
 
       const categoryValue = category || 'autre'
-      console.log('[create drop] category value:', categoryValue)
-      const { error: insertError } = await supabase.from('stories').insert({
+      const insertPayload = {
         seller_id: user.id,
         video_url: publicUrl,
         thumbnail_url: thumbnailPublicUrl,
@@ -349,7 +348,9 @@ export default function CreateDropScreen() {
         duration_hours: durationHours,
         expires_at: new Date(Date.now() + durationMs).toISOString(),
         status: 'active',
-      })
+      }
+      console.log('[create drop] full insert payload:', JSON.stringify(insertPayload, null, 2))
+      const { error: insertError } = await supabase.from('stories').insert(insertPayload)
       if (insertError) throw insertError
 
       setLoading(false)
