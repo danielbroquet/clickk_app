@@ -9,6 +9,10 @@ import {
   ActivityIndicator,
   Dimensions,
   StyleSheet,
+  Alert,
+  ActionSheetIOS,
+  Modal,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -18,6 +22,7 @@ import { useAuth } from '../../lib/auth'
 import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
+import ReportModal from '../../components/ui/ReportModal'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const LISTING_CELL = Math.floor((SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2)
@@ -52,6 +57,44 @@ interface Listing {
   price_chf: number
   category: string | null
   condition: string | null
+}
+
+// ─── useBlock hook ────────────────────────────────────────────────────────────
+
+const useBlock = (currentUserId: string, targetUserId: string) => {
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!currentUserId || !targetUserId) return
+    supabase
+      .from('user_blocks')
+      .select('id')
+      .eq('blocker_id', currentUserId)
+      .eq('blocked_id', targetUserId)
+      .maybeSingle()
+      .then(({ data }) => setIsBlocked(!!data))
+  }, [currentUserId, targetUserId])
+
+  const toggleBlock = async () => {
+    setLoading(true)
+    if (isBlocked) {
+      await supabase
+        .from('user_blocks')
+        .delete()
+        .eq('blocker_id', currentUserId)
+        .eq('blocked_id', targetUserId)
+      setIsBlocked(false)
+    } else {
+      await supabase
+        .from('user_blocks')
+        .insert({ blocker_id: currentUserId, blocked_id: targetUserId })
+      setIsBlocked(true)
+    }
+    setLoading(false)
+  }
+
+  return { isBlocked, toggleBlock, loading }
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -115,8 +158,11 @@ export default function PublicProfileScreen() {
   const [loading, setLoading]   = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [chatLoading, setChatLoading] = useState(false)
+  const [menuVisible, setMenuVisible] = useState(false)
+  const [reportUserVisible, setReportUserVisible] = useState(false)
 
   const { isFollowing, followersCount, toggleFollow, loading: followLoading } = useFollow(id ?? '')
+  const { isBlocked, toggleBlock, loading: blockLoading } = useBlock(currentUserId, id ?? '')
 
   // Redirect to own profile tab
   useEffect(() => {
@@ -174,6 +220,46 @@ export default function PublicProfileScreen() {
     }
   }, [id, currentUserId])
 
+  const handleMenuPress = () => {
+    if (Platform.OS === 'ios') {
+      if (isBlocked) {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: ['Débloquer cet utilisateur', 'Annuler'],
+            cancelButtonIndex: 1,
+          },
+          (buttonIndex) => {
+            if (buttonIndex === 0) toggleBlock()
+          }
+        )
+      } else {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: ['Signaler cet utilisateur', 'Bloquer cet utilisateur', 'Annuler'],
+            cancelButtonIndex: 2,
+            destructiveButtonIndex: 1,
+          },
+          (buttonIndex) => {
+            if (buttonIndex === 0) {
+              setReportUserVisible(true)
+            } else if (buttonIndex === 1) {
+              Alert.alert(
+                'Bloquer cet utilisateur ?',
+                'Il ne pourra plus voir votre profil ni vous envoyer de messages. Vous ne verrez plus son contenu dans le feed.',
+                [
+                  { text: 'Annuler', style: 'cancel' },
+                  { text: 'Bloquer', style: 'destructive', onPress: toggleBlock },
+                ]
+              )
+            }
+          }
+        )
+      }
+    } else {
+      setMenuVisible(true)
+    }
+  }
+
   // ── Loading / error states ─────────────────────────────────────────────────
 
   if (loading) {
@@ -205,6 +291,44 @@ export default function PublicProfileScreen() {
   const displayName = profile.display_name ?? profile.username
   const initial     = displayName.charAt(0).toUpperCase()
 
+  // ── Blocked state ──────────────────────────────────────────────────────────
+
+  if (isBlocked) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.menuBtn} onPress={handleMenuPress}>
+          <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <View style={styles.centered}>
+          <Ionicons name="ban-outline" size={48} color={colors.textSecondary} />
+          <Text style={styles.blockedUsername}>@{profile.username}</Text>
+          <Text style={styles.blockedMessage}>Vous avez bloqué cet utilisateur</Text>
+          <TouchableOpacity
+            onPress={toggleBlock}
+            disabled={blockLoading}
+            style={styles.unblockLink}
+          >
+            {blockLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.unblockLinkText}>Débloquer</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <ReportModal
+          visible={reportUserVisible}
+          onClose={() => setReportUserVisible(false)}
+          targetType="user"
+          targetId={id ?? ''}
+        />
+      </SafeAreaView>
+    )
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -212,6 +336,11 @@ export default function PublicProfileScreen() {
       {/* Floating back */}
       <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color={colors.text} />
+      </TouchableOpacity>
+
+      {/* Menu button */}
+      <TouchableOpacity style={styles.menuBtn} onPress={handleMenuPress}>
+        <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -312,6 +441,76 @@ export default function PublicProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Android/web action sheet fallback */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetBackdrop}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}
+        />
+        <View style={styles.actionSheet}>
+          <View style={styles.sheetHandle} />
+          {!isBlocked && (
+            <TouchableOpacity
+              style={styles.sheetOption}
+              onPress={() => {
+                setMenuVisible(false)
+                setReportUserVisible(true)
+              }}
+            >
+              <Ionicons name="flag-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.sheetOptionText}>Signaler cet utilisateur</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.sheetOption}
+            onPress={() => {
+              setMenuVisible(false)
+              if (isBlocked) {
+                toggleBlock()
+              } else {
+                Alert.alert(
+                  'Bloquer cet utilisateur ?',
+                  'Il ne pourra plus voir votre profil ni vous envoyer de messages. Vous ne verrez plus son contenu dans le feed.',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    { text: 'Bloquer', style: 'destructive', onPress: toggleBlock },
+                  ]
+                )
+              }
+            }}
+          >
+            <Ionicons
+              name={isBlocked ? 'checkmark-circle-outline' : 'ban-outline'}
+              size={20}
+              color={isBlocked ? colors.primary : colors.error}
+            />
+            <Text style={[styles.sheetOptionText, !isBlocked && { color: colors.error }]}>
+              {isBlocked ? 'Débloquer cet utilisateur' : 'Bloquer cet utilisateur'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sheetOption, styles.sheetCancel]}
+            onPress={() => setMenuVisible(false)}
+          >
+            <Text style={styles.sheetCancelText}>Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      <ReportModal
+        visible={reportUserVisible}
+        onClose={() => setReportUserVisible(false)}
+        targetType="user"
+        targetId={id ?? ''}
+      />
     </SafeAreaView>
   )
 }
@@ -333,6 +532,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     alignSelf: 'flex-start',
+  },
+
+  menuBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+    zIndex: 10,
+  },
+
+  // ── Blocked state ─────────────────────────────────────────────────────────
+  blockedUsername: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.body,
+    color: colors.textSecondary,
+    marginTop: spacing.md,
+  },
+  blockedMessage: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.body,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  unblockLink: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  unblockLinkText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.body,
+    color: colors.primary,
   },
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -544,5 +776,55 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.medium,
     fontSize: fontSize.body,
     color: colors.textSecondary,
+  },
+
+  // ── Action sheet (Android/web) ────────────────────────────────────────────
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  actionSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingTop: 12,
+    paddingBottom: 40,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+  },
+  sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetOptionText: {
+    fontFamily: fontFamily.medium,
+    fontSize: fontSize.body,
+    color: colors.text,
+  },
+  sheetCancel: {
+    borderBottomWidth: 0,
+    justifyContent: 'center',
+    marginTop: spacing.sm,
+  },
+  sheetCancelText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: fontSize.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 })

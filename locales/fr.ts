@@ -85,6 +85,12 @@ export default {
     sign_out: 'Se déconnecter',
     new_story: 'Nouvelle',
     no_publications: 'Aucune publication',
+    block: 'Bloquer',
+    unblock: 'Débloquer',
+    block_confirm_title: 'Bloquer cet utilisateur ?',
+    block_confirm_message: 'Il ne pourra plus voir votre profil ni vous envoyer de messages. Vous ne verrez plus son contenu dans le feed.',
+    blocked_message: 'Vous avez bloqué cet utilisateur',
+    report_user: 'Signaler cet utilisateur',
   },
   discover: {
     title: 'Découvrir',

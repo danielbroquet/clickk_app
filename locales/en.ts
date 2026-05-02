@@ -85,6 +85,12 @@ export default {
     sign_out: 'Sign out',
     new_story: 'New',
     no_publications: 'No publications',
+    block: 'Block',
+    unblock: 'Unblock',
+    block_confirm_title: 'Block this user?',
+    block_confirm_message: 'They will no longer be able to see your profile or send you messages. You will no longer see their content in the feed.',
+    blocked_message: 'You have blocked this user',
+    report_user: 'Report this user',
   },
   discover: {
     title: 'Discover',
