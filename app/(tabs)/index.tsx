@@ -30,6 +30,7 @@ import Animated, {
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
+import { useWatchlist } from '../../hooks/useWatchlist'
 import ReportModal from '../../components/ui/ReportModal'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -116,9 +117,8 @@ function DropItem({
   const videoRef = useRef<Video>(null)
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
-  const [liked, setLiked] = useState(false)
-  const [likeCount, setLikeCount] = useState(() => Math.floor(Math.random() * 200) + 10)
   const [watching] = useState(() => Math.floor(Math.random() * 80) + 5)
+  const { isWatchlisted, watchlistCount, toggleWatchlist } = useWatchlist(story.id)
   const [menuVisible, setMenuVisible] = useState(false)
   const [reportVisible, setReportVisible] = useState(false)
   const [buyVisible, setBuyVisible] = useState(false)
@@ -194,13 +194,6 @@ function DropItem({
       clearTimeout(longPressTimer.current)
       longPressTimer.current = null
     }
-  }
-
-  const toggleLike = () => {
-    setLiked((v) => {
-      setLikeCount((c) => c + (v ? -1 : 1))
-      return !v
-    })
   }
 
   const openMenu = () => {
@@ -294,14 +287,14 @@ function DropItem({
       </TouchableOpacity>
 
       <View style={styles.actionsCol}>
-        <TouchableOpacity style={styles.actionBtn} onPress={toggleLike} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.actionBtn} onPress={toggleWatchlist} activeOpacity={0.7}>
           <Ionicons
-            name={liked ? 'heart' : 'heart-outline'}
+            name={isWatchlisted ? 'heart' : 'heart-outline'}
             size={26}
-            color={liked ? '#FF4757' : '#FFFFFF'}
+            color={isWatchlisted ? '#FF4757' : '#FFFFFF'}
           />
         </TouchableOpacity>
-        <Text style={styles.actionCount}>{likeCount}</Text>
+        <Text style={styles.actionCount}>{watchlistCount > 0 ? watchlistCount : ''}</Text>
 
         <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
           <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />

@@ -115,6 +115,11 @@ export default {
     option_story_title: 'Crea un Drop',
     option_story_sub: 'Asta olandese — prezzo decrescente',
   },
+  watchlist: {
+    title: 'La mia watchlist',
+    empty_title: 'Nessun drop salvato',
+    empty_message: 'Tocca ♡ per seguire un\'asta.',
+  },
   report: {
     title: 'Segnala',
     subtitle: 'Perché stai segnalando questo contenuto?',

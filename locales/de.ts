@@ -115,6 +115,11 @@ export default {
     option_story_title: 'Drop erstellen',
     option_story_sub: 'Holländische Auktion — fallender Preis',
   },
+  watchlist: {
+    title: 'Meine Watchlist',
+    empty_title: 'Keine gespeicherten Drops',
+    empty_message: 'Tippe auf ♡ um einer Auktion zu folgen.',
+  },
   report: {
     title: 'Melden',
     subtitle: 'Warum meldest du diesen Inhalt?',

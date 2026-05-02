@@ -74,15 +74,16 @@ export default function TabLayout() {
           name="inbox"
           options={{
             title: 'Inbox',
+            href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="watchlist"
+          options={{
+            title: 'Watchlist',
             tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={22} color={color} />
+              <Ionicons name={focused ? 'heart' : 'heart-outline'} size={22} color={color} />
             ),
-            tabBarBadge: totalInboxBadge > 0 ? totalInboxBadge : undefined,
-            tabBarBadgeStyle: {
-              backgroundColor: '#00D2B8',
-              color: '#0F0F0F',
-              fontSize: 10,
-            },
           }}
         />
         <Tabs.Screen

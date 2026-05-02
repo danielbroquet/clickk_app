@@ -115,6 +115,11 @@ export default {
     option_story_title: 'Créer un Drop',
     option_story_sub: 'Enchère hollandaise — prix descendant',
   },
+  watchlist: {
+    title: 'Ma watchlist',
+    empty_title: 'Aucun drop sauvegardé',
+    empty_message: 'Tap sur ♡ pour suivre une enchère.',
+  },
   report: {
     title: 'Signaler',
     subtitle: 'Pourquoi signalez-vous ce contenu ?',
