@@ -55,8 +55,15 @@ const PRESETS: { key: SpeedPreset; emoji: string; label: string; tagline: string
   { key: 'RELAX',    emoji: '🌙', label: 'RELAX',    tagline: '7 jours · lente'      },
 ]
 
-const CATEGORIES = [
-  'Sneakers', 'Mode', 'Tech', 'Montres', 'Art', 'Sport', 'Maison', 'Autre',
+const CATEGORIES: { label: string; value: string }[] = [
+  { label: 'Sneakers', value: 'sneakers' },
+  { label: 'Mode',     value: 'mode'     },
+  { label: 'Tech',     value: 'tech'     },
+  { label: 'Montres',  value: 'watches'  },
+  { label: 'Art',      value: 'art'      },
+  { label: 'Sport',    value: 'sport'    },
+  { label: 'Maison',   value: 'maison'   },
+  { label: 'Autre',    value: 'autre'    },
 ]
 
 const PRESET_ACCENT: Record<SpeedPreset, string> = {
@@ -172,7 +179,7 @@ function CategoryPicker({
     <>
       <TouchableOpacity style={s.catTrigger} onPress={() => setOpen(true)} activeOpacity={0.8}>
         <Text style={[s.catTriggerText, !value && { color: colors.textSecondary }]}>
-          {value || 'Choisir une catégorie'}
+          {CATEGORIES.find((c) => c.value === value)?.label ?? 'Choisir une catégorie'}
         </Text>
         <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -183,12 +190,12 @@ function CategoryPicker({
           <Text style={s.catSheetTitle}>Catégorie</Text>
           {CATEGORIES.map((c) => (
             <TouchableOpacity
-              key={c}
-              style={[s.catItem, value === c && s.catItemActive]}
-              onPress={() => { onChange(c); setOpen(false) }}
+              key={c.value}
+              style={[s.catItem, value === c.value && s.catItemActive]}
+              onPress={() => { onChange(c.value); setOpen(false) }}
             >
-              <Text style={[s.catItemText, value === c && s.catItemTextActive]}>{c}</Text>
-              {value === c && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+              <Text style={[s.catItemText, value === c.value && s.catItemTextActive]}>{c.label}</Text>
+              {value === c.value && <Ionicons name="checkmark" size={18} color={colors.primary} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -330,7 +337,7 @@ export default function CreateDropScreen() {
         thumbnail_url: thumbnailPublicUrl,
         title: title.trim(),
         description: description.trim() || null,
-        category: category || null,
+        category: category || 'autre',
         start_price_chf: sp,
         floor_price_chf: fp,
         current_price_chf: sp,
