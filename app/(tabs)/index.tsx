@@ -18,7 +18,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -103,11 +103,13 @@ function LivePill() {
 function DropItem({
   story,
   active,
+  tabFocused,
   onSwipeDown,
   currentUserId,
 }: {
   story: FeedStory
   active: boolean
+  tabFocused: boolean
   onSwipeDown: () => void
   currentUserId: string
 }) {
@@ -124,11 +126,12 @@ function DropItem({
 
   const [price, setPrice] = useState(() => computePrice(story))
   const [progress, setProgress] = useState(() => computeProgress(story))
+  const [localSold, setLocalSold] = useState(false)
 
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
 
   const isSeller = currentUserId === story.seller_id
-  const isSold = story.status === 'sold' || story.buyer_id !== null
+  const isSold = localSold || story.status === 'sold' || story.buyer_id !== null
   const disabled = isSeller || story.status !== 'active' || isSold
 
   useEffect(() => {
@@ -144,12 +147,12 @@ function DropItem({
 
   useEffect(() => {
     if (!videoRef.current) return
-    if (active && !paused && !buyVisible) {
+    if (active && tabFocused && !paused && !buyVisible) {
       videoRef.current.playAsync().catch(() => {})
     } else {
       videoRef.current.pauseAsync().catch(() => {})
     }
-  }, [active, paused, buyVisible])
+  }, [active, tabFocused, paused, buyVisible])
 
   const pulse = useSharedValue(1)
   useEffect(() => {
@@ -227,6 +230,7 @@ function DropItem({
   const confirmBuy = async () => {
     await handlePurchase(story.id, snapshotPrice, () => {
       setBuyVisible(false)
+      setLocalSold(true)
       Alert.alert('Achat confirmé !', '', [{ text: 'OK' }])
     })
   }
@@ -262,7 +266,7 @@ function DropItem({
         resizeMode={ResizeMode.COVER}
         isLooping
         isMuted={muted}
-        shouldPlay={active && !paused && !buyVisible}
+        shouldPlay={active && tabFocused && !paused && !buyVisible}
         posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
         usePoster={!!story.thumbnail_url}
       />
@@ -451,7 +455,15 @@ export default function FeedScreen() {
   const [stories, setStories] = useState<FeedStory[]>([])
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [tabFocused, setTabFocused] = useState(true)
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 })
+
+  useFocusEffect(
+    useCallback(() => {
+      setTabFocused(true)
+      return () => setTabFocused(false)
+    }, [])
+  )
 
   const fetchStories = useCallback(async () => {
     const { data, error } = await supabase
@@ -493,11 +505,12 @@ export default function FeedScreen() {
       <DropItem
         story={item}
         active={index === activeIndex}
+        tabFocused={tabFocused}
         onSwipeDown={handleSwipeDown}
         currentUserId={currentUserId}
       />
     ),
-    [activeIndex, currentUserId, handleSwipeDown]
+    [activeIndex, tabFocused, currentUserId, handleSwipeDown]
   )
 
   const getItemLayout = useCallback(
