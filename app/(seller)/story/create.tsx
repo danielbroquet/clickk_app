@@ -216,6 +216,7 @@ export default function CreateDropScreen() {
   // Step 1
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
+  const [videoDurationSeconds, setVideoDurationSeconds] = useState<number>(30)
 
   // Step 2
   const [title, setTitle] = useState('')
@@ -246,9 +247,14 @@ export default function CreateDropScreen() {
     } catch { return null }
   }
 
-  const handleVideoSelected = async (uri: string) => {
-    setVideoUri(uri)
-    const thumb = await generateThumbnail(uri)
+  const handleVideoSelected = async (asset: ImagePicker.ImagePickerAsset) => {
+    setVideoUri(asset.uri)
+    const durationMs = asset.duration ?? null
+    const durationSec = durationMs != null && durationMs > 0
+      ? Math.min(Math.max(Math.round(durationMs / 1000), 1), 30)
+      : 30
+    setVideoDurationSeconds(durationSec)
+    const thumb = await generateThumbnail(asset.uri)
     setThumbnailUri(thumb)
   }
 
@@ -264,7 +270,7 @@ export default function CreateDropScreen() {
       videoMaxDuration: 60,
       quality: 1,
     })
-    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0].uri)
+    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
 
   const launchGallery = async () => {
@@ -274,7 +280,7 @@ export default function CreateDropScreen() {
       videoMaxDuration: 60,
       quality: 1,
     })
-    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0].uri)
+    if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
 
   // ── navigation ─────────────────────────────────────────────────────────────
@@ -339,6 +345,7 @@ export default function CreateDropScreen() {
         title: title.trim(),
         description: description.trim() || null,
         category: categoryValue,
+        video_duration_seconds: Math.min(Math.max(Math.round(videoDurationSeconds), 1), 30),
         start_price_chf: sp,
         floor_price_chf: fp,
         current_price_chf: sp,
@@ -414,7 +421,7 @@ export default function CreateDropScreen() {
               thumbnailUri={thumbnailUri}
               onCamera={launchCamera}
               onGallery={launchGallery}
-              onClear={() => { setVideoUri(null); setThumbnailUri(null) }}
+              onClear={() => { setVideoUri(null); setThumbnailUri(null); setVideoDurationSeconds(30) }}
             />
           )}
           {step === 2 && (
