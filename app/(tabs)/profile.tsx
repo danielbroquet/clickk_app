@@ -46,6 +46,8 @@ type DropCell = {
   status: string
   buyer_id?: string | null
   updated_at?: string | null
+  archived_at?: string | null
+  title?: string | null
 }
 
 // ── Grid cell ────────────────────────────────────────────────────────────────
@@ -552,13 +554,175 @@ const sheetStyles = StyleSheet.create({
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
-type TabKey = 'drops' | 'achats'
+type TabKey = 'drops' | 'archive' | 'achats'
+
+function daysLeftBeforeDeletion(archivedAt: string | null | undefined): number {
+  if (!archivedAt) return 7
+  const ms = new Date(archivedAt).getTime() + 7 * 24 * 3600 * 1000 - Date.now()
+  return Math.max(0, Math.ceil(ms / (24 * 3600 * 1000)))
+}
+
+function ArchiveCell({
+  drop,
+  onRelaunch,
+  onDelete,
+}: {
+  drop: DropCell
+  onRelaunch: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const thumb = drop.thumbnail_url ?? drop.video_url
+  const daysLeft = daysLeftBeforeDeletion(drop.archived_at)
+
+  const handleDelete = () => {
+    Alert.alert(
+      'Supprimer définitivement ?',
+      'Ce drop sera supprimé immédiatement et définitivement.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+      ],
+    )
+  }
+
+  return (
+    <View style={archiveStyles.card}>
+      <View style={archiveStyles.media}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={archiveStyles.thumb} />
+        ) : (
+          <View style={[archiveStyles.thumb, archiveStyles.placeholder]}>
+            <Ionicons name="videocam-outline" size={24} color={colors.border} />
+          </View>
+        )}
+        <View style={archiveStyles.expiredBadge}>
+          <Text style={archiveStyles.expiredBadgeText}>Expiré</Text>
+        </View>
+      </View>
+
+      <View style={archiveStyles.body}>
+        <Text style={archiveStyles.title} numberOfLines={2}>
+          {drop.title || 'Drop sans titre'}
+        </Text>
+        <View style={archiveStyles.metaRow}>
+          <Ionicons name="time-outline" size={12} color={colors.warning} />
+          <Text style={archiveStyles.metaText}>
+            Supprimé dans {daysLeft} jour{daysLeft > 1 ? 's' : ''}
+          </Text>
+        </View>
+
+        <View style={archiveStyles.actions}>
+          <TouchableOpacity
+            style={archiveStyles.relaunchBtn}
+            onPress={() => onRelaunch(drop.id)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="refresh" size={14} color="#0F0F0F" />
+            <Text style={archiveStyles.relaunchText}>Relancer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={archiveStyles.trashBtn}
+            onPress={handleDelete}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  )
+}
+
+const archiveStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    marginBottom: 10,
+  },
+  media: { width: 100, height: 120, position: 'relative' },
+  thumb: { width: 100, height: 120 },
+  placeholder: {
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  expiredBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  expiredBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: fontFamily.semiBold,
+  },
+  body: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  metaText: {
+    fontSize: 11,
+    color: colors.warning,
+    fontFamily: fontFamily.medium,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  relaunchBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    height: 32,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  relaunchText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    color: '#0F0F0F',
+  },
+  trashBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,71,87,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+})
 
 export default function ProfileScreen() {
   const { profile, session, refreshProfile } = useAuth()
   const [dropsCount, setDropsCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
   const [ownDrops, setOwnDrops] = useState<DropCell[]>([])
+  const [archivedDrops, setArchivedDrops] = useState<DropCell[]>([])
   const [purchases, setPurchases] = useState<DropCell[]>([])
   const [editVisible, setEditVisible] = useState(false)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
@@ -586,11 +750,21 @@ export default function ProfileScreen() {
 
     supabase
       .from('stories')
-      .select('id, thumbnail_url, video_url, current_price_chf, status')
+      .select('id, thumbnail_url, video_url, current_price_chf, status, title')
       .eq('seller_id', currentUserId)
+      .neq('status', 'expired')
       .order('created_at', { ascending: false })
       .limit(60)
       .then(({ data }) => setOwnDrops((data ?? []) as DropCell[]))
+
+    supabase
+      .from('stories')
+      .select('id, thumbnail_url, video_url, current_price_chf, status, title, archived_at')
+      .eq('seller_id', currentUserId)
+      .eq('status', 'expired')
+      .order('archived_at', { ascending: false })
+      .limit(60)
+      .then(({ data }) => setArchivedDrops((data ?? []) as DropCell[]))
 
     supabase
       .from('stories')
@@ -618,11 +792,29 @@ export default function ProfileScreen() {
   }
 
   const handleDeleteDrop = async (dropId: string) => {
-    // Optimistic remove
+    // Optimistic remove from active grid; the trigger sets archived_at
     setOwnDrops(prev => prev.filter(d => d.id !== dropId))
-    await supabase
+    const { data } = await supabase
       .from('stories')
       .update({ status: 'expired' })
+      .eq('id', dropId)
+      .eq('seller_id', currentUserId)
+      .select('id, thumbnail_url, video_url, current_price_chf, status, title, archived_at')
+      .maybeSingle()
+    if (data) {
+      setArchivedDrops(prev => [data as DropCell, ...prev])
+    }
+  }
+
+  const handleRelaunchDrop = (dropId: string) => {
+    router.push({ pathname: '/story/create', params: { relaunchId: dropId } })
+  }
+
+  const handleHardDeleteArchived = async (dropId: string) => {
+    setArchivedDrops(prev => prev.filter(d => d.id !== dropId))
+    await supabase
+      .from('stories')
+      .delete()
       .eq('id', dropId)
       .eq('seller_id', currentUserId)
   }
@@ -785,6 +977,21 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
+            style={[styles.tabItem, activeTab === 'archive' && styles.tabItemActive]}
+            onPress={() => setActiveTab('archive')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="archive-outline"
+              size={20}
+              color={activeTab === 'archive' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'archive' && styles.tabLabelActive]}>
+              Archive{archivedDrops.length > 0 ? ` (${archivedDrops.length})` : ''}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={[styles.tabItem, activeTab === 'achats' && styles.tabItemActive]}
             onPress={() => setActiveTab('achats')}
             activeOpacity={0.8}
@@ -825,6 +1032,27 @@ export default function ProfileScreen() {
                   editMode={editMode}
                   onLongPress={handleEnterEditMode}
                   onDelete={handleDeleteDrop}
+                />
+              ))}
+            </View>
+          )
+        ) : activeTab === 'archive' ? (
+          archivedDrops.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="archive-outline" size={48} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>Aucun drop archivé</Text>
+              <Text style={styles.emptyHint}>
+                Les drops expirés apparaîtront ici pendant 7 jours avant suppression définitive.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.archiveList}>
+              {archivedDrops.map(drop => (
+                <ArchiveCell
+                  key={drop.id}
+                  drop={drop}
+                  onRelaunch={handleRelaunchDrop}
+                  onDelete={handleHardDeleteArchived}
                 />
               ))}
             </View>
@@ -1054,6 +1282,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   emptyTitle: { fontSize: 14, color: colors.textSecondary },
+  emptyHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    lineHeight: 17,
+    marginTop: 4,
+  },
+  archiveList: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+  },
   emptyCta: {
     backgroundColor: colors.primary,
     paddingHorizontal: 20,

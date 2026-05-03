@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Video, ResizeMode } from 'expo-av'
@@ -37,8 +37,10 @@ type DropInterval = 30 | 60 | 120
 type DurationHours = 24 | 72 | 168
 
 export default function CreateStoryScreen() {
+  const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
   const [step, setStep] = useState<Step>(1)
   const [videoUri, setVideoUri] = useState<string | null>(null)
+  const [reusedVideoUrl, setReusedVideoUrl] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [startPrice, setStartPrice] = useState('')
@@ -49,12 +51,41 @@ export default function CreateStoryScreen() {
   const [publishing, setPublishing] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [userId, setUserId] = useState<string | null>(null)
+  const [prefilling, setPrefilling] = useState(!!relaunchId)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) =>
       setUserId(data.user?.id ?? null)
     )
   }, [])
+
+  useEffect(() => {
+    if (!relaunchId) return
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('stories')
+        .select('title, description, video_url, start_price_chf, floor_price_chf, speed_preset, duration_hours')
+        .eq('id', relaunchId)
+        .maybeSingle()
+      if (cancelled || !data) { setPrefilling(false); return }
+      setTitle(data.title ?? '')
+      setDescription(data.description ?? '')
+      setStartPrice(String(data.start_price_chf ?? ''))
+      setFloorPrice(String(data.floor_price_chf ?? ''))
+      if (data.speed_preset) setSpeedPreset(data.speed_preset as SpeedPreset)
+      if (data.duration_hours) {
+        const dh = data.duration_hours as number
+        if (dh === 24 || dh === 72 || dh === 168) setDurationHours(dh as DurationHours)
+      }
+      if (data.video_url) {
+        setReusedVideoUrl(data.video_url)
+        setVideoUri(data.video_url)
+      }
+      setPrefilling(false)
+    })()
+    return () => { cancelled = true }
+  }, [relaunchId])
 
   const pickVideo = async (fromCamera = false) => {
     const opts: ImagePicker.ImagePickerOptions = {
@@ -70,6 +101,7 @@ export default function CreateStoryScreen() {
 
     if (!result.canceled && result.assets[0]) {
       setVideoUri(result.assets[0].uri)
+      setReusedVideoUrl(null)
       setErrors(e => ({ ...e, video: '' }))
     }
   }
@@ -110,25 +142,33 @@ export default function CreateStoryScreen() {
     setErrors(e => ({ ...e, publish: '' }))
 
     try {
-      const path = `${userId}/${Date.now()}.mp4`
-      let localUri = videoUri
-      if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
-        const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
-        await FileSystem.copyAsync({ from: localUri, to: cacheUri })
-        localUri = cacheUri
+      let publicUrl: string
+
+      // If the user kept the original video from a relaunch, reuse its URL
+      if (reusedVideoUrl && videoUri === reusedVideoUrl) {
+        publicUrl = reusedVideoUrl
+      } else {
+        const path = `${userId}/${Date.now()}.mp4`
+        let localUri = videoUri
+        if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
+          const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
+          await FileSystem.copyAsync({ from: localUri, to: cacheUri })
+          localUri = cacheUri
+        }
+        const base64 = await FileSystem.readAsStringAsync(localUri, {
+          encoding: 'base64',
+        })
+        const { error: uploadError } = await supabase.storage
+          .from('stories')
+          .upload(path, decode(base64), { contentType: 'video/mp4' })
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl: newUrl } } = supabase.storage
+          .from('stories')
+          .getPublicUrl(path)
+        publicUrl = newUrl
       }
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
-        encoding: 'base64',
-      })
-      const { error: uploadError } = await supabase.storage
-        .from('stories')
-        .upload(path, decode(base64), { contentType: 'video/mp4' })
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('stories')
-        .getPublicUrl(path)
 
       const expiresAt = new Date(
         Date.now() + durationHours * 60 * 60 * 1000
@@ -151,6 +191,16 @@ export default function CreateStoryScreen() {
       })
 
       if (insertError) throw insertError
+
+      // If this was a relaunch, hard-delete the old archived drop
+      if (relaunchId) {
+        await supabase
+          .from('stories')
+          .delete()
+          .eq('id', relaunchId)
+          .eq('seller_id', userId)
+          .eq('status', 'expired')
+      }
 
       router.replace('/(tabs)/index')
     } catch (err: any) {
