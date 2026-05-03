@@ -41,6 +41,28 @@ interface StorySale {
   buyer: { id: string; username: string; avatar_url: string | null } | null
 }
 
+interface ArchivedDrop {
+  id: string
+  title: string | null
+  thumbnail_url: string | null
+  video_url: string | null
+  current_price_chf: number
+  start_price_chf: number | null
+  floor_price_chf: number | null
+  archived_at: string | null
+  status: string
+}
+
+type ScreenTab = 'ventes' | 'archive'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function daysLeft(archivedAt: string | null | undefined): number {
+  if (!archivedAt) return 7
+  const ms = new Date(archivedAt).getTime() + 7 * 24 * 3600 * 1000 - Date.now()
+  return Math.max(0, Math.ceil(ms / (24 * 3600 * 1000)))
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 function useToast() {
@@ -258,13 +280,169 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// ─── Archive card ─────────────────────────────────────────────────────────────
+
+function ArchiveCard({
+  drop,
+  onRelaunch,
+  onDelete,
+}: {
+  drop: ArchivedDrop
+  onRelaunch: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  const thumb = drop.thumbnail_url ?? drop.video_url
+  const days = daysLeft(drop.archived_at)
+
+  const confirmDelete = () =>
+    Alert.alert('Supprimer définitivement ?', 'Ce drop sera supprimé immédiatement.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+    ])
+
+  return (
+    <View style={archiveStyles.card}>
+      <View style={archiveStyles.media}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={archiveStyles.thumb} />
+        ) : (
+          <View style={[archiveStyles.thumb, archiveStyles.placeholder]}>
+            <Ionicons name="videocam-outline" size={22} color={colors.border} />
+          </View>
+        )}
+      </View>
+
+      <View style={archiveStyles.body}>
+        <Text style={archiveStyles.title} numberOfLines={2}>
+          {drop.title || 'Drop sans titre'}
+        </Text>
+
+        <View style={archiveStyles.priceRow}>
+          <Text style={archiveStyles.price}>
+            CHF {Number(drop.current_price_chf).toFixed(0)}
+          </Text>
+          <View style={archiveStyles.expiryBadge}>
+            <Ionicons name="time-outline" size={11} color={colors.warning} />
+            <Text style={archiveStyles.expiryText}>
+              {days}j restant{days > 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+
+        <View style={archiveStyles.actions}>
+          <TouchableOpacity
+            style={archiveStyles.relaunchBtn}
+            onPress={() => onRelaunch(drop.id)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="refresh" size={14} color="#0F0F0F" />
+            <Text style={archiveStyles.relaunchText}>Relancer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={archiveStyles.trashBtn}
+            onPress={confirmDelete}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  )
+}
+
+const archiveStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  media: { width: 90, height: 110 },
+  thumb: { width: 90, height: 110, resizeMode: 'cover' },
+  placeholder: {
+    backgroundColor: colors.surfaceHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  body: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  price: {
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
+    color: colors.primary,
+  },
+  expiryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  expiryText: {
+    fontSize: 10,
+    color: colors.warning,
+    fontFamily: fontFamily.semiBold,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  relaunchBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 32,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+  },
+  relaunchText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    color: '#0F0F0F',
+  },
+  trashBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+})
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SalesScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
 
+  const [activeTab, setActiveTab] = useState<ScreenTab>('ventes')
   const [sales, setSales] = useState<StorySale[]>([])
+  const [archived, setArchived] = useState<ArchivedDrop[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [shipModal, setShipModal] = useState<{ id: string; title: string } | null>(null)
@@ -272,30 +450,37 @@ export default function SalesScreen() {
 
   const fetchSales = useCallback(async () => {
     if (!currentUserId) return
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('stories')
       .select('id, title, thumbnail_url, video_url, final_price_chf, status, tracking_number, shipped_at, delivered_at, created_at, buyer_id, buyer:profiles!buyer_id(id, username, avatar_url)')
       .eq('seller_id', currentUserId)
       .in('status', ['sold', 'shipped', 'delivered'])
       .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('[fetchSales] failed:', error)
-      return
-    }
     setSales((data ?? []) as unknown as StorySale[])
+  }, [currentUserId])
+
+  const fetchArchived = useCallback(async () => {
+    if (!currentUserId) return
+    const { data } = await supabase
+      .from('stories')
+      .select('id, title, thumbnail_url, video_url, current_price_chf, start_price_chf, floor_price_chf, archived_at, status')
+      .eq('seller_id', currentUserId)
+      .eq('status', 'expired')
+      .order('archived_at', { ascending: false })
+      .limit(60)
+    setArchived((data ?? []) as ArchivedDrop[])
   }, [currentUserId])
 
   useEffect(() => {
     setLoading(true)
-    fetchSales().finally(() => setLoading(false))
-  }, [fetchSales])
+    Promise.all([fetchSales(), fetchArchived()]).finally(() => setLoading(false))
+  }, [fetchSales, fetchArchived])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
-    await fetchSales()
+    await Promise.all([fetchSales(), fetchArchived()])
     setRefreshing(false)
-  }, [fetchSales])
+  }, [fetchSales, fetchArchived])
 
   const handleMessage = useCallback(
     async (buyerId: string | null) => {
@@ -310,21 +495,59 @@ export default function SalesScreen() {
     [currentUserId, show],
   )
 
+  const handleRelaunch = useCallback((dropId: string) => {
+    router.push({ pathname: '/story/create', params: { relaunchId: dropId } })
+  }, [])
+
+  const handleHardDelete = useCallback(async (dropId: string) => {
+    setArchived(prev => prev.filter(d => d.id !== dropId))
+    await supabase
+      .from('stories')
+      .delete()
+      .eq('id', dropId)
+      .eq('seller_id', currentUserId)
+    show('Drop supprimé')
+  }, [currentUserId, show])
+
   return (
     <SafeAreaView style={salesStyles.safe} edges={['top']}>
       <View style={salesStyles.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={salesStyles.headerTitle}>Mes ventes</Text>
+        <Text style={salesStyles.headerTitle}>
+          {activeTab === 'ventes' ? 'Mes ventes' : 'Archive'}
+        </Text>
         <View style={{ width: 24 }} />
+      </View>
+
+      {/* Tab bar */}
+      <View style={salesStyles.tabBar}>
+        <TouchableOpacity
+          style={[salesStyles.tabItem, activeTab === 'ventes' && salesStyles.tabItemActive]}
+          onPress={() => setActiveTab('ventes')}
+          activeOpacity={0.8}
+        >
+          <Text style={[salesStyles.tabLabel, activeTab === 'ventes' && salesStyles.tabLabelActive]}>
+            Ventes
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[salesStyles.tabItem, activeTab === 'archive' && salesStyles.tabItemActive]}
+          onPress={() => setActiveTab('archive')}
+          activeOpacity={0.8}
+        >
+          <Text style={[salesStyles.tabLabel, activeTab === 'archive' && salesStyles.tabLabelActive]}>
+            Archive{archived.length > 0 ? ` (${archived.length})` : ''}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={salesStyles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : (
+      ) : activeTab === 'ventes' ? (
         <FlatList
           data={sales}
           keyExtractor={(s) => s.id}
@@ -412,6 +635,37 @@ export default function SalesScreen() {
           }}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         />
+      ) : (
+        <FlatList
+          data={archived}
+          keyExtractor={(d) => d.id}
+          contentContainerStyle={archived.length === 0 ? salesStyles.emptyContainer : salesStyles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={salesStyles.emptyState}>
+              <Ionicons name="archive-outline" size={52} color={colors.textSecondary} />
+              <Text style={salesStyles.emptyText}>Aucun drop archivé</Text>
+              <Text style={salesStyles.emptySubtext}>
+                Les drops expirés restent ici 7 jours avant suppression définitive.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <ArchiveCard
+              drop={item}
+              onRelaunch={handleRelaunch}
+              onDelete={handleHardDelete}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
+        />
       )}
 
       <ShipModal
@@ -446,6 +700,29 @@ const salesStyles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  tabItem: {
+    flex: 1,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabItemActive: { borderBottomColor: colors.primary },
+  tabLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
+  },
+  tabLabelActive: {
+    color: colors.primary,
+    fontFamily: fontFamily.semiBold,
+  },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: spacing.md },
   emptyContainer: { flexGrow: 1, padding: spacing.md },
@@ -465,6 +742,8 @@ const salesStyles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginTop: spacing.sm,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
   card: {
     backgroundColor: colors.surface,
