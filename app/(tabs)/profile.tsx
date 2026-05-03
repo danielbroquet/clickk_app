@@ -122,48 +122,50 @@ function DropGridCell({
   }
 
   return (
-    <Reanimated.View style={[gridStyles.cell, animStyle]}>
-      <TouchableOpacity
-        style={StyleSheet.absoluteFill}
-        activeOpacity={editMode ? 1 : 0.85}
-        onPress={handlePress}
-        onLongPress={onLongPress}
-        delayLongPress={500}
-      >
-        {thumb ? (
-          <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
-        ) : (
-          <View style={[gridStyles.thumb, gridStyles.placeholder]}>
-            <Ionicons name="videocam-outline" size={28} color={colors.border} />
-          </View>
-        )}
+    <Reanimated.View style={[gridStyles.cellWrapper, animStyle]}>
+      <View style={gridStyles.cell}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={editMode ? 1 : 0.85}
+          onPress={handlePress}
+          onLongPress={onLongPress}
+          delayLongPress={500}
+        >
+          {thumb ? (
+            <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
+          ) : (
+            <View style={[gridStyles.thumb, gridStyles.placeholder]}>
+              <Ionicons name="videocam-outline" size={28} color={colors.border} />
+            </View>
+          )}
 
-        {/* Price badge */}
-        <View style={gridStyles.priceBadge}>
-          <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
-        </View>
+          {/* Price badge */}
+          <View style={gridStyles.priceBadge}>
+            <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
+          </View>
 
-        {/* Status badge */}
-        {variant === 'own' && status === 'sold' && (
-          <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-            <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
-          </View>
-        )}
-        {variant === 'own' && status === 'expired' && (
-          <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
-            <Text style={gridStyles.statusExpiredText}>Expiré</Text>
-          </View>
-        )}
-        {variant === 'purchase' && (
-          <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-            <Text style={gridStyles.statusSoldText}>
-              {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+          {/* Status badge */}
+          {variant === 'own' && status === 'sold' && (
+            <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+              <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+            </View>
+          )}
+          {variant === 'own' && status === 'expired' && (
+            <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
+              <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+            </View>
+          )}
+          {variant === 'purchase' && (
+            <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+              <Text style={gridStyles.statusSoldText}>
+                {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
 
-      {/* Delete button — shown in edit mode for deletable own drops */}
+      {/* Delete button outside the clipped cell so it's fully visible */}
       {editMode && canDelete && (
         <TouchableOpacity
           style={gridStyles.deleteBtn}
@@ -183,6 +185,10 @@ const gridStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 2,
     paddingHorizontal: 0,
+  },
+  cellWrapper: {
+    width: CELL_SIZE,
+    height: CELL_SIZE,
   },
   cell: {
     width: CELL_SIZE,
