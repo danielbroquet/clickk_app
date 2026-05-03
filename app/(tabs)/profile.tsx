@@ -13,7 +13,17 @@ import {
   Animated,
   ActivityIndicator,
   StyleSheet,
+  Alert,
 } from 'react-native'
+import Reanimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  cancelAnimation,
+} from 'react-native-reanimated'
+import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -53,48 +63,117 @@ function AddCell() {
   )
 }
 
-function DropGridCell({ drop, variant }: { drop: DropCell; variant: 'own' | 'purchase' }) {
+function DropGridCell({
+  drop,
+  variant,
+  editMode,
+  onLongPress,
+  onDelete,
+}: {
+  drop: DropCell
+  variant: 'own' | 'purchase'
+  editMode: boolean
+  onLongPress: () => void
+  onDelete: (id: string) => void
+}) {
   const thumb = drop.thumbnail_url ?? drop.video_url
   const status = drop.status
+  const rotation = useSharedValue(0)
+  const canDelete = variant === 'own' && status !== 'sold' && status !== 'shipped'
+
+  useEffect(() => {
+    if (editMode && canDelete) {
+      rotation.value = withRepeat(
+        withSequence(
+          withTiming(2, { duration: 100 }),
+          withTiming(-2, { duration: 100 }),
+        ),
+        -1,
+        true,
+      )
+    } else {
+      cancelAnimation(rotation)
+      rotation.value = withTiming(0, { duration: 80 })
+    }
+  }, [editMode])
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+  }))
+
+  const handlePress = () => {
+    if (editMode) return
+    router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })
+  }
+
+  const handleDeletePress = () => {
+    if (status === 'sold' || status === 'shipped') {
+      Alert.alert('Impossible — ce drop a déjà été vendu.')
+      return
+    }
+    Alert.alert(
+      'Supprimer ce drop ?',
+      undefined,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+      ],
+    )
+  }
 
   return (
-    <TouchableOpacity
-      style={gridStyles.cell}
-      activeOpacity={0.85}
-      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })}
-    >
-      {thumb ? (
-        <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
-      ) : (
-        <View style={[gridStyles.thumb, gridStyles.placeholder]}>
-          <Ionicons name="videocam-outline" size={28} color={colors.border} />
-        </View>
-      )}
+    <Reanimated.View style={[gridStyles.cell, animStyle]}>
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={editMode ? 1 : 0.85}
+        onPress={handlePress}
+        onLongPress={onLongPress}
+        delayLongPress={500}
+      >
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
+        ) : (
+          <View style={[gridStyles.thumb, gridStyles.placeholder]}>
+            <Ionicons name="videocam-outline" size={28} color={colors.border} />
+          </View>
+        )}
 
-      {/* Price badge */}
-      <View style={gridStyles.priceBadge}>
-        <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
-      </View>
+        {/* Price badge */}
+        <View style={gridStyles.priceBadge}>
+          <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
+        </View>
 
-      {/* Status badge */}
-      {variant === 'own' && status === 'sold' && (
-        <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-          <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
-        </View>
+        {/* Status badge */}
+        {variant === 'own' && status === 'sold' && (
+          <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+            <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+          </View>
+        )}
+        {variant === 'own' && status === 'expired' && (
+          <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
+            <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+          </View>
+        )}
+        {variant === 'purchase' && (
+          <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+            <Text style={gridStyles.statusSoldText}>
+              {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Delete button — shown in edit mode for deletable own drops */}
+      {editMode && canDelete && (
+        <TouchableOpacity
+          style={gridStyles.deleteBtn}
+          onPress={handleDeletePress}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={gridStyles.deleteBtnText}>×</Text>
+        </TouchableOpacity>
       )}
-      {variant === 'own' && status === 'expired' && (
-        <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
-          <Text style={gridStyles.statusExpiredText}>Expiré</Text>
-        </View>
-      )}
-      {variant === 'purchase' && (
-        <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-          <Text style={gridStyles.statusSoldText}>
-            {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
+    </Reanimated.View>
   )
 }
 
@@ -157,6 +236,27 @@ const gridStyles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 11,
     fontFamily: fontFamily.semiBold,
+  },
+  deleteBtn: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FF3B30',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  deleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 16,
+    marginTop: -1,
   },
 })
 
@@ -458,6 +558,7 @@ export default function ProfileScreen() {
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('drops')
   const [bioExpanded, setBioExpanded] = useState(false)
+  const [editMode, setEditMode] = useState(false)
 
   const currentUserId = session?.user?.id ?? ''
 
@@ -502,6 +603,24 @@ export default function ProfileScreen() {
 
   const { followersCount, loading: followLoading } = useFollow(currentUserId)
 
+  const handleEnterEditMode = () => {
+    if (editMode) return
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+    }
+    setEditMode(true)
+  }
+
+  const handleDeleteDrop = async (dropId: string) => {
+    // Optimistic remove
+    setOwnDrops(prev => prev.filter(d => d.id !== dropId))
+    await supabase
+      .from('stories')
+      .update({ status: 'expired' })
+      .eq('id', dropId)
+      .eq('seller_id', currentUserId)
+  }
+
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
   const username = profile?.username ?? 'username'
   const initial = displayName.charAt(0).toUpperCase()
@@ -512,14 +631,25 @@ export default function ProfileScreen() {
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.topHeader}>
           <Text style={styles.topHeaderUsername} numberOfLines={1}>@{username}</Text>
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => router.push('/profile/settings')}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="settings-outline" size={22} color={colors.text} />
-          </TouchableOpacity>
+          {editMode ? (
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => setEditMode(false)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.terminerText}>Terminer</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => router.push('/profile/settings')}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="settings-outline" size={22} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* ── Profile info ────────────────────────────────────────────────── */}
@@ -682,7 +812,14 @@ export default function ProfileScreen() {
             <View style={gridStyles.grid}>
               <AddCell />
               {ownDrops.map(drop => (
-                <DropGridCell key={drop.id} drop={drop} variant="own" />
+                <DropGridCell
+                  key={drop.id}
+                  drop={drop}
+                  variant="own"
+                  editMode={editMode}
+                  onLongPress={handleEnterEditMode}
+                  onDelete={handleDeleteDrop}
+                />
               ))}
             </View>
           )
@@ -694,7 +831,14 @@ export default function ProfileScreen() {
         ) : (
           <View style={gridStyles.grid}>
             {purchases.map(drop => (
-              <DropGridCell key={drop.id} drop={drop} variant="purchase" />
+              <DropGridCell
+                key={drop.id}
+                drop={drop}
+                variant="purchase"
+                editMode={false}
+                onLongPress={() => {}}
+                onDelete={() => {}}
+              />
             ))}
           </View>
         )}
@@ -737,6 +881,11 @@ const styles = StyleSheet.create({
     right: 16,
     top: 10,
     padding: 4,
+  },
+  terminerText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    color: colors.primary,
   },
 
   // Profile info
