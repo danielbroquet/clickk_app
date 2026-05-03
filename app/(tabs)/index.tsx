@@ -43,6 +43,7 @@ import { useFollow } from '../../hooks/useFollow'
 import { useDropPresence } from '../../hooks/useDropPresence'
 import ReportModal from '../../components/ui/ReportModal'
 import { SaleToast, SaleToastPayload } from '../../components/ui/SaleToast'
+import { getOrCreateConversation } from '../../lib/utils'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -452,6 +453,21 @@ function DropItem({
   const carouselAnimStyle = useAnimatedStyle(() => ({ opacity: carouselOpacity.value }))
 
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
+
+  const [chatLoading, setChatLoading] = useState(false)
+  const handleMessage = useCallback(async () => {
+    if (!currentUserId || !sellerId) return
+    setChatLoading(true)
+    try {
+      const convId = await getOrCreateConversation(supabase, currentUserId, sellerId)
+      setDetailVisible(false)
+      router.push(`/conversation/${convId}`)
+    } catch {
+      // silently ignore
+    } finally {
+      setChatLoading(false)
+    }
+  }, [currentUserId, sellerId])
 
   const isSeller = currentUserId === story.seller_id
   const isSold = localSold || story.status === 'sold' || story.buyer_id !== null
@@ -926,16 +942,29 @@ function DropItem({
               </TouchableOpacity>
 
               {sellerId !== currentUserId && (
-                <TouchableOpacity
-                  style={[detailStyles.followBtn, isFollowing && detailStyles.followBtnActive]}
-                  onPress={toggleFollow}
-                  disabled={followLoading}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[detailStyles.followBtnText, isFollowing && detailStyles.followBtnTextActive]}>
-                    {isFollowing ? 'Abonné' : 'Suivre'}
-                  </Text>
-                </TouchableOpacity>
+                <View style={detailStyles.sellerActions}>
+                  <TouchableOpacity
+                    style={[detailStyles.followBtn, isFollowing && detailStyles.followBtnActive]}
+                    onPress={toggleFollow}
+                    disabled={followLoading}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[detailStyles.followBtnText, isFollowing && detailStyles.followBtnTextActive]}>
+                      {isFollowing ? 'Abonné' : 'Suivre'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={detailStyles.messageBtn}
+                    onPress={handleMessage}
+                    disabled={chatLoading}
+                    activeOpacity={0.8}
+                  >
+                    {chatLoading
+                      ? <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" />
+                      : <Ionicons name="chatbubble-outline" size={16} color="rgba(255,255,255,0.9)" />
+                    }
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
 
@@ -1783,6 +1812,22 @@ const detailStyles = StyleSheet.create({
   },
   followBtnText: { color: '#0F0F0F', fontSize: 12, fontWeight: '700' },
   followBtnTextActive: { color: '#00D2B8' },
+
+  sellerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  messageBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   divider: {
     height: StyleSheet.hairlineWidth,
