@@ -115,6 +115,12 @@ export default {
     option_story_title: 'Drop erstellen',
     option_story_sub: 'Holländische Auktion — fallender Preis',
   },
+  comments: {
+    title: 'Kommentare',
+    empty: 'Noch keine Kommentare',
+    placeholder: 'Kommentar hinzufügen...',
+    first: 'Sei der Erste!',
+  },
   watchlist: {
     title: 'Meine Watchlist',
     empty_title: 'Keine gespeicherten Drops',

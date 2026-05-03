@@ -18,7 +18,11 @@ import {
   RefreshControl,
   Share,
   ScrollView,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native'
+import * as Haptics from 'expo-haptics'
+import i18n from '../../lib/i18n'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -89,6 +93,26 @@ function dropPerMinute(s: FeedStory): number {
   return span / (total / 60000)
 }
 
+interface Comment {
+  id: string
+  content: string
+  created_at: string
+  user_id: string
+  profiles: { username: string | null; avatar_url?: string | null } | null
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const ms = Date.now() - new Date(dateStr).getTime()
+  const s = Math.floor(ms / 1000)
+  if (s < 60) return `il y a ${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `il y a ${m}m`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `il y a ${h}h`
+  const d = Math.floor(h / 24)
+  return `il y a ${d}j`
+}
+
 function formatCountdown(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now()
   if (ms <= 0) return 'Expiré'
@@ -109,6 +133,263 @@ function RecentViewersPill({ count }: { count: number }) {
     <View style={styles.recentViewersPill}>
       <Text style={styles.recentViewersText}>{icon} {label}</Text>
     </View>
+  )
+}
+
+function CommentsSheet({
+  visible,
+  onClose,
+  storyId,
+  currentUserId,
+  initialCount,
+  onCommentAdded,
+  onCommentDeleted,
+}: {
+  visible: boolean
+  onClose: () => void
+  storyId: string
+  currentUserId: string
+  initialCount: number
+  onCommentAdded: (c: Comment) => void
+  onCommentDeleted: (id: string) => void
+}) {
+  const insets = useSafeAreaInsets()
+  const [comments, setComments] = useState<Comment[]>([])
+  const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [input, setInput] = useState('')
+  const [sending, setSending] = useState(false)
+  const [count, setCount] = useState(initialCount)
+  const listRef = useRef<FlatList<Comment>>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  useEffect(() => setCount(initialCount), [initialCount])
+
+  const fetchComments = useCallback(async () => {
+    const { data } = await supabase
+      .from('comments')
+      .select('id, content, created_at, user_id, profiles:user_id(username, avatar_url)')
+      .eq('story_id', storyId)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    setComments((data as unknown as Comment[]) ?? [])
+    setLoading(false)
+    setRefreshing(false)
+  }, [storyId])
+
+  useEffect(() => {
+    if (!visible) return
+    setLoading(true)
+    fetchComments()
+
+    // Realtime
+    channelRef.current = supabase
+      .channel(`comments:${storyId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `story_id=eq.${storyId}` },
+        async (payload) => {
+          const row = payload.new as { id: string; content: string; created_at: string; user_id: string }
+          // Don't duplicate own optimistic insert
+          if (row.user_id === currentUserId) return
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('username, avatar_url')
+            .eq('id', row.user_id)
+            .maybeSingle()
+          const newComment: Comment = {
+            id: row.id,
+            content: row.content,
+            created_at: row.created_at,
+            user_id: row.user_id,
+            profiles: prof ?? { username: null, avatar_url: null },
+          }
+          setComments(prev => [newComment, ...prev])
+          setCount(n => n + 1)
+          onCommentAdded(newComment)
+        },
+      )
+      .subscribe()
+
+    return () => {
+      channelRef.current?.unsubscribe()
+      channelRef.current = null
+    }
+  }, [visible, storyId, fetchComments, currentUserId, onCommentAdded])
+
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || !currentUserId || sending) return
+    setSending(true)
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+    }
+
+    // Fetch current user's profile for optimistic UI
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('id', currentUserId)
+      .maybeSingle()
+
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({ story_id: storyId, user_id: currentUserId, content: text })
+      .select('id, content, created_at, user_id')
+      .maybeSingle()
+
+    setSending(false)
+
+    if (error || !data) {
+      setInput(text)
+      return
+    }
+
+    const newComment: Comment = {
+      id: data.id,
+      content: data.content,
+      created_at: data.created_at,
+      user_id: data.user_id,
+      profiles: { username: profile?.username ?? null, avatar_url: profile?.avatar_url ?? null },
+    }
+    setComments(prev => [newComment, ...prev])
+    setCount(n => n + 1)
+    setInput('')
+    onCommentAdded(newComment)
+    listRef.current?.scrollToOffset({ offset: 0, animated: true })
+  }
+
+  const handleDelete = (c: Comment) => {
+    Alert.alert('Supprimer ce commentaire ?', undefined, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          setComments(prev => prev.filter(x => x.id !== c.id))
+          setCount(n => Math.max(0, n - 1))
+          onCommentDeleted(c.id)
+          await supabase.from('comments').delete().eq('id', c.id).eq('user_id', currentUserId)
+        },
+      },
+    ])
+  }
+
+  const onRefresh = () => { setRefreshing(true); fetchComments() }
+
+  const renderItem: ListRenderItem<Comment> = ({ item }) => {
+    const isOwn = item.user_id === currentUserId
+    const username = item.profiles?.username ?? 'user'
+    const initial = username.charAt(0).toUpperCase()
+    const avatar = item.profiles?.avatar_url
+    return (
+      <View style={commentStyles.row}>
+        {avatar ? (
+          <Image source={{ uri: avatar }} style={commentStyles.avatar} />
+        ) : (
+          <View style={commentStyles.avatarFallback}>
+            <Text style={commentStyles.avatarInitial}>{initial}</Text>
+          </View>
+        )}
+        <View style={commentStyles.body}>
+          <View style={commentStyles.headerRow}>
+            <Text style={commentStyles.username}>@{username}</Text>
+            <Text style={commentStyles.timeAgo}>{formatTimeAgo(item.created_at)}</Text>
+          </View>
+          <Text style={commentStyles.content}>{item.content}</Text>
+        </View>
+        {isOwn && (
+          <TouchableOpacity
+            onPress={() => handleDelete(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={commentStyles.deleteBtn}
+          >
+            <Ionicons name="trash-outline" size={16} color="#888" />
+          </TouchableOpacity>
+        )}
+      </View>
+    )
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView
+        style={commentStyles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Header */}
+        <View style={commentStyles.header}>
+          <View style={commentStyles.handle} />
+          <View style={commentStyles.headerInner}>
+            <View style={{ width: 32 }} />
+            <Text style={commentStyles.title}>
+              {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
+            </Text>
+            <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* List */}
+        {loading ? (
+          <View style={commentStyles.centerFill}>
+            <ActivityIndicator color="#00D2B8" />
+          </View>
+        ) : comments.length === 0 ? (
+          <View style={commentStyles.centerFill}>
+            <Ionicons name="chatbubble-outline" size={48} color="#444" />
+            <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
+            <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={comments}
+            keyExtractor={(c) => c.id}
+            renderItem={renderItem}
+            ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
+            contentContainerStyle={{ paddingVertical: 8 }}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
+            }
+          />
+        )}
+
+        {/* Input bar */}
+        <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+          <View style={commentStyles.inputAvatarFallback}>
+            <Text style={commentStyles.inputAvatarInitial}>
+              {currentUserId ? 'M' : '?'}
+            </Text>
+          </View>
+          <TextInput
+            style={commentStyles.input}
+            placeholder={i18n.t('comments.placeholder')}
+            placeholderTextColor="#666"
+            value={input}
+            onChangeText={setInput}
+            maxLength={300}
+            multiline
+            editable={!!currentUserId && !sending}
+          />
+          {input.trim().length > 0 && (
+            <TouchableOpacity style={commentStyles.sendBtn} onPress={handleSend} disabled={sending}>
+              {sending ? (
+                <ActivityIndicator size="small" color="#0F0F0F" />
+              ) : (
+                <Ionicons name="arrow-up" size={18} color="#0F0F0F" />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   )
 }
 
@@ -144,6 +425,15 @@ function DropItem({
   const [countdown, setCountdown] = useState(() => formatCountdown(story.expires_at))
   const [localSold, setLocalSold] = useState(false)
   const [recentViewers, setRecentViewers] = useState<number>(0)
+
+  // Comments
+  const [commentsVisible, setCommentsVisible] = useState(false)
+  const [commentCount, setCommentCount] = useState(0)
+  const carouselRef = useRef<Comment[]>([])
+  const [carouselIdx, setCarouselIdx] = useState(0)
+  const [carouselVersion, setCarouselVersion] = useState(0)
+  const carouselOpacity = useSharedValue(1)
+  const carouselAnimStyle = useAnimatedStyle(() => ({ opacity: carouselOpacity.value }))
 
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
 
@@ -200,6 +490,61 @@ function DropItem({
       videoRef.current.pauseAsync().catch(() => {})
     }
   }, [active, tabFocused, paused, buyVisible])
+
+  // Fetch comments + count when drop becomes active
+  useEffect(() => {
+    if (!active) return
+    let mounted = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('comments')
+        .select('id, content, created_at, user_id, profiles:user_id(username, avatar_url)')
+        .eq('story_id', story.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+      const { count } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('story_id', story.id)
+      if (!mounted) return
+      carouselRef.current = (data as unknown as Comment[]) ?? []
+      setCarouselIdx(0)
+      setCarouselVersion(v => v + 1)
+      setCommentCount(count ?? 0)
+    })()
+    return () => { mounted = false }
+  }, [active, story.id])
+
+  // Carousel rotation every 3.5s with fade
+  useEffect(() => {
+    if (!active) return
+    if (carouselRef.current.length < 2) return
+    const h = setInterval(() => {
+      carouselOpacity.value = withTiming(0, { duration: 200 }, (finished) => {
+        if (!finished) return
+      })
+      setTimeout(() => {
+        setCarouselIdx(i => (i + 1) % Math.max(carouselRef.current.length, 1))
+        carouselOpacity.value = withTiming(1, { duration: 200 })
+      }, 220)
+    }, 3500)
+    return () => clearInterval(h)
+  }, [active, carouselVersion, carouselOpacity])
+
+  const handleNewComment = useCallback((c: Comment) => {
+    carouselRef.current = [c, ...carouselRef.current].slice(0, 10)
+    setCarouselIdx(0)
+    setCarouselVersion(v => v + 1)
+    setCommentCount(n => n + 1)
+    carouselOpacity.value = 1
+  }, [carouselOpacity])
+
+  const handleDeletedComment = useCallback((id: string) => {
+    carouselRef.current = carouselRef.current.filter(c => c.id !== id)
+    setCarouselIdx(0)
+    setCarouselVersion(v => v + 1)
+    setCommentCount(n => Math.max(0, n - 1))
+  }, [])
 
   const pulse = useSharedValue(1)
   useEffect(() => {
@@ -358,6 +703,11 @@ function DropItem({
         </TouchableOpacity>
         <Text style={styles.actionCount}>{watchlistCount > 0 ? watchlistCount : ''}</Text>
 
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setCommentsVisible(true)} activeOpacity={0.7}>
+          <Ionicons name="chatbubble-outline" size={26} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.actionCount}>{commentCount > 0 ? commentCount : ''}</Text>
+
         <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.7}>
           <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -373,6 +723,24 @@ function DropItem({
         style={styles.bottomGradient}
         pointerEvents="box-none"
       >
+        {carouselRef.current.length > 0 && (
+          <TouchableOpacity
+            style={styles.carouselContainer}
+            activeOpacity={0.8}
+            onPress={() => setCommentsVisible(true)}
+          >
+            <Animated.View style={carouselAnimStyle}>
+              <Text style={styles.carouselText} numberOfLines={2}>
+                <Text style={styles.carouselUser}>
+                  @{carouselRef.current[carouselIdx]?.profiles?.username ?? 'user'}
+                </Text>
+                <Text style={styles.carouselSpacer}>  </Text>
+                <Text>{carouselRef.current[carouselIdx]?.content ?? ''}</Text>
+              </Text>
+            </Animated.View>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={styles.sellerRow} onPress={openSellerProfile} activeOpacity={0.8}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={styles.sellerAvatar} />
@@ -471,6 +839,17 @@ function DropItem({
         onClose={() => setReportVisible(false)}
         targetType="story"
         targetId={story.id}
+      />
+
+      {/* ── Comments sheet ─────────────────────────────────────────────── */}
+      <CommentsSheet
+        visible={commentsVisible}
+        onClose={() => setCommentsVisible(false)}
+        storyId={story.id}
+        currentUserId={currentUserId}
+        initialCount={commentCount}
+        onCommentAdded={handleNewComment}
+        onCommentDeleted={handleDeletedComment}
       />
 
       {/* ── Detail sheet ───────────────────────────────────────────────── */}
@@ -1085,6 +1464,26 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
     zIndex: 4,
   },
+  carouselContainer: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    maxWidth: SCREEN_WIDTH * 0.7,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  carouselText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  carouselUser: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  carouselSpacer: { color: 'transparent' },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sellerAvatar: { width: 28, height: 28, borderRadius: 14 },
   sellerAvatarFallback: {
@@ -1447,4 +1846,93 @@ const detailStyles = StyleSheet.create({
   buyBtnDisabled: { backgroundColor: '#2A2A2A' },
   buyBtnText: { color: '#0F0F0F', fontSize: 15, fontWeight: '700' },
   buyBtnTextDisabled: { color: '#555' },
+})
+
+const commentStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#1A1A1A' },
+  header: { paddingTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2A2A2A' },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#444',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  headerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  title: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  closeBtn: { padding: 4 },
+  centerFill: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, paddingHorizontal: 20 },
+  emptyTitle: { color: '#FFFFFF', fontSize: 15, fontWeight: '600', marginTop: 8 },
+  emptySub: { color: '#888', fontSize: 13 },
+
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  avatar: { width: 28, height: 28, borderRadius: 14 },
+  avatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#00D2B8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: { color: '#0F0F0F', fontSize: 12, fontWeight: '700' },
+  body: { flex: 1 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  username: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  timeAgo: { color: '#888', fontSize: 11 },
+  content: { color: '#FFFFFF', fontSize: 14, lineHeight: 21 },
+  deleteBtn: { padding: 4, marginLeft: 4 },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: '#2A2A2A', marginLeft: 54 },
+
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#2A2A2A',
+    backgroundColor: '#1A1A1A',
+  },
+  inputAvatarFallback: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#00D2B8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputAvatarInitial: { color: '#0F0F0F', fontSize: 12, fontWeight: '700' },
+  input: {
+    flex: 1,
+    minHeight: 36,
+    maxHeight: 100,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    color: '#FFFFFF',
+    fontSize: 14,
+  },
+  sendBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00D2B8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 })

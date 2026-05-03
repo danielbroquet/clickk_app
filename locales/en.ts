@@ -115,6 +115,12 @@ export default {
     option_story_title: 'Create a Drop',
     option_story_sub: 'Dutch auction — descending price',
   },
+  comments: {
+    title: 'Comments',
+    empty: 'No comments yet',
+    placeholder: 'Add a comment...',
+    first: 'Be the first!',
+  },
   watchlist: {
     title: 'My watchlist',
     empty_title: 'No saved drops',

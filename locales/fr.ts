@@ -115,6 +115,12 @@ export default {
     option_story_title: 'Créer un Drop',
     option_story_sub: 'Enchère hollandaise — prix descendant',
   },
+  comments: {
+    title: 'Commentaires',
+    empty: 'Pas encore de commentaire',
+    placeholder: 'Ajouter un commentaire...',
+    first: 'Sois le premier !',
+  },
   watchlist: {
     title: 'Ma watchlist',
     empty_title: 'Aucun drop sauvegardé',

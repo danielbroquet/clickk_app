@@ -115,6 +115,12 @@ export default {
     option_story_title: 'Crea un Drop',
     option_story_sub: 'Asta olandese — prezzo decrescente',
   },
+  comments: {
+    title: 'Commenti',
+    empty: 'Ancora nessun commento',
+    placeholder: 'Aggiungi un commento...',
+    first: 'Sii il primo!',
+  },
   watchlist: {
     title: 'La mia watchlist',
     empty_title: 'Nessun drop salvato',
