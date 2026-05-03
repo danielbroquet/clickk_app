@@ -16,6 +16,7 @@ import {
   Pressable,
   Alert,
   RefreshControl,
+  Share,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -249,6 +250,16 @@ function DropItem({
     }
   }
 
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `${story.title} — CHF ${price.toFixed(2)} sur CLICKK`,
+      })
+    } catch {
+      // user cancelled or share not available — ignore
+    }
+  }
+
   const username = story.seller?.username ?? 'vendeur'
   const avatar = story.seller?.avatar_url
   const perMin = dropPerMinute(story)
@@ -315,10 +326,10 @@ function DropItem({
         </TouchableOpacity>
         <Text style={styles.actionCount}>{watchlistCount > 0 ? watchlistCount : ''}</Text>
 
-        <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.7}>
           <Ionicons name="arrow-redo-outline" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.actionCount}>Share</Text>
+        <Text style={styles.actionCount}>Partager</Text>
 
         <TouchableOpacity style={styles.actionBtn} onPress={openMenu} activeOpacity={0.7}>
           <Ionicons name="ellipsis-horizontal" size={24} color="#FFFFFF" />

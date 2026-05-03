@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
@@ -16,6 +16,9 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
   const [isWatchlisted, setIsWatchlisted] = useState(false)
   const [watchlistCount, setWatchlistCount] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  // Prevents the refetch effect from overwriting an in-flight optimistic update
+  const toggling = useRef(false)
 
   useEffect(() => {
     if (!storyId) return
@@ -38,6 +41,11 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
 
     Promise.all([checkPromise, countPromise]).then(([checkRes, countRes]) => {
       if (!mounted) return
+      // Don't overwrite state that was set by an in-flight toggle
+      if (toggling.current) {
+        setLoading(false)
+        return
+      }
       setIsWatchlisted(!!checkRes.data)
       setWatchlistCount(countRes.count ?? 0)
       setLoading(false)
@@ -47,11 +55,18 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
   }, [storyId, userId])
 
   const toggleWatchlist = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      console.log('[watchlist] toggleWatchlist aborted — no userId')
+      return
+    }
 
     const wasWatchlisted = isWatchlisted
     const prevCount = watchlistCount
 
+    console.log('[watchlist] toggle start', { storyId, wasWatchlisted, userId })
+
+    // Optimistic update
+    toggling.current = true
     setIsWatchlisted(!wasWatchlisted)
     setWatchlistCount(wasWatchlisted ? prevCount - 1 : prevCount + 1)
 
@@ -62,16 +77,27 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
           .delete()
           .eq('user_id', userId)
           .eq('story_id', storyId)
-        if (error) throw error
+        if (error) {
+          console.log('[watchlist] delete error', error)
+          throw error
+        }
+        console.log('[watchlist] deleted OK')
       } else {
         const { error } = await supabase
           .from('watchlist')
           .insert({ user_id: userId, story_id: storyId })
-        if (error) throw error
+        if (error) {
+          console.log('[watchlist] insert error', error)
+          throw error
+        }
+        console.log('[watchlist] inserted OK')
       }
-    } catch {
+    } catch (err) {
+      console.log('[watchlist] rolling back optimistic update', err)
       setIsWatchlisted(wasWatchlisted)
       setWatchlistCount(prevCount)
+    } finally {
+      toggling.current = false
     }
   }, [userId, storyId, isWatchlisted, watchlistCount])
 
