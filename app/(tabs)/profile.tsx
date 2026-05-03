@@ -5,7 +5,6 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   Dimensions,
   Modal,
   TextInput,
@@ -26,62 +25,142 @@ import i18n from '../../lib/i18n'
 import { useFollow } from '../../hooks/useFollow'
 import { callEdgeFunction } from '../../lib/edgeFunction'
 
-const CELL_SIZE = Math.floor(Dimensions.get('window').width / 3)
+const SCREEN_WIDTH = Dimensions.get('window').width
+const CELL_SIZE = (SCREEN_WIDTH - 4) / 2
 
-type StoryCell = {
+type DropCell = {
   id: string
+  thumbnail_url: string | null
   video_url: string | null
   current_price_chf: number
   status: string
+  buyer_id?: string | null
+  updated_at?: string | null
 }
 
-function GridCell({ story }: { story: StoryCell }) {
-  const sold = story.status === 'sold'
+// ── Grid cell ────────────────────────────────────────────────────────────────
+
+function AddCell() {
+  return (
+    <TouchableOpacity
+      style={[gridStyles.cell, gridStyles.addCell]}
+      activeOpacity={0.85}
+      onPress={() => router.push('/story/create')}
+    >
+      <Ionicons name="add" size={44} color="#0F0F0F" />
+      <Text style={gridStyles.addCellLabel}>Nouveau drop</Text>
+    </TouchableOpacity>
+  )
+}
+
+function DropGridCell({ drop, variant }: { drop: DropCell; variant: 'own' | 'purchase' }) {
+  const thumb = drop.thumbnail_url ?? drop.video_url
+  const status = drop.status
+
   return (
     <TouchableOpacity
       style={gridStyles.cell}
-      activeOpacity={0.8}
-      onPress={() => router.push(`/story/${story.id}`)}
+      activeOpacity={0.85}
+      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })}
     >
-      {story.video_url ? (
-        <Image source={{ uri: story.video_url }} style={gridStyles.thumb} resizeMode="cover" />
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
       ) : (
-        <View style={[gridStyles.thumb, gridStyles.placeholder]} />
-      )}
-      {sold && (
-        <View style={gridStyles.soldOverlay}>
-          <Text style={gridStyles.soldLabel}>Vendu</Text>
+        <View style={[gridStyles.thumb, gridStyles.placeholder]}>
+          <Ionicons name="videocam-outline" size={28} color={colors.border} />
         </View>
       )}
+
+      {/* Price badge */}
       <View style={gridStyles.priceBadge}>
-        <Text style={gridStyles.priceText}>CHF {story.current_price_chf.toFixed(2)}</Text>
+        <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
       </View>
+
+      {/* Status badge */}
+      {variant === 'own' && status === 'sold' && (
+        <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+          <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+        </View>
+      )}
+      {variant === 'own' && status === 'expired' && (
+        <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
+          <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+        </View>
+      )}
+      {variant === 'purchase' && (
+        <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+          <Text style={gridStyles.statusSoldText}>
+            {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   )
 }
 
 const gridStyles = StyleSheet.create({
-  cell: { width: CELL_SIZE, height: CELL_SIZE },
-  thumb: { width: CELL_SIZE, height: CELL_SIZE },
-  placeholder: { backgroundColor: '#2A2A2A' },
-  soldOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+    paddingHorizontal: 0,
+  },
+  cell: {
+    width: CELL_SIZE,
+    aspectRatio: 1,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  addCell: {
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 6,
   },
-  soldLabel: { color: '#fff', fontFamily: fontFamily.bold, fontSize: 13 },
+  addCellLabel: {
+    color: '#0F0F0F',
+    fontFamily: fontFamily.semiBold,
+    fontSize: 12,
+  },
+  thumb: { width: '100%', height: '100%' },
+  placeholder: { justifyContent: 'center', alignItems: 'center' },
   priceBadge: {
     position: 'absolute',
     bottom: 6,
     left: 6,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
   },
-  priceText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  priceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  statusSold: { backgroundColor: 'rgba(0,210,184,0.2)' },
+  statusSoldText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+  },
+  statusExpired: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  statusExpiredText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+  },
 })
+
+// ── Edit profile sheet (unchanged) ───────────────────────────────────────────
 
 function EditProfileSheet({
   visible,
@@ -136,30 +215,24 @@ function EditProfileSheet({
       base64: true,
     })
     if (result.canceled || !result.assets[0]) return
-
     const asset = result.assets[0]
     if (!asset.base64) {
       setError('Impossible de lire l\'image.')
       return
     }
-
     setAvatarUploading(true)
     setError(null)
-
     try {
       const path = `${userId}/avatar.jpg`
       const byteArray = Uint8Array.from(atob(asset.base64), c => c.charCodeAt(0))
       const { error: uploadErr } = await supabase.storage
         .from('avatars')
         .upload(path, byteArray, { upsert: true, contentType: 'image/jpeg' })
-
       if (uploadErr) {
         setError(uploadErr.message)
         return
       }
-
       const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-      // Bust cache by appending timestamp
       setAvatarUrl(`${data.publicUrl}?t=${Date.now()}`)
     } finally {
       setAvatarUploading(false)
@@ -200,10 +273,7 @@ function EditProfileSheet({
             { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] },
           ]}
         >
-          {/* Handle */}
           <View style={sheetStyles.handle} />
-
-          {/* Header row */}
           <View style={sheetStyles.sheetHeader}>
             <TouchableOpacity onPress={onClose}>
               <Text style={sheetStyles.cancelText}>Annuler</Text>
@@ -218,7 +288,6 @@ function EditProfileSheet({
 
           {!!error && <Text style={sheetStyles.errorText}>{error}</Text>}
 
-          {/* Avatar picker */}
           <View style={sheetStyles.avatarSection}>
             <TouchableOpacity
               style={sheetStyles.avatarCircle}
@@ -245,7 +314,6 @@ function EditProfileSheet({
             <Text style={sheetStyles.avatarHint}>Modifier la photo</Text>
           </View>
 
-          {/* Fields */}
           <View style={sheetStyles.fieldGroup}>
             <Text style={sheetStyles.fieldLabel}>Nom affiché</Text>
             <TextInput
@@ -376,325 +444,272 @@ const sheetStyles = StyleSheet.create({
   avatarHint: { fontSize: 12, color: colors.primary, marginTop: 6 },
 })
 
+// ── Screen ───────────────────────────────────────────────────────────────────
+
+type TabKey = 'drops' | 'achats'
+
 export default function ProfileScreen() {
-  const { profile, signOut, session, refreshProfile } = useAuth()
-  const [articlesCount, setArticlesCount] = useState<number | null>(null)
+  const { profile, session, refreshProfile } = useAuth()
+  const [dropsCount, setDropsCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
-  const [stories, setStories] = useState<StoryCell[]>([])
+  const [ownDrops, setOwnDrops] = useState<DropCell[]>([])
+  const [purchases, setPurchases] = useState<DropCell[]>([])
   const [editVisible, setEditVisible] = useState(false)
-  const [activeOrdersCount, setActiveOrdersCount] = useState(0)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<TabKey>('drops')
+  const [bioExpanded, setBioExpanded] = useState(false)
+
+  const currentUserId = session?.user?.id ?? ''
 
   useEffect(() => {
-    const userId = session?.user?.id
-    if (!userId) return
+    if (!currentUserId) return
 
     supabase
       .from('stories')
       .select('*', { count: 'exact', head: true })
-      .eq('seller_id', userId)
-      .then(({ count }) => setArticlesCount(count ?? 0))
+      .eq('seller_id', currentUserId)
+      .then(({ count }) => setDropsCount(count ?? 0))
 
     supabase
       .from('stories')
       .select('*', { count: 'exact', head: true })
-      .eq('seller_id', userId)
+      .eq('seller_id', currentUserId)
       .eq('status', 'sold')
       .then(({ count }) => setVentesCount(count ?? 0))
 
     supabase
       .from('stories')
-      .select('id, video_url, current_price_chf, status')
-      .eq('seller_id', userId)
+      .select('id, thumbnail_url, video_url, current_price_chf, status')
+      .eq('seller_id', currentUserId)
       .order('created_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => setStories((data ?? []) as StoryCell[]))
+      .limit(60)
+      .then(({ data }) => setOwnDrops((data ?? []) as DropCell[]))
 
-    Promise.all([
-      supabase
-        .from('stories')
-        .select('*', { count: 'exact', head: true })
-        .eq('buyer_id', userId)
-        .in('status', ['sold', 'shipped']),
-      supabase
-        .from('shop_orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('buyer_id', userId)
-        .in('status', ['paid', 'sold', 'shipped']),
-    ]).then(([sRes, oRes]) => {
-      setActiveOrdersCount((sRes.count ?? 0) + (oRes.count ?? 0))
-    })
+    supabase
+      .from('stories')
+      .select('id, thumbnail_url, video_url, current_price_chf, status, buyer_id, updated_at')
+      .eq('buyer_id', currentUserId)
+      .order('updated_at', { ascending: false })
+      .limit(60)
+      .then(({ data }) => setPurchases((data ?? []) as DropCell[]))
 
-    callEdgeFunction<{ available_chf: number }>('get-seller-wallet')
-      .then(data => setWalletBalance(data.available_chf ?? 0))
-      .catch(() => setWalletBalance(null))
-  }, [session?.user?.id])
+    if (profile?.role === 'seller') {
+      callEdgeFunction<{ available_chf: number }>('get-seller-wallet')
+        .then(data => setWalletBalance(data.available_chf ?? 0))
+        .catch(() => setWalletBalance(null))
+    }
+  }, [currentUserId, profile?.role])
+
+  const { followersCount, loading: followLoading } = useFollow(currentUserId)
 
   const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
   const username = profile?.username ?? 'username'
   const initial = displayName.charAt(0).toUpperCase()
-  const currentUserId = session?.user?.id ?? ''
-  // Profile screen always shows the logged-in user's own profile
-  const profileUserId = currentUserId
-  const userId = currentUserId
-  const isOwnProfile = profileUserId === currentUserId
-
-  const {
-    isFollowing,
-    followersCount,
-    toggleFollow,
-    loading: followLoading,
-  } = useFollow(profileUserId)
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          {/* Settings button */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <View style={styles.topHeader}>
+          <Text style={styles.topHeaderUsername} numberOfLines={1}>@{username}</Text>
           <TouchableOpacity
-            style={styles.settingsIconBtn}
+            style={styles.settingsBtn}
             onPress={() => router.push('/profile/settings')}
             activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
+            <Ionicons name="settings-outline" size={22} color={colors.text} />
           </TouchableOpacity>
+        </View>
 
-          {/* Avatar + stats */}
-          <View style={styles.topRow}>
-            <View style={styles.avatarWrap}>
-              {profile?.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
-              ) : (
-                <Text style={styles.avatarInitial}>{initial}</Text>
-              )}
-            </View>
-            <View style={styles.statsRow}>
-              {[
-                { value: articlesCount, label: i18n.t('profile.articles') },
-                { value: followLoading ? null : followersCount, label: i18n.t('profile.followers') },
-                { value: ventesCount, label: i18n.t('profile.sales') },
-              ].map(stat => (
-                <View key={stat.label} style={styles.stat}>
-                  <Text style={styles.statNum}>{stat.value === null ? '--' : stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Name / bio */}
-          <Text style={styles.displayName}>{displayName}</Text>
-          <Text style={styles.username}>@{username}</Text>
-          {!!profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-
-          {/* Buttons */}
-          <View style={styles.btnRow}>
-            {isOwnProfile ? (
-              <>
-                <TouchableOpacity style={styles.editBtn} onPress={() => setEditVisible(true)}>
-                  <Text style={styles.editBtnText}>{i18n.t('profile.edit')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() => router.push('/(tabs)/discover')}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="person-add-outline" size={18} color={colors.text} />
-                </TouchableOpacity>
-              </>
+        {/* ── Profile info ────────────────────────────────────────────────── */}
+        <View style={styles.profileInfo}>
+          <View style={styles.avatarWrap}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
             ) : (
-              <TouchableOpacity
-                style={[styles.followBtn, isFollowing && styles.followBtnActive]}
-                onPress={toggleFollow}
-                disabled={followLoading}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}>
-                  {isFollowing ? 'Abonné' : 'Suivre'}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.avatarInitial}>{initial}</Text>
             )}
           </View>
+
+          <Text style={styles.displayName}>{displayName}</Text>
+          <Text style={styles.username}>@{username}</Text>
+
+          {!!profile?.bio && (
+            <TouchableOpacity activeOpacity={0.8} onPress={() => setBioExpanded(b => !b)}>
+              <Text style={styles.bio} numberOfLines={bioExpanded ? undefined : 3}>
+                {profile.bio}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.statsRow}>
+            <View style={styles.stat}>
+              <Text style={styles.statNum}>{dropsCount === null ? '--' : dropsCount}</Text>
+              <Text style={styles.statLabel}>Drops</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statNum}>
+                {followLoading ? '--' : followersCount}
+              </Text>
+              <Text style={styles.statLabel}>Abonnés</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statNum}>{ventesCount === null ? '--' : ventesCount}</Text>
+              <Text style={styles.statLabel}>Ventes</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => setEditVisible(true)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.editBtnText}>{i18n.t('profile.edit')}</Text>
+          </TouchableOpacity>
 
           {profile?.role !== 'seller' && (
             <TouchableOpacity
               style={styles.becomeSellerBtn}
               onPress={() => router.push('/become-seller')}
+              activeOpacity={0.85}
             >
               <Text style={styles.becomeSellerText}>{i18n.t('profile.become_seller')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
+        {/* ── Wallet banner (seller only) ─────────────────────────────────── */}
+        {profile?.role === 'seller' && (
+          <TouchableOpacity
+            style={styles.walletCard}
+            onPress={() => router.push('/wallet')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.walletLeft}>
+              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
+              <Text style={styles.walletLabel}>Mon wallet</Text>
+            </View>
+            <View style={styles.walletRight}>
+              <Text style={styles.walletAmount}>
+                {walletBalance === null ? '--' : `CHF ${walletBalance.toFixed(2)}`}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* ── Quick links ─────────────────────────────────────────────────── */}
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/profile/orders')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="cube-outline" size={20} color={colors.primary} />
+            <Text style={styles.quickLabel}>Mes commandes</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/profile/payment-methods')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="card-outline" size={20} color={colors.primary} />
+            <Text style={styles.quickLabel}>Paiement</Text>
+          </TouchableOpacity>
+
+          {profile?.role === 'seller' && (
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => router.push('/(seller)/sales')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="receipt-outline" size={20} color={colors.primary} />
+              <Text style={styles.quickLabel}>Ventes</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Tab bar ─────────────────────────────────────────────────────── */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tabItem, activeTab === 'drops' && styles.tabItemActive]}
+            onPress={() => setActiveTab('drops')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={20}
+              color={activeTab === 'drops' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'drops' && styles.tabLabelActive]}>
+              Drops
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabItem, activeTab === 'achats' && styles.tabItemActive]}
+            onPress={() => setActiveTab('achats')}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="bag-outline"
+              size={20}
+              color={activeTab === 'achats' ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[styles.tabLabel, activeTab === 'achats' && styles.tabLabelActive]}>
+              Achats
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Grid content ────────────────────────────────────────────────── */}
+        {activeTab === 'drops' ? (
+          ownDrops.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="videocam-outline" size={48} color={colors.textSecondary} />
+              <Text style={styles.emptyTitle}>Publie ton premier drop</Text>
+              <TouchableOpacity
+                style={styles.emptyCta}
+                onPress={() => router.push('/story/create')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.emptyCtaText}>Créer un drop</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={gridStyles.grid}>
+              <AddCell />
+              {ownDrops.map(drop => (
+                <DropGridCell key={drop.id} drop={drop} variant="own" />
+              ))}
+            </View>
+          )
+        ) : purchases.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="bag-outline" size={48} color={colors.textSecondary} />
+            <Text style={styles.emptyTitle}>Aucun achat pour l'instant</Text>
+          </View>
+        ) : (
+          <View style={gridStyles.grid}>
+            {purchases.map(drop => (
+              <DropGridCell key={drop.id} drop={drop} variant="purchase" />
+            ))}
+          </View>
+        )}
+
         {/* Edit profile sheet */}
         <EditProfileSheet
           visible={editVisible}
           onClose={() => setEditVisible(false)}
           onSaved={refreshProfile}
-          userId={userId}
+          userId={currentUserId}
           initialDisplayName={profile?.display_name ?? ''}
           initialBio={profile?.bio ?? ''}
           initialUsername={profile?.username ?? ''}
           initialAvatarUrl={profile?.avatar_url ?? null}
         />
-
-        {/* Story circles */}
-        <View style={styles.storiesWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storiesRow}
-          >
-            {/* Create new story */}
-            <TouchableOpacity
-              style={styles.storyItem}
-              activeOpacity={0.8}
-              onPress={() => router.push('/story/create')}
-            >
-              <View style={[styles.storyCircle, styles.storyCircleAdd]}>
-                <Ionicons name="add" size={26} color={colors.primary} />
-              </View>
-              <Text style={styles.storyLabel}>{i18n.t('profile.new_story')}</Text>
-            </TouchableOpacity>
-
-            {/* Existing stories */}
-            {stories.map(story => (
-              <TouchableOpacity
-                key={story.id}
-                style={styles.storyItem}
-                activeOpacity={0.8}
-                onPress={() => router.push(`/story/${story.id}`)}
-              >
-                <View style={[styles.storyCircle, story.status === 'sold' && styles.storyCircleSold]}>
-                  {story.video_url ? (
-                    <Image source={{ uri: story.video_url }} style={styles.storyCircleImg} />
-                  ) : (
-                    <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
-                  )}
-                </View>
-                <Text style={styles.storyLabel} numberOfLines={1}>
-                  {story.status === 'sold' ? 'Vendu' : `CHF ${story.current_price_chf.toFixed(0)}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Grid tab */}
-        <View style={styles.tabBar}>
-          <View style={styles.activeTab}>
-            <Ionicons name="grid-outline" size={22} color={colors.primary} />
-          </View>
-        </View>
-
-        {/* Publications grid */}
-        {stories.length === 0 ? (
-          <View style={styles.emptyGrid}>
-            <Text style={styles.emptyTitle}>{i18n.t('profile.no_publications')}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={stories}
-            keyExtractor={item => item.id}
-            numColumns={3}
-            scrollEnabled={false}
-            renderItem={({ item }) => <GridCell story={item} />}
-          />
-        )}
-
-        {/* Settings */}
-        <View style={styles.settingsSection}>
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => router.push('/profile/orders')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="bag-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_orders')}</Text>
-            </View>
-            <View style={styles.settingsRowRight}>
-              {activeOrdersCount > 0 && (
-                <View style={styles.ordersBadge}>
-                  <Text style={styles.ordersBadgeText}>{activeOrdersCount}</Text>
-                </View>
-              )}
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.settingsDivider} />
-
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => router.push('/wallet')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="wallet-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_wallet')}</Text>
-            </View>
-            <View style={styles.settingsRowRight}>
-              {walletBalance !== null && (
-                <Text style={styles.walletBalance}>
-                  CHF {walletBalance.toFixed(2)}
-                </Text>
-              )}
-              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.settingsDivider} />
-
-          <View style={styles.settingsDivider} />
-
-          <TouchableOpacity
-            style={styles.settingsRow}
-            onPress={() => router.push('/profile/payment-methods')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.settingsRowLeft}>
-              <Ionicons name="card-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.settingsRowLabel}>{i18n.t('profile.payment_methods')}</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-
-          {profile?.role === 'seller' && (
-            <>
-              <View style={styles.settingsDivider} />
-              <TouchableOpacity
-                style={styles.settingsRow}
-                onPress={() => router.push('/(seller)/sales')}
-                activeOpacity={0.7}
-              >
-                <View style={styles.settingsRowLeft}>
-                  <Ionicons name="receipt-outline" size={20} color={colors.textSecondary} />
-                  <Text style={styles.settingsRowLabel}>{i18n.t('profile.my_sales')}</Text>
-                </View>
-                <View style={styles.settingsRowRight}>
-                  {ventesCount !== null && ventesCount > 0 && (
-                    <View style={styles.ordersBadge}>
-                      <Text style={styles.ordersBadgeText}>{ventesCount}</Text>
-                    </View>
-                  )}
-                  <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-                </View>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* À propos */}
-        <TouchableOpacity style={styles.aboutBtn} onPress={() => router.push('/profile/about')}>
-          <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
-          <Text style={styles.aboutText}>À propos · CGU · Confidentialité</Text>
-        </TouchableOpacity>
-
-        {/* Sign out */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={signOut}>
-          <Text style={styles.signOutText}>{i18n.t('profile.sign_out')}</Text>
-        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   )
@@ -702,198 +717,198 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { paddingHorizontal: 16, paddingTop: 16 },
-  settingsIconBtn: {
+
+  // Header
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    position: 'relative',
+  },
+  topHeaderUsername: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
+    color: colors.text,
+  },
+  settingsBtn: {
     position: 'absolute',
-    top: 16,
     right: 16,
-    zIndex: 10,
+    top: 10,
     padding: 4,
   },
-  topRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+
+  // Profile info
+  profileInfo: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
   avatarWrap: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: colors.surface,
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: colors.primary,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 12,
   },
   avatarImg: { width: 80, height: 80 },
   avatarInitial: { fontFamily: fontFamily.bold, fontSize: 28, color: colors.primary },
-  statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', marginLeft: 16 },
-  stat: { alignItems: 'center' },
-  statNum: { fontFamily: fontFamily.bold, fontSize: 20, color: colors.text },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  displayName: { fontFamily: fontFamily.bold, fontSize: 17, color: colors.text },
-  username: { fontSize: 14, color: colors.textSecondary, marginTop: 2 },
-  bio: { fontSize: 14, color: colors.text, marginTop: 6 },
-  btnRow: { flexDirection: 'row', marginTop: 12, gap: 8 },
-  editBtn: {
-    flex: 1,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtnText: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.text },
-  addBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  followBtn: {
-    flex: 1,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  followBtnActive: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  followBtnText: { fontFamily: fontFamily.semiBold, fontSize: 13, color: '#000' },
-  followBtnTextActive: { color: colors.primary },
-  storiesWrap: { marginTop: 16 },
-  storiesRow: { paddingHorizontal: 16, gap: 16 },
-  storyItem: { alignItems: 'center', gap: 6 },
-  storyCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  storyCircleAdd: {
-    borderStyle: 'dashed',
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(0,210,184,0.06)',
-  },
-  storyCircleSold: {
-    borderColor: colors.border,
-    opacity: 0.5,
-  },
-  storyCircleImg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-  },
-  storyLabel: { fontSize: 11, color: colors.textSecondary },
-  tabBar: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    marginTop: 16,
-  },
-  activeTab: {
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary,
-  },
-  emptyGrid: {
-    height: 300,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyTitle: { fontSize: 14, color: colors.textSecondary, marginTop: 12 },
-  settingsSection: {
-    marginTop: 16,
-    marginHorizontal: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  settingsRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  settingsRowLabel: {
-    fontSize: 14,
-    fontFamily: fontFamily.medium,
+  displayName: {
+    fontFamily: fontFamily.bold,
+    fontSize: 18,
     color: colors.text,
+    lineHeight: 22,
   },
-  settingsRowRight: {
+  username: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  bio: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 18,
+    paddingHorizontal: 8,
+  },
+
+  // Stats
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
+    gap: 40,
+    marginTop: 18,
+    marginBottom: 18,
   },
-  walletBalance: {
+  stat: { alignItems: 'center' },
+  statNum: { fontFamily: fontFamily.bold, fontSize: 18, color: colors.text },
+  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+
+  // Buttons
+  editBtn: {
+    alignSelf: 'stretch',
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editBtnText: {
     fontFamily: fontFamily.semiBold,
     fontSize: 13,
     color: colors.primary,
   },
-  settingsDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 16,
-  },
-  ordersBadge: {
-    minWidth: 20,
-    height: 20,
+  becomeSellerBtn: {
+    alignSelf: 'stretch',
+    height: 38,
     borderRadius: 10,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
-  },
-  ordersBadgeText: {
-    fontSize: 11,
-    fontFamily: fontFamily.bold,
-    color: '#0F0F0F',
-  },
-  aboutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: 14,
-    marginTop: 4,
-  },
-  aboutText: {
-    fontFamily: fontFamily.regular,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  signOutBtn: { padding: 16, marginTop: 4, alignItems: 'center' },
-  signOutText: { fontFamily: fontFamily.medium, fontSize: 14, color: colors.error },
-  becomeSellerBtn: {
-    backgroundColor: 'rgba(0,210,184,0.1)',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
     marginTop: 8,
   },
-  becomeSellerText: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.primary },
+  becomeSellerText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: '#0F0F0F',
+  },
+
+  // Wallet
+  walletCard: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  walletLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  walletLabel: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 14,
+    color: colors.text,
+  },
+  walletRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  walletAmount: {
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
+    color: colors.primary,
+  },
+
+  // Quick links
+  quickRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  quickCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    gap: 6,
+  },
+  quickLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
+  },
+
+  // Tabs
+  tabBar: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  tabItem: {
+    flex: 1,
+    height: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabItemActive: { borderBottomColor: colors.primary },
+  tabLabel: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontFamily: fontFamily.medium,
+  },
+  tabLabelActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
+
+  // Empty
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 10,
+  },
+  emptyTitle: { fontSize: 14, color: colors.textSecondary },
+  emptyCta: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 8,
+  },
+  emptyCtaText: {
+    color: '#0F0F0F',
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+  },
 })

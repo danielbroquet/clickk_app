@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Image,
-  FlatList,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -12,6 +11,7 @@ import {
   ActionSheetIOS,
   Modal,
   Platform,
+  Dimensions,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -22,6 +22,9 @@ import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
 import ReportModal from '../../components/ui/ReportModal'
+
+const SCREEN_WIDTH = Dimensions.get('window').width
+const CELL_SIZE = (SCREEN_WIDTH - 4) / 2
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,10 +40,11 @@ interface Profile {
   created_at: string
 }
 
-interface Story {
+interface Drop {
   id: string
   title: string | null
   video_url: string | null
+  thumbnail_url: string | null
   current_price_chf: number
   status: string
   expires_at: string | null
@@ -84,28 +88,93 @@ const useBlock = (currentUserId: string, targetUserId: string) => {
   return { isBlocked, toggleBlock, loading }
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Grid cell ────────────────────────────────────────────────────────────────
 
-function StoryCard({ story }: { story: Story }) {
+function DropGridCell({ drop }: { drop: Drop }) {
+  const thumb = drop.thumbnail_url ?? drop.video_url
+  const status = drop.status
+
   return (
     <TouchableOpacity
-      style={styles.storyCard}
+      style={gridStyles.cell}
       activeOpacity={0.85}
-      onPress={() => router.push(`/story/${story.id}`)}
+      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })}
     >
-      {story.video_url ? (
-        <Image source={{ uri: story.video_url }} style={styles.storyThumb} resizeMode="cover" />
+      {thumb ? (
+        <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
       ) : (
-        <View style={[styles.storyThumb, styles.thumbPlaceholder]}>
+        <View style={[gridStyles.thumb, gridStyles.placeholder]}>
           <Ionicons name="videocam-outline" size={28} color={colors.border} />
         </View>
       )}
-      <View style={styles.storyPriceBadge}>
-        <Text style={styles.storyPriceText}>CHF {story.current_price_chf.toFixed(2)}</Text>
+
+      <View style={gridStyles.priceBadge}>
+        <Text style={gridStyles.priceBadgeText}>CHF {Number(drop.current_price_chf).toFixed(0)}</Text>
       </View>
+
+      {status === 'sold' && (
+        <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
+          <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+        </View>
+      )}
+      {status === 'expired' && (
+        <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
+          <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+        </View>
+      )}
     </TouchableOpacity>
   )
 }
+
+const gridStyles = StyleSheet.create({
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 2,
+  },
+  cell: {
+    width: CELL_SIZE,
+    aspectRatio: 1,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  thumb: { width: '100%', height: '100%' },
+  placeholder: { justifyContent: 'center', alignItems: 'center' },
+  priceBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  priceBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+  },
+  statusBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+  statusSold: { backgroundColor: 'rgba(0,210,184,0.2)' },
+  statusSoldText: {
+    color: colors.primary,
+    fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+  },
+  statusExpired: { backgroundColor: 'rgba(255,255,255,0.1)' },
+  statusExpiredText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontFamily: fontFamily.semiBold,
+  },
+})
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -114,18 +183,19 @@ export default function PublicProfileScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
 
-  const [profile, setProfile]   = useState<Profile | null>(null)
-  const [stories, setStories]   = useState<Story[]>([])
-  const [loading, setLoading]   = useState(true)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [drops, setDrops] = useState<Drop[]>([])
+  const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [menuVisible, setMenuVisible] = useState(false)
   const [reportUserVisible, setReportUserVisible] = useState(false)
+  const [dropsCount, setDropsCount] = useState<number>(0)
+  const [ventesCount, setVentesCount] = useState<number>(0)
 
   const { isFollowing, followersCount, toggleFollow, loading: followLoading } = useFollow(id ?? '')
   const { isBlocked, toggleBlock, loading: blockLoading } = useBlock(currentUserId, id ?? '')
 
-  // Redirect to own profile tab
   useEffect(() => {
     if (id && currentUserId && id === currentUserId) {
       router.replace('/(tabs)/profile')
@@ -145,18 +215,46 @@ export default function PublicProfileScreen() {
 
       supabase
         .from('stories')
-        .select('id, title, video_url, current_price_chf, start_price_chf, floor_price_chf, status, expires_at, created_at')
+        .select('id, title, video_url, thumbnail_url, current_price_chf, status, expires_at, created_at')
         .eq('seller_id', id)
         .eq('status', 'active')
         .order('created_at', { ascending: false }),
-    ]).then(([profileRes, storiesRes]) => {
+
+      supabase
+        .from('stories')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', id),
+
+      supabase
+        .from('stories')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', id)
+        .eq('status', 'sold'),
+    ]).then(async ([profileRes, activeRes, dropsCountRes, ventesRes]) => {
       if (profileRes.error || !profileRes.data) {
         setFetchError('Profil introuvable')
-      } else {
-        setProfile(profileRes.data as Profile)
+        setLoading(false)
+        return
       }
-      setStories((storiesRes.data ?? []) as Story[])
-      setLoading(false)
+      setProfile(profileRes.data as Profile)
+      setDropsCount(dropsCountRes.count ?? 0)
+      setVentesCount(ventesRes.count ?? 0)
+
+      const active = (activeRes.data ?? []) as Drop[]
+      if (active.length > 0) {
+        setDrops(active)
+        setLoading(false)
+      } else {
+        // Fallback: show all drops regardless of status
+        const { data: all } = await supabase
+          .from('stories')
+          .select('id, title, video_url, thumbnail_url, current_price_chf, status, expires_at, created_at')
+          .eq('seller_id', id)
+          .order('created_at', { ascending: false })
+          .limit(60)
+        setDrops((all ?? []) as Drop[])
+        setLoading(false)
+      }
     })
   }, [id])
 
@@ -167,7 +265,7 @@ export default function PublicProfileScreen() {
       const convId = await getOrCreateConversation(supabase, currentUserId, id)
       router.push(`/conversation/${convId}`)
     } catch {
-      // silently ignore — user stays on profile
+      // silently ignore
     } finally {
       setChatLoading(false)
     }
@@ -213,14 +311,31 @@ export default function PublicProfileScreen() {
     }
   }
 
-  // ── Loading / error states ─────────────────────────────────────────────────
+  // ── Header bar (reused across states) ───────────────────────────────────────
+  const headerBar = (usernameLabel: string) => (
+    <View style={styles.topHeader}>
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="chevron-back" size={26} color={colors.text} />
+      </TouchableOpacity>
+      <Text style={styles.topHeaderUsername} numberOfLines={1}>@{usernameLabel}</Text>
+      <TouchableOpacity
+        style={styles.menuBtn}
+        onPress={handleMenuPress}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
+      </TouchableOpacity>
+    </View>
+  )
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        {headerBar('')}
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -231,9 +346,7 @@ export default function PublicProfileScreen() {
   if (fetchError || !profile) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+        {headerBar('')}
         <View style={styles.centered}>
           <Text style={styles.errorText}>{fetchError ?? 'Profil introuvable'}</Text>
         </View>
@@ -242,19 +355,12 @@ export default function PublicProfileScreen() {
   }
 
   const displayName = profile.display_name ?? profile.username
-  const initial     = displayName.charAt(0).toUpperCase()
-
-  // ── Blocked state ──────────────────────────────────────────────────────────
+  const initial = displayName.charAt(0).toUpperCase()
 
   if (isBlocked) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuBtn} onPress={handleMenuPress}>
-          <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
-        </TouchableOpacity>
+        {headerBar(profile.username)}
         <View style={styles.centered}>
           <Ionicons name="ban-outline" size={48} color={colors.textSecondary} />
           <Text style={styles.blockedUsername}>@{profile.username}</Text>
@@ -282,25 +388,13 @@ export default function PublicProfileScreen() {
     )
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Floating back */}
-      <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color={colors.text} />
-      </TouchableOpacity>
-
-      {/* Menu button */}
-      <TouchableOpacity style={styles.menuBtn} onPress={handleMenuPress}>
-        <Ionicons name="ellipsis-horizontal" size={22} color={colors.textSecondary} />
-      </TouchableOpacity>
+      {headerBar(profile.username)}
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <View style={styles.header}>
-          {/* Avatar */}
+        {/* Profile info */}
+        <View style={styles.profileInfo}>
           <View style={styles.avatarWrap}>
             {profile.avatar_url ? (
               <Image source={{ uri: profile.avatar_url }} style={styles.avatarImg} />
@@ -309,25 +403,25 @@ export default function PublicProfileScreen() {
             )}
           </View>
 
-          {/* Name + bio */}
           <Text style={styles.displayName}>{displayName}</Text>
           <Text style={styles.username}>@{profile.username}</Text>
-          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+          {profile.bio ? <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text> : null}
 
-          {/* Stats row */}
           <View style={styles.statsRow}>
             <View style={styles.stat}>
-              <Text style={styles.statNum}>{followersCount}</Text>
+              <Text style={styles.statNum}>{dropsCount}</Text>
+              <Text style={styles.statLabel}>Drops</Text>
+            </View>
+            <View style={styles.stat}>
+              <Text style={styles.statNum}>{followLoading ? '--' : followersCount}</Text>
               <Text style={styles.statLabel}>Abonnés</Text>
             </View>
-            <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Text style={styles.statNum}>{profile.following_count ?? 0}</Text>
-              <Text style={styles.statLabel}>Abonnements</Text>
+              <Text style={styles.statNum}>{ventesCount}</Text>
+              <Text style={styles.statLabel}>Ventes</Text>
             </View>
           </View>
 
-          {/* Action buttons */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.followBtn, isFollowing && styles.followBtnActive]}
@@ -339,7 +433,7 @@ export default function PublicProfileScreen() {
                 <ActivityIndicator size="small" color={isFollowing ? colors.primary : '#0F0F0F'} />
               ) : (
                 <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}>
-                  {isFollowing ? 'Abonné' : "S'abonner"}
+                  {isFollowing ? 'Abonné' : 'Suivre'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -353,29 +447,26 @@ export default function PublicProfileScreen() {
               {chatLoading ? (
                 <ActivityIndicator size="small" color={colors.text} />
               ) : (
-                <Ionicons name="chatbubble-outline" size={18} color={colors.text} />
+                <>
+                  <Ionicons name="chatbubble-outline" size={16} color={colors.text} />
+                  <Text style={styles.messageBtnText}>Message</Text>
+                </>
               )}
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ── Stories section ─────────────────────────────────────────────── */}
-        {stories.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Drops en cours</Text>
-            <FlatList
-              data={stories}
-              keyExtractor={s => s.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.storiesRow}
-              renderItem={({ item }) => <StoryCard story={item} />}
-            />
+        {/* Drops grid */}
+        {drops.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Ionicons name="videocam-outline" size={44} color={colors.textSecondary} />
+            <Text style={styles.emptyText}>Ce vendeur n'a pas encore publié de drop</Text>
           </View>
         ) : (
-          <View style={styles.emptySection}>
-            <Ionicons name="flash-outline" size={44} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>Aucun drop pour l'instant</Text>
+          <View style={gridStyles.grid}>
+            {drops.map(drop => (
+              <DropGridCell key={drop.id} drop={drop} />
+            ))}
           </View>
         )}
       </ScrollView>
@@ -453,10 +544,8 @@ export default function PublicProfileScreen() {
   )
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1, backgroundColor: colors.bg },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: {
     fontFamily: fontFamily.medium,
@@ -466,21 +555,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
 
-  backBtn: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    alignSelf: 'flex-start',
+  // Header
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    position: 'relative',
   },
-
+  topHeaderUsername: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
+    color: colors.text,
+  },
+  backBtn: {
+    position: 'absolute',
+    left: 12,
+    top: 8,
+    padding: 4,
+  },
   menuBtn: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 8,
-    zIndex: 10,
+    right: 12,
+    top: 10,
+    padding: 4,
   },
 
-  // ── Blocked state ─────────────────────────────────────────────────────────
+  // Blocked
   blockedUsername: {
     fontFamily: fontFamily.semiBold,
     fontSize: fontSize.body,
@@ -505,14 +607,12 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  header: {
+  // Profile info
+  profileInfo: {
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   avatarWrap: {
     width: 80,
@@ -522,76 +622,56 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primary,
     overflow: 'hidden',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  avatarImg:     { width: 80, height: 80 },
-  avatarInitial: {
-    fontFamily: fontFamily.bold,
-    fontSize: 28,
-    color: colors.primary,
-  },
+  avatarImg: { width: 80, height: 80 },
+  avatarInitial: { fontFamily: fontFamily.bold, fontSize: 28, color: colors.primary },
 
   displayName: {
     fontFamily: fontFamily.bold,
-    fontSize: fontSize.headline,
+    fontSize: 18,
     color: colors.text,
-    marginBottom: 2,
+    lineHeight: 22,
   },
   username: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.body,
+    fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    marginTop: 2,
   },
   bio: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.caption,
+    fontSize: 13,
     color: colors.textSecondary,
     textAlign: 'center',
+    marginTop: 10,
     lineHeight: 18,
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 8,
   },
 
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: spacing.lg,
+    justifyContent: 'center',
+    gap: 40,
+    marginTop: 18,
+    marginBottom: 18,
   },
   stat: { alignItems: 'center' },
-  statNum: {
-    fontFamily: fontFamily.bold,
-    fontSize: fontSize.headline,
-    color: colors.text,
-  },
-  statLabel: {
-    fontFamily: fontFamily.regular,
-    fontSize: fontSize.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border,
-  },
+  statNum: { fontFamily: fontFamily.bold, fontSize: 18, color: colors.text },
+  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 
   actionRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
+    gap: 8,
+    alignSelf: 'stretch',
   },
   followBtn: {
+    flex: 1,
     height: 38,
-    paddingHorizontal: spacing.lg,
     borderRadius: 10,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 120,
   },
   followBtnActive: {
     backgroundColor: 'transparent',
@@ -600,14 +680,14 @@ const styles = StyleSheet.create({
   },
   followBtnText: {
     fontFamily: fontFamily.semiBold,
-    fontSize: fontSize.label,
+    fontSize: 13,
     color: '#0F0F0F',
   },
   followBtnTextActive: {
     color: colors.primary,
   },
   messageBtn: {
-    width: 38,
+    flex: 1,
     height: 38,
     borderRadius: 10,
     borderWidth: 1,
@@ -615,59 +695,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
-
-  // ── Sections ──────────────────────────────────────────────────────────────
-  section: {
-    marginTop: spacing.lg,
-  },
-  sectionTitle: {
+  messageBtnText: {
     fontFamily: fontFamily.semiBold,
-    fontSize: fontSize.body,
+    fontSize: 13,
     color: colors.text,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
   },
 
-  // ── Story cards ───────────────────────────────────────────────────────────
-  storiesRow: {
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-  },
-  storyCard: {
-    width: 120,
-    height: 180,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-  },
-  storyThumb: {
-    width: 120,
-    height: 180,
-  },
-  storyPriceBadge: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,210,184,0.85)',
-    borderRadius: 6,
-    paddingVertical: 4,
-    alignItems: 'center',
-  },
-  storyPriceText: {
-    fontFamily: fontFamily.bold,
-    fontSize: 11,
-    color: '#0F0F0F',
-  },
-
-  thumbPlaceholder: {
-    backgroundColor: colors.surfaceHigh,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Empty ─────────────────────────────────────────────────────────────────
+  // Empty
   emptySection: {
     alignItems: 'center',
     paddingTop: spacing.xl,
@@ -677,9 +714,11 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.medium,
     fontSize: fontSize.body,
     color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
   },
 
-  // ── Action sheet (Android/web) ────────────────────────────────────────────
+  // Action sheet
   sheetBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
