@@ -17,6 +17,7 @@ import {
   Alert,
   RefreshControl,
   Share,
+  ScrollView,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -34,6 +35,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import { useWatchlist } from '../../hooks/useWatchlist'
+import { useFollow } from '../../hooks/useFollow'
 import { useDropPresence } from '../../hooks/useDropPresence'
 import ReportModal from '../../components/ui/ReportModal'
 import { SaleToast, SaleToastPayload } from '../../components/ui/SaleToast'
@@ -44,6 +46,8 @@ interface FeedStory {
   id: string
   seller_id: string
   title: string
+  description: string | null
+  category: string | null
   start_price_chf: number
   floor_price_chf: number
   current_price_chf: number
@@ -58,7 +62,7 @@ interface FeedStory {
 }
 
 const STORY_SELECT = `
-  id, seller_id, title, start_price_chf, floor_price_chf, current_price_chf,
+  id, seller_id, title, description, category, start_price_chf, floor_price_chf, current_price_chf,
   video_url, thumbnail_url, status, buyer_id, created_at, expires_at, price_drop_seconds,
   seller:seller_id ( id, username, avatar_url )
 `
@@ -83,6 +87,15 @@ function dropPerMinute(s: FeedStory): number {
   if (total <= 0) return 0
   const span = s.start_price_chf - s.floor_price_chf
   return span / (total / 60000)
+}
+
+function formatCountdown(expiresAt: string): string {
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return 'Expiré'
+  const h = Math.floor(ms / 3600000)
+  const m = Math.floor((ms % 3600000) / 60000)
+  const s = Math.floor((ms % 60000) / 1000)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 function RecentViewersPill({ count }: { count: number }) {
@@ -117,13 +130,18 @@ function DropItem({
   const [paused, setPaused] = useState(false)
   const viewerCount = useDropPresence(story.id, active && tabFocused)
   const { isWatchlisted, watchlistCount, toggleWatchlist } = useWatchlist(story.id)
+  const sellerId = story.seller?.id ?? ''
+  const { isFollowing, toggleFollow, loading: followLoading } = useFollow(sellerId)
+  const sheetInsets = useSafeAreaInsets()
   const [menuVisible, setMenuVisible] = useState(false)
   const [reportVisible, setReportVisible] = useState(false)
   const [buyVisible, setBuyVisible] = useState(false)
+  const [detailVisible, setDetailVisible] = useState(false)
   const [snapshotPrice, setSnapshotPrice] = useState(0)
 
   const [price, setPrice] = useState(() => computePrice(story))
   const [progress, setProgress] = useState(() => computeProgress(story))
+  const [countdown, setCountdown] = useState(() => formatCountdown(story.expires_at))
   const [localSold, setLocalSold] = useState(false)
   const [recentViewers, setRecentViewers] = useState<number>(0)
 
@@ -138,11 +156,24 @@ function DropItem({
     const tick = () => {
       setPrice(computePrice(story))
       setProgress(computeProgress(story))
+      setCountdown(formatCountdown(story.expires_at))
     }
     tick()
-    const h = setInterval(tick, 1000)
+    const h = setInterval(tick, 250)
     return () => clearInterval(h)
   }, [active, story])
+
+  // Keep sheet price updated even when not the active feed item
+  useEffect(() => {
+    if (!detailVisible) return
+    const tick = () => {
+      setPrice(computePrice(story))
+      setCountdown(formatCountdown(story.expires_at))
+    }
+    tick()
+    const h = setInterval(tick, 250)
+    return () => clearInterval(h)
+  }, [detailVisible, story])
 
   useEffect(() => {
     if (!active || !currentUserId) return
@@ -233,6 +264,7 @@ function DropItem({
   const openBuy = () => {
     if (disabled) return
     setSnapshotPrice(price)
+    setDetailVisible(false)
     setBuyVisible(true)
   }
 
@@ -352,9 +384,24 @@ function DropItem({
           <Text style={styles.sellerUsername}>@{username}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.productTitle} numberOfLines={2}>
-          {story.title}
-        </Text>
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => setDetailVisible(true)}
+          style={styles.titleRow}
+        >
+          <Text style={styles.productTitle} numberOfLines={2}>
+            {story.title}
+          </Text>
+          <Ionicons name="chevron-up" size={14} color="rgba(255,255,255,0.5)" style={styles.titleChevron} />
+        </TouchableOpacity>
+
+        {!!story.description && (
+          <TouchableOpacity activeOpacity={0.75} onPress={() => setDetailVisible(true)}>
+            <Text style={styles.productDesc} numberOfLines={2}>
+              {story.description}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.priceBlock}>
           <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
@@ -425,6 +472,132 @@ function DropItem({
         targetType="story"
         targetId={story.id}
       />
+
+      {/* ── Detail sheet ───────────────────────────────────────────────── */}
+      <Modal
+        visible={detailVisible}
+        transparent
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setDetailVisible(false)}
+      >
+        <View style={[detailStyles.root, { paddingBottom: sheetInsets.bottom + 16 }]}>
+          {/* Handle + close */}
+          <View style={detailStyles.handleRow}>
+            <View style={detailStyles.handle} />
+            <TouchableOpacity
+              style={detailStyles.closeBtn}
+              onPress={() => setDetailVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={detailStyles.scrollContent}
+          >
+            {/* Seller row */}
+            <View style={detailStyles.sellerRow}>
+              <TouchableOpacity
+                style={detailStyles.sellerLeft}
+                onPress={() => {
+                  setDetailVisible(false)
+                  if (sellerId && sellerId !== currentUserId) {
+                    router.push(`/profile/${sellerId}`)
+                  }
+                }}
+                activeOpacity={0.8}
+              >
+                {story.seller?.avatar_url ? (
+                  <Image source={{ uri: story.seller.avatar_url }} style={detailStyles.sellerAvatar} />
+                ) : (
+                  <View style={detailStyles.sellerAvatarFallback}>
+                    <Text style={detailStyles.sellerAvatarInitial}>
+                      {(story.seller?.username ?? 'V').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={detailStyles.sellerUsername}>@{story.seller?.username ?? 'vendeur'}</Text>
+              </TouchableOpacity>
+
+              {sellerId !== currentUserId && (
+                <TouchableOpacity
+                  style={[detailStyles.followBtn, isFollowing && detailStyles.followBtnActive]}
+                  onPress={toggleFollow}
+                  disabled={followLoading}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[detailStyles.followBtnText, isFollowing && detailStyles.followBtnTextActive]}>
+                    {isFollowing ? 'Abonné' : 'Suivre'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={detailStyles.divider} />
+
+            {/* Category */}
+            {!!story.category && (
+              <View style={detailStyles.categoryBadge}>
+                <Text style={detailStyles.categoryText}>
+                  {story.category.charAt(0).toUpperCase() + story.category.slice(1)}
+                </Text>
+              </View>
+            )}
+
+            {/* Title */}
+            <Text style={detailStyles.title}>{story.title}</Text>
+
+            {/* Description */}
+            {!!story.description && (
+              <Text style={detailStyles.description}>{story.description}</Text>
+            )}
+
+            <View style={detailStyles.divider} />
+
+            {/* Price section */}
+            <Text style={detailStyles.priceLabel}>PRIX ACTUEL</Text>
+            <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
+            {dropPerMinute(story) > 0 && (
+              <Text style={detailStyles.priceDrop}>
+                ↓ baisse toutes les {story.price_drop_seconds ?? 60}s
+              </Text>
+            )}
+            <Text style={detailStyles.priceFloor}>
+              Prix plancher : CHF {story.floor_price_chf.toFixed(2)}
+            </Text>
+
+            <View style={detailStyles.divider} />
+
+            {/* Expiry */}
+            <Text style={detailStyles.expires}>
+              Expire dans {countdown}
+            </Text>
+          </ScrollView>
+
+          {/* Sticky footer */}
+          <View style={detailStyles.footer}>
+            <TouchableOpacity
+              style={[detailStyles.buyBtn, disabled && detailStyles.buyBtnDisabled]}
+              activeOpacity={0.85}
+              disabled={disabled}
+              onPress={openBuy}
+            >
+              <Text style={[detailStyles.buyBtnText, disabled && detailStyles.buyBtnTextDisabled]}>
+                {isSold
+                  ? 'Vendu'
+                  : isSeller
+                  ? 'Votre drop'
+                  : story.status !== 'active'
+                  ? 'Enchère terminée'
+                  : `Acheter maintenant — CHF ${price.toFixed(2)}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={buyVisible}
@@ -925,12 +1098,27 @@ const styles = StyleSheet.create({
   sellerAvatarInitial: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   sellerUsername: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+    marginBottom: 4,
+  },
+  titleChevron: {
+    marginTop: 3,
+  },
   productTitle: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
-    marginBottom: 12,
+    flex: 1,
+  },
+  productDesc: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
   },
 
   priceBlock: {
@@ -1101,4 +1289,162 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+})
+
+const detailStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: 60,
+  },
+  handleRow: {
+    alignItems: 'center',
+    paddingTop: 12,
+    marginBottom: 4,
+    position: 'relative',
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#444',
+  },
+  closeBtn: {
+    position: 'absolute',
+    right: 16,
+    top: 10,
+    padding: 4,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+
+  // Seller row
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  sellerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  sellerAvatar: { width: 32, height: 32, borderRadius: 16 },
+  sellerAvatarFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#333',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sellerAvatarInitial: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  sellerUsername: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  followBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#00D2B8',
+  },
+  followBtnActive: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#00D2B8',
+  },
+  followBtnText: { color: '#0F0F0F', fontSize: 12, fontWeight: '700' },
+  followBtnTextActive: { color: '#00D2B8' },
+
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#333',
+    marginVertical: 16,
+  },
+
+  // Category
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,210,184,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.4)',
+    borderRadius: 99,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  categoryText: {
+    color: '#00D2B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Text content
+  title: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+    marginBottom: 12,
+  },
+  description: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 15,
+    lineHeight: 25,
+  },
+
+  // Price section
+  priceLabel: {
+    color: '#717976',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  priceBig: {
+    color: '#00D2B8',
+    fontSize: 36,
+    fontWeight: '700',
+    letterSpacing: -1,
+    marginBottom: 4,
+  },
+  priceDrop: {
+    color: '#FFA502',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  priceFloor: {
+    color: '#717976',
+    fontSize: 12,
+  },
+
+  expires: {
+    color: '#717976',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  // Footer
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#2A2A2A',
+  },
+  buyBtn: {
+    height: 52,
+    backgroundColor: '#00D2B8',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buyBtnDisabled: { backgroundColor: '#2A2A2A' },
+  buyBtnText: { color: '#0F0F0F', fontSize: 15, fontWeight: '700' },
+  buyBtnTextDisabled: { color: '#555' },
 })
