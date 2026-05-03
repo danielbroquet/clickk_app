@@ -84,23 +84,16 @@ function dropPerMinute(s: FeedStory): number {
   return span / (total / 60000)
 }
 
-function LivePill() {
-  const dot = useSharedValue(1)
-  useEffect(() => {
-    dot.value = withRepeat(
-      withSequence(
-        withTiming(0.3, { duration: 600, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 600, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    )
-  }, [dot])
-  const dotStyle = useAnimatedStyle(() => ({ opacity: dot.value }))
+function RecentViewersPill({ count }: { count: number }) {
+  if (count < 2) return null
+  let label: string
+  if (count >= 51) label = 'Populaire'
+  else if (count >= 11) label = '+10 personnes regardent'
+  else label = `${count} personnes regardent`
+  const icon = count >= 51 ? '🔥' : '👁'
   return (
-    <View style={styles.livePill}>
-      <Animated.View style={[styles.liveDot, dotStyle]} />
-      <Text style={styles.liveText}>LIVE</Text>
+    <View style={styles.recentViewersPill}>
+      <Text style={styles.recentViewersText}>{icon} {label}</Text>
     </View>
   )
 }
@@ -131,6 +124,7 @@ function DropItem({
   const [price, setPrice] = useState(() => computePrice(story))
   const [progress, setProgress] = useState(() => computeProgress(story))
   const [localSold, setLocalSold] = useState(false)
+  const [recentViewers, setRecentViewers] = useState<number>(0)
 
   const { handlePurchase, purchasing, instantLoading } = useStoryPurchase()
 
@@ -148,6 +142,23 @@ function DropItem({
     const h = setInterval(tick, 1000)
     return () => clearInterval(h)
   }, [active, story])
+
+  useEffect(() => {
+    if (!active || !currentUserId) return
+    supabase
+      .from('story_views')
+      .insert({ story_id: story.id, user_id: currentUserId })
+      .then(() => {})
+    ;(async () => {
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const { count } = await supabase
+        .from('story_views')
+        .select('*', { count: 'exact', head: true })
+        .eq('story_id', story.id)
+        .gte('viewed_at', tenMinAgo)
+      setRecentViewers(count ?? 0)
+    })()
+  }, [active, currentUserId, story.id])
 
   useEffect(() => {
     if (!videoRef.current) return
@@ -275,7 +286,7 @@ function DropItem({
       )}
 
       <View style={styles.topRow} pointerEvents="box-none">
-        {story.status === 'active' ? <LivePill /> : <View />}
+        <RecentViewersPill count={recentViewers} />
         {viewerCount > 1 ? (
           <View style={styles.watchingPill}>
             <Ionicons name="eye-outline" size={12} color="#FFFFFF" />
@@ -824,17 +835,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 10,
   },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FF3B30',
+  recentViewersPill: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
+    paddingVertical: 5,
+    borderRadius: 99,
   },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
-  liveText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  recentViewersText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
   watchingPill: {
     flexDirection: 'row',
     alignItems: 'center',
