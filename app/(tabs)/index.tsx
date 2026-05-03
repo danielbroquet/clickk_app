@@ -15,10 +15,12 @@ import {
   Modal,
   Pressable,
   Alert,
+  RefreshControl,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { router, useFocusEffect } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -446,13 +448,28 @@ function DropItem({
   )
 }
 
+type FeedTab = 'foryou' | 'following'
+
 const keyExtractor = (item: FeedStory) => item.id
 
 export default function FeedScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
-  const [stories, setStories] = useState<FeedStory[]>([])
-  const [loading, setLoading] = useState(true)
+  const insets = useSafeAreaInsets()
+
+  const [activeTab, setActiveTab] = useState<FeedTab>('foryou')
+
+  // Per-tab state
+  const [forYouStories, setForYouStories] = useState<FeedStory[]>([])
+  const [forYouLoading, setForYouLoading] = useState(true)
+  const [forYouLoaded, setForYouLoaded] = useState(false)
+  const [forYouRefreshing, setForYouRefreshing] = useState(false)
+
+  const [followingStories, setFollowingStories] = useState<FeedStory[]>([])
+  const [followingLoading, setFollowingLoading] = useState(false)
+  const [followingLoaded, setFollowingLoaded] = useState(false)
+  const [followingRefreshing, setFollowingRefreshing] = useState(false)
+
   const [activeIndex, setActiveIndex] = useState(0)
   const [tabFocused, setTabFocused] = useState(true)
   const [toast, setToast] = useState<SaleToastPayload | null>(null)
@@ -465,7 +482,8 @@ export default function FeedScreen() {
     }, [])
   )
 
-  const fetchStories = useCallback(async () => {
+  // ── Fetch "Pour toi" ────────────────────────────────────────────────────────
+  const fetchForYou = useCallback(async () => {
     const { data, error } = await supabase
       .from('stories')
       .select(STORY_SELECT)
@@ -473,18 +491,68 @@ export default function FeedScreen() {
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(30)
-    if (error) {
-      setLoading(false)
-      return
-    }
-    setStories((data as unknown as FeedStory[]) ?? [])
-    setLoading(false)
+    if (!error) setForYouStories((data as unknown as FeedStory[]) ?? [])
+    setForYouLoading(false)
+    setForYouLoaded(true)
+    setForYouRefreshing(false)
   }, [])
 
-  useEffect(() => {
-    fetchStories()
-  }, [fetchStories])
+  // ── Fetch "Abonnements" ─────────────────────────────────────────────────────
+  const fetchFollowing = useCallback(async () => {
+    if (!currentUserId) {
+      setFollowingLoading(false)
+      setFollowingLoaded(true)
+      setFollowingRefreshing(false)
+      return
+    }
+    const { data: follows } = await supabase
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', currentUserId)
 
+    const ids = (follows ?? []).map((f: { following_id: string }) => f.following_id)
+
+    if (ids.length === 0) {
+      setFollowingStories([])
+      setFollowingLoading(false)
+      setFollowingLoaded(true)
+      setFollowingRefreshing(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('stories')
+      .select(STORY_SELECT)
+      .eq('status', 'active')
+      .gt('expires_at', new Date().toISOString())
+      .in('seller_id', ids)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    if (!error) setFollowingStories((data as unknown as FeedStory[]) ?? [])
+    setFollowingLoading(false)
+    setFollowingLoaded(true)
+    setFollowingRefreshing(false)
+  }, [currentUserId])
+
+  // Initial load
+  useEffect(() => { fetchForYou() }, [fetchForYou])
+
+  // Load following tab on first switch to it
+  useEffect(() => {
+    if (activeTab === 'following' && !followingLoaded && !followingLoading) {
+      setFollowingLoading(true)
+      fetchFollowing()
+    }
+  }, [activeTab, followingLoaded, followingLoading, fetchFollowing])
+
+  // Reset active index when switching tabs
+  const handleTabSwitch = useCallback((tab: FeedTab) => {
+    setActiveTab(tab)
+    setActiveIndex(0)
+  }, [])
+
+  // ── Realtime sale toast ─────────────────────────────────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel('drop_sales')
@@ -525,9 +593,12 @@ export default function FeedScreen() {
     console.log('[feed] swipe down -> main menu (TBD)')
   }, [])
 
+  const activeStories = activeTab === 'foryou' ? forYouStories : followingStories
+  const isLoading = activeTab === 'foryou' ? forYouLoading : followingLoading
+
   const preloadStories = useMemo(
-    () => stories.slice(activeIndex + 1, activeIndex + 3),
-    [stories, activeIndex]
+    () => activeStories.slice(activeIndex + 1, activeIndex + 3),
+    [activeStories, activeIndex]
   )
 
   const renderItem: ListRenderItem<FeedStory> = useCallback(
@@ -548,19 +619,81 @@ export default function FeedScreen() {
     []
   )
 
-  if (loading) {
+  // ── Tab header overlay ──────────────────────────────────────────────────────
+  const tabHeader = (
+    <View style={[styles.tabHeaderWrap, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+      <LinearGradient
+        colors={['rgba(0,0,0,0.55)', 'transparent']}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <View style={styles.tabRow} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.tabBtn}
+          onPress={() => handleTabSwitch('following')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.tabLabel, activeTab !== 'following' && styles.tabLabelInactive]}>
+            Abonnements
+          </Text>
+          {activeTab === 'following' && <View style={styles.tabUnderline} />}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.tabBtn}
+          onPress={() => handleTabSwitch('foryou')}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.tabLabel, activeTab !== 'foryou' && styles.tabLabelInactive]}>
+            Pour toi
+          </Text>
+          {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+
+  // ── Loading state ───────────────────────────────────────────────────────────
+  if (isLoading) {
     return (
-      <View style={styles.empty}>
-        <ActivityIndicator size="large" color="#00D2B8" />
+      <View style={styles.root}>
+        <View style={styles.empty}>
+          <ActivityIndicator size="large" color="#00D2B8" />
+        </View>
+        {tabHeader}
       </View>
     )
   }
 
-  if (stories.length === 0) {
+  // ── Following empty state ───────────────────────────────────────────────────
+  if (activeTab === 'following' && activeStories.length === 0) {
     return (
-      <View style={styles.empty}>
-        <Ionicons name="flash-outline" size={48} color="#555" />
-        <Text style={styles.emptyText}>Aucun drop actif</Text>
+      <View style={styles.root}>
+        <View style={styles.empty}>
+          <Ionicons name="people-outline" size={48} color="#555" />
+          <Text style={styles.emptyText}>Tu ne suis encore personne.</Text>
+          <TouchableOpacity
+            style={styles.discoverBtn}
+            onPress={() => handleTabSwitch('foryou')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.discoverBtnText}>Découvrir des vendeurs</Text>
+          </TouchableOpacity>
+        </View>
+        {tabHeader}
+      </View>
+    )
+  }
+
+  // ── For You empty state ─────────────────────────────────────────────────────
+  if (activeTab === 'foryou' && activeStories.length === 0) {
+    return (
+      <View style={styles.root}>
+        <View style={styles.empty}>
+          <Ionicons name="flash-outline" size={48} color="#555" />
+          <Text style={styles.emptyText}>Aucun drop actif</Text>
+        </View>
+        {tabHeader}
       </View>
     )
   }
@@ -568,7 +701,8 @@ export default function FeedScreen() {
   return (
     <View style={styles.root}>
       <FlatList
-        data={stories}
+        key={activeTab}
+        data={activeStories}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         pagingEnabled
@@ -582,7 +716,24 @@ export default function FeedScreen() {
         initialNumToRender={1}
         maxToRenderPerBatch={2}
         removeClippedSubviews
+        refreshControl={
+          <RefreshControl
+            refreshing={activeTab === 'foryou' ? forYouRefreshing : followingRefreshing}
+            onRefresh={() => {
+              if (activeTab === 'foryou') {
+                setForYouRefreshing(true)
+                fetchForYou()
+              } else {
+                setFollowingRefreshing(true)
+                fetchFollowing()
+              }
+            }}
+            tintColor="#00D2B8"
+          />
+        }
       />
+
+      {tabHeader}
 
       {toast && <SaleToast key={toast.id} payload={toast} onDismiss={() => setToast(null)} />}
 
@@ -629,7 +780,7 @@ const styles = StyleSheet.create({
 
   topRow: {
     position: 'absolute',
-    top: 58,
+    top: 96,
     left: 12,
     right: 12,
     flexDirection: 'row',
@@ -846,4 +997,54 @@ const styles = StyleSheet.create({
     right: -100,
   },
   preloadVideo: { width: 1, height: 1 },
+
+  // ── Feed tabs ───────────────────────────────────────────────────────────────
+  tabHeaderWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 28,
+    paddingBottom: 10,
+  },
+  tabBtn: {
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  tabLabel: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  tabLabelInactive: {
+    opacity: 0.5,
+    fontWeight: '500',
+  },
+  tabUnderline: {
+    marginTop: 3,
+    height: 2,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 1,
+  },
+
+  discoverBtn: {
+    marginTop: 16,
+    backgroundColor: '#00D2B8',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  discoverBtnText: {
+    color: '#0F0F0F',
+    fontSize: 14,
+    fontWeight: '700',
+  },
 })
