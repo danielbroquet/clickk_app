@@ -19,7 +19,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, {
   useSharedValue,
@@ -456,6 +456,7 @@ export default function FeedScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
   const insets = useSafeAreaInsets()
+  const params = useLocalSearchParams<{ initialStoryId?: string }>()
 
   const [activeTab, setActiveTab] = useState<FeedTab>('foryou')
 
@@ -474,6 +475,7 @@ export default function FeedScreen() {
   const [tabFocused, setTabFocused] = useState(true)
   const [toast, setToast] = useState<SaleToastPayload | null>(null)
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 })
+  const flatListRef = useRef<FlatList<FeedStory>>(null)
 
   useFocusEffect(
     useCallback(() => {
@@ -537,6 +539,39 @@ export default function FeedScreen() {
 
   // Initial load
   useEffect(() => { fetchForYou() }, [fetchForYou])
+
+  // ── Handle initialStoryId from navigation params ────────────────────────────
+  useEffect(() => {
+    const targetId = params.initialStoryId
+    if (!targetId || forYouLoading) return
+    setActiveTab('foryou')
+
+    const idx = forYouStories.findIndex((s) => s.id === targetId)
+    if (idx !== -1) {
+      setActiveIndex(idx)
+      flatListRef.current?.scrollToIndex({ index: idx, animated: false })
+      router.setParams({ initialStoryId: undefined })
+      return
+    }
+
+    // Story not in current list — fetch it and prepend
+    ;(async () => {
+      const { data } = await supabase
+        .from('stories')
+        .select(STORY_SELECT)
+        .eq('id', targetId)
+        .maybeSingle()
+      if (data) {
+        setForYouStories((prev) => {
+          if (prev.find((s) => s.id === targetId)) return prev
+          return [data as unknown as FeedStory, ...prev]
+        })
+        setActiveIndex(0)
+        flatListRef.current?.scrollToIndex({ index: 0, animated: false })
+      }
+      router.setParams({ initialStoryId: undefined })
+    })()
+  }, [params.initialStoryId, forYouLoading, forYouStories])
 
   // Load following tab on first switch to it
   useEffect(() => {
@@ -701,6 +736,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.root}>
       <FlatList
+        ref={flatListRef}
         key={activeTab}
         data={activeStories}
         keyExtractor={keyExtractor}

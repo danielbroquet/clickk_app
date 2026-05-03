@@ -27,7 +27,7 @@ function StoryCard({ item }: { item: StoryWithSeller }) {
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.85}
-      onPress={() => router.push(`/story/${item.id}`)}
+      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: item.id } })}
     >
       {thumb ? (
         <Image source={{ uri: thumb }} style={styles.cardImage} resizeMode="cover" />
