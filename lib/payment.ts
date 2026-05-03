@@ -112,9 +112,8 @@ export function usePaymentMethods(): UsePaymentMethodsResult {
     []
   )
 
-  // TODO (EAS Build): detach payment method via @stripe/stripe-react-native SDK
-  const removeMethod = useCallback(async (_methodId: string): Promise<void> => {
-    return
+  const removeMethod = useCallback(async (methodId: string): Promise<void> => {
+    await callEdgeFunction('detach-payment-method', { payment_method_id: methodId })
   }, [])
 
   return {
