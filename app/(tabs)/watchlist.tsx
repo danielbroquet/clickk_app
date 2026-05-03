@@ -40,7 +40,7 @@ interface WatchlistRow {
 
 const STORY_SELECT = `
   id, story_id,
-  story:story_id (
+  stories!watchlist_story_id_fkey (
     id, title, current_price_chf, start_price_chf, floor_price_chf,
     thumbnail_url, video_url, status, buyer_id, created_at, expires_at
   )
@@ -163,12 +163,28 @@ export default function WatchlistScreen() {
 
   const fetchWatchlist = useCallback(async () => {
     if (!userId) { setLoading(false); return }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('watchlist')
       .select(STORY_SELECT)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-    setRows((data as unknown as WatchlistRow[]) ?? [])
+
+    if (error) {
+      console.log('[watchlist] fetch error', error)
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+
+    // Supabase returns the joined table under the FK constraint name ("stories")
+    // Normalize it to the expected "story" field
+    const normalized = (data ?? []).map((r: any) => ({
+      id: r.id,
+      story_id: r.story_id,
+      story: r.stories ?? r.story ?? null,
+    })).filter((r: any) => r.story !== null)
+
+    setRows(normalized as WatchlistRow[])
     setLoading(false)
     setRefreshing(false)
   }, [userId])
