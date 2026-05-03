@@ -228,6 +228,13 @@ function CommentsSheet({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
 
+    const { data: { session: liveSession } } = await supabase.auth.getSession()
+    if (!liveSession) {
+      console.log('[supabase] no session, refreshing...')
+      await supabase.auth.refreshSession()
+    }
+    console.log('[auth] session uid:', liveSession?.user?.id)
+
     const { data, error } = await supabase
       .from('comments')
       .insert({ story_id: storyId, user_id: currentUserId, content: text })

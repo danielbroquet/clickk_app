@@ -71,6 +71,13 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
     setWatchlistCount(wasWatchlisted ? prevCount - 1 : prevCount + 1)
 
     try {
+      const { data: { session: liveSession } } = await supabase.auth.getSession()
+      if (!liveSession) {
+        console.log('[supabase] no session, refreshing...')
+        await supabase.auth.refreshSession()
+      }
+      console.log('[auth] session uid:', liveSession?.user?.id)
+
       if (wasWatchlisted) {
         const { error } = await supabase
           .from('watchlist')
