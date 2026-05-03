@@ -92,7 +92,7 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
       } else {
         const { error } = await supabase
           .from('watchlist')
-          .insert({ user_id: userId, story_id: storyId })
+          .upsert({ user_id: userId, story_id: storyId }, { onConflict: 'user_id,story_id', ignoreDuplicates: true })
         if (error) {
           console.log('[watchlist] insert error', error)
           throw error
