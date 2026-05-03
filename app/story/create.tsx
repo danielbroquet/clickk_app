@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -41,6 +42,7 @@ export default function CreateStoryScreen() {
   const [step, setStep] = useState<Step>(1)
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [reusedVideoUrl, setReusedVideoUrl] = useState<string | null>(null)
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [startPrice, setStartPrice] = useState('')
@@ -65,7 +67,7 @@ export default function CreateStoryScreen() {
     ;(async () => {
       const { data } = await supabase
         .from('stories')
-        .select('title, description, video_url, start_price_chf, floor_price_chf, speed_preset, duration_hours')
+        .select('title, description, video_url, thumbnail_url, start_price_chf, floor_price_chf, speed_preset, duration_hours')
         .eq('id', relaunchId)
         .maybeSingle()
       if (cancelled || !data) { setPrefilling(false); return }
@@ -82,6 +84,7 @@ export default function CreateStoryScreen() {
         setReusedVideoUrl(data.video_url)
         setVideoUri(data.video_url)
       }
+      if (data.thumbnail_url) setThumbnailUrl(data.thumbnail_url)
       setPrefilling(false)
     })()
     return () => { cancelled = true }
@@ -214,6 +217,58 @@ export default function CreateStoryScreen() {
   const fp = parseFloat(floorPrice)
   const showPricePreview = !isNaN(sp) && !isNaN(fp) && sp > 0 && fp > 0
 
+  // ── Relaunch mode: single-page pre-filled form ──────────────────────────────
+  if (relaunchId) {
+    if (prefilling) {
+      return (
+        <SafeAreaView style={styles.safe}>
+          <View style={[styles.flex, { justifyContent: 'center', alignItems: 'center' }]}>
+            <ActivityIndicator size="large" color={C.primary} />
+          </View>
+        </SafeAreaView>
+      )
+    }
+
+    return (
+      <SafeAreaView style={styles.safe}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.headerSide}>
+              <Ionicons name="arrow-back" size={22} color={C.text} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Relancer le drop</Text>
+            <View style={styles.headerSide} />
+          </View>
+
+          <RelaunchForm
+            thumbnailUrl={thumbnailUrl}
+            videoUri={videoUri}
+            title={title}
+            setTitle={setTitle}
+            description={description}
+            setDescription={setDescription}
+            startPrice={startPrice}
+            setStartPrice={setStartPrice}
+            floorPrice={floorPrice}
+            setFloorPrice={setFloorPrice}
+            speedPreset={speedPreset}
+            setSpeedPreset={setSpeedPreset}
+            durationHours={durationHours}
+            setDurationHours={setDurationHours}
+            errors={errors}
+            publishing={publishing}
+            onPublish={handlePublish}
+            onPickVideo={() => pickVideo(false)}
+          />
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    )
+  }
+
+  // ── Normal creation: 3-step wizard ──────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -295,6 +350,279 @@ export default function CreateStoryScreen() {
     </SafeAreaView>
   )
 }
+
+// ─── Relaunch Form ────────────────────────────────────────────────────────────
+
+function RelaunchForm({
+  thumbnailUrl,
+  videoUri,
+  title, setTitle,
+  description, setDescription,
+  startPrice, setStartPrice,
+  floorPrice, setFloorPrice,
+  speedPreset, setSpeedPreset,
+  durationHours, setDurationHours,
+  errors,
+  publishing,
+  onPublish,
+  onPickVideo,
+}: {
+  thumbnailUrl: string | null
+  videoUri: string | null
+  title: string; setTitle: (v: string) => void
+  description: string; setDescription: (v: string) => void
+  startPrice: string; setStartPrice: (v: string) => void
+  floorPrice: string; setFloorPrice: (v: string) => void
+  speedPreset: SpeedPreset; setSpeedPreset: (v: SpeedPreset) => void
+  durationHours: DurationHours; setDurationHours: (v: DurationHours) => void
+  errors: Record<string, string>
+  publishing: boolean
+  onPublish: () => void
+  onPickVideo: () => void
+}) {
+  const durations: DurationHours[] = [24, 72, 168]
+  const speeds: { key: SpeedPreset; icon: string; label: string; sub: string }[] = [
+    { key: 'FLASH',    icon: 'flash-outline', label: 'Flash',    sub: '−20% / drop' },
+    { key: 'STANDARD', icon: 'time-outline',  label: 'Standard', sub: '−10% / drop' },
+    { key: 'RELAX',    icon: 'leaf-outline',  label: 'Relax',    sub: '−5% / drop'  },
+  ]
+  const sp = parseFloat(startPrice)
+  const fp = parseFloat(floorPrice)
+  const previewOk = !isNaN(sp) && !isNaN(fp) && sp > 0 && fp > 0
+
+  const preview = thumbnailUrl ?? videoUri
+
+  return (
+    <View style={styles.flex}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.stepContent, { paddingBottom: 40 }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Video preview */}
+        <View style={rlStyles.mediaRow}>
+          <View style={rlStyles.thumbWrap}>
+            {preview ? (
+              <Image source={{ uri: preview }} style={rlStyles.thumb} resizeMode="cover" />
+            ) : (
+              <View style={[rlStyles.thumb, rlStyles.thumbPlaceholder]}>
+                <Ionicons name="videocam-outline" size={28} color={C.muted} />
+              </View>
+            )}
+            <View style={rlStyles.videoOverlay}>
+              <Ionicons name="play-circle" size={28} color="rgba(255,255,255,0.8)" />
+            </View>
+          </View>
+          <View style={rlStyles.mediaInfo}>
+            <Text style={rlStyles.mediaLabel}>Vidéo du drop</Text>
+            <Text style={rlStyles.mediaHint} numberOfLines={2}>
+              {videoUri ? 'Vidéo originale utilisée' : 'Aucune vidéo'}
+            </Text>
+            <TouchableOpacity style={rlStyles.changeVideoBtn} onPress={onPickVideo}>
+              <Ionicons name="swap-horizontal" size={13} color={C.primary} />
+              <Text style={rlStyles.changeVideoBtnText}>Changer la vidéo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Title */}
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Titre</Text>
+        <TextInput
+          style={[styles.input, !!errors.title && styles.inputError]}
+          placeholder="Nom du produit"
+          placeholderTextColor={C.muted}
+          value={title}
+          onChangeText={setTitle}
+        />
+        {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+
+        {/* Description */}
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.inputMulti]}
+          placeholder="Décrivez le produit (optionnel)"
+          placeholderTextColor={C.muted}
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          numberOfLines={3}
+        />
+
+        {/* Prices */}
+        <View style={rlStyles.pricesRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>Prix de départ</Text>
+            <View style={[styles.priceRow, { marginTop: 6 }, !!errors.startPrice && styles.inputError]}>
+              <Text style={styles.chfPrefix}>CHF</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="0.00"
+                placeholderTextColor={C.muted}
+                value={startPrice}
+                onChangeText={setStartPrice}
+                keyboardType="numeric"
+              />
+            </View>
+            {!!errors.startPrice && <Text style={styles.errorText}>{errors.startPrice}</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.fieldLabel}>Prix plancher</Text>
+            <View style={[styles.priceRow, { marginTop: 6 }, !!errors.floorPrice && styles.inputError]}>
+              <Text style={styles.chfPrefix}>CHF</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="0.00"
+                placeholderTextColor={C.muted}
+                value={floorPrice}
+                onChangeText={setFloorPrice}
+                keyboardType="numeric"
+              />
+            </View>
+            {!!errors.floorPrice && <Text style={styles.errorText}>{errors.floorPrice}</Text>}
+          </View>
+        </View>
+
+        {previewOk && (
+          <View style={styles.previewCard}>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Prix de départ</Text>
+              <Text style={[styles.previewValue, { color: C.primary }]}>CHF {sp.toFixed(2)}</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Prix plancher</Text>
+              <Text style={[styles.previewValue, { color: C.muted }]}>CHF {fp.toFixed(2)}</Text>
+            </View>
+            <View style={styles.previewRow}>
+              <Text style={styles.previewLabel}>Economie max</Text>
+              <Text style={[styles.previewValue, { color: C.warn }]}>CHF {(sp - fp).toFixed(2)}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Speed */}
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Amplitude de baisse</Text>
+        {speeds.map(s => (
+          <TouchableOpacity
+            key={s.key}
+            style={[styles.speedCard, speedPreset === s.key && styles.speedCardActive]}
+            onPress={() => setSpeedPreset(s.key)}
+          >
+            <Ionicons name={s.icon as any} size={20} color={speedPreset === s.key ? C.primary : C.muted} />
+            <View style={styles.speedCardText}>
+              <Text style={[styles.speedCardLabel, speedPreset === s.key && { color: C.primary }]}>
+                {s.label}
+              </Text>
+              <Text style={styles.speedCardSub}>{s.sub}</Text>
+            </View>
+            {speedPreset === s.key && (
+              <Ionicons name="checkmark-circle" size={18} color={C.primary} style={{ marginLeft: 'auto' }} />
+            )}
+          </TouchableOpacity>
+        ))}
+
+        {/* Duration */}
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Durée du drop</Text>
+        <View style={styles.segmentedRow}>
+          {durations.map(d => (
+            <TouchableOpacity
+              key={d}
+              style={[styles.segment, durationHours === d && styles.segmentActive]}
+              onPress={() => setDurationHours(d)}
+            >
+              <Text style={[styles.segmentText, durationHours === d && styles.segmentTextActive]}>
+                {d === 168 ? '7j' : `${d}h`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {!!errors.publish && (
+          <Text style={[styles.errorText, { marginTop: 12 }]}>{errors.publish}</Text>
+        )}
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          style={[styles.publishBtn, publishing && { opacity: 0.7 }]}
+          onPress={onPublish}
+          disabled={publishing}
+        >
+          {publishing ? (
+            <>
+              <ActivityIndicator color="#0F0F0F" />
+              <Text style={[styles.publishBtnText, { marginLeft: 10 }]}>Publication...</Text>
+            </>
+          ) : (
+            <Text style={styles.publishBtnText}>Publier le drop</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+const rlStyles = StyleSheet.create({
+  mediaRow: {
+    flexDirection: 'row',
+    gap: 14,
+    backgroundColor: C.surface,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: C.border,
+  },
+  thumbWrap: {
+    width: 72,
+    height: 90,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  thumb: { width: 72, height: 90 },
+  thumbPlaceholder: {
+    backgroundColor: '#252525',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    inset: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  mediaInfo: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 4,
+  },
+  mediaLabel: {
+    color: C.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  mediaHint: {
+    color: C.muted,
+    fontSize: 12,
+  },
+  changeVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  changeVideoBtnText: {
+    color: C.primary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pricesRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 18,
+  },
+})
 
 // ─── Step 1 ──────────────────────────────────────────────────────────────────
 
