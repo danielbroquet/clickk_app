@@ -36,7 +36,7 @@ import { useFollow } from '../../hooks/useFollow'
 import { callEdgeFunction } from '../../lib/edgeFunction'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const CELL_SIZE = (SCREEN_WIDTH - 4) / 2
+const CELL_SIZE = (SCREEN_WIDTH - 2) / 2
 
 type DropCell = {
   id: string
@@ -186,7 +186,7 @@ const gridStyles = StyleSheet.create({
   },
   cell: {
     width: CELL_SIZE,
-    aspectRatio: 1,
+    height: CELL_SIZE,
     backgroundColor: colors.surface,
     overflow: 'hidden',
   },

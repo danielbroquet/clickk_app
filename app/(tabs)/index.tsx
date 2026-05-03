@@ -141,6 +141,7 @@ function CommentsSheet({
   onClose,
   storyId,
   currentUserId,
+  currentUserProfile,
   initialCount,
   onCommentAdded,
   onCommentDeleted,
@@ -149,6 +150,7 @@ function CommentsSheet({
   onClose: () => void
   storyId: string
   currentUserId: string
+  currentUserProfile: { username: string | null; avatar_url: string | null }
   initialCount: number
   onCommentAdded: (c: Comment) => void
   onCommentDeleted: (id: string) => void
@@ -221,22 +223,18 @@ function CommentsSheet({
     const text = input.trim()
     if (!text || !currentUserId || sending) return
     setSending(true)
+    setInput('')
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
-
-    // Fetch current user's profile for optimistic UI
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username, avatar_url')
-      .eq('id', currentUserId)
-      .maybeSingle()
 
     const { data, error } = await supabase
       .from('comments')
       .insert({ story_id: storyId, user_id: currentUserId, content: text })
       .select('id, content, created_at, user_id')
       .maybeSingle()
+
+    console.log('[comments] insert result:', { data, error })
 
     setSending(false)
 
@@ -250,11 +248,13 @@ function CommentsSheet({
       content: data.content,
       created_at: data.created_at,
       user_id: data.user_id,
-      profiles: { username: profile?.username ?? null, avatar_url: profile?.avatar_url ?? null },
+      profiles: {
+        username: currentUserProfile.username,
+        avatar_url: currentUserProfile.avatar_url,
+      },
     }
     setComments(prev => [newComment, ...prev])
     setCount(n => n + 1)
-    setInput('')
     onCommentAdded(newComment)
     listRef.current?.scrollToOffset({ offset: 0, animated: true })
   }
@@ -363,11 +363,15 @@ function CommentsSheet({
 
         {/* Input bar */}
         <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          <View style={commentStyles.inputAvatarFallback}>
-            <Text style={commentStyles.inputAvatarInitial}>
-              {currentUserId ? 'M' : '?'}
-            </Text>
-          </View>
+          {currentUserProfile.avatar_url ? (
+            <Image source={{ uri: currentUserProfile.avatar_url }} style={commentStyles.avatar} />
+          ) : (
+            <View style={commentStyles.inputAvatarFallback}>
+              <Text style={commentStyles.inputAvatarInitial}>
+                {(currentUserProfile.username ?? 'U').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
           <TextInput
             style={commentStyles.input}
             placeholder={i18n.t('comments.placeholder')}
@@ -406,6 +410,11 @@ function DropItem({
   onSwipeDown: () => void
   currentUserId: string
 }) {
+  const { profile: authProfile } = useAuth()
+  const currentUserProfile = {
+    username: authProfile?.username ?? null,
+    avatar_url: authProfile?.avatar_url ?? null,
+  }
   const videoRef = useRef<Video>(null)
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
@@ -694,7 +703,14 @@ function DropItem({
       </TouchableOpacity>
 
       <View style={styles.actionsCol}>
-        <TouchableOpacity style={styles.actionBtn} onPress={toggleWatchlist} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => {
+            console.log('[heart] isWatchlisted:', isWatchlisted, 'userId:', currentUserId, 'storyId:', story.id)
+            toggleWatchlist()
+          }}
+          activeOpacity={0.7}
+        >
           <Ionicons
             name={isWatchlisted ? 'heart' : 'heart-outline'}
             size={26}
@@ -847,6 +863,7 @@ function DropItem({
         onClose={() => setCommentsVisible(false)}
         storyId={story.id}
         currentUserId={currentUserId}
+        currentUserProfile={currentUserProfile}
         initialCount={commentCount}
         onCommentAdded={handleNewComment}
         onCommentDeleted={handleDeletedComment}
