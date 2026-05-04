@@ -26,6 +26,16 @@ import { getOrCreateConversation } from '../../lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ShippingAddressInfo {
+  full_name: string
+  line1: string
+  line2: string | null
+  postal_code: string
+  city: string
+  country: string
+  phone: string | null
+}
+
 interface StorySale {
   id: string
   title: string
@@ -39,6 +49,7 @@ interface StorySale {
   created_at: string
   buyer_id: string | null
   buyer: { id: string; username: string; avatar_url: string | null } | null
+  shipping_address: ShippingAddressInfo | null
 }
 
 interface ArchivedDrop {
@@ -452,7 +463,7 @@ export default function SalesScreen() {
     if (!currentUserId) return
     const { data } = await supabase
       .from('stories')
-      .select('id, title, thumbnail_url, video_url, final_price_chf, status, tracking_number, shipped_at, delivered_at, created_at, buyer_id, buyer:profiles!buyer_id(id, username, avatar_url)')
+      .select('id, title, thumbnail_url, video_url, final_price_chf, status, tracking_number, shipped_at, delivered_at, created_at, buyer_id, buyer:profiles!buyer_id(id, username, avatar_url), shipping_address:shipping_addresses!shipping_address_id(full_name, line1, line2, postal_code, city, country, phone)')
       .eq('seller_id', currentUserId)
       .in('status', ['sold', 'shipped', 'delivered'])
       .order('created_at', { ascending: false })
@@ -609,7 +620,52 @@ export default function SalesScreen() {
                       </Text>
                     </View>
 
-                    {item.status === 'sold' && (
+                    {item.shipping_address ? (
+                      <View style={salesStyles.addressBox}>
+                        <View style={salesStyles.addressHeader}>
+                          <Ionicons name="location-outline" size={13} color={colors.primary} />
+                          <Text style={salesStyles.addressHeaderText}>Adresse de livraison</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const a = item.shipping_address!
+                              const txt = `${a.full_name}\n${a.line1}${a.line2 ? `\n${a.line2}` : ''}\n${a.postal_code} ${a.city}\n${a.country}${a.phone ? `\n${a.phone}` : ''}`
+                              if (Platform.OS !== 'web') {
+                                Haptics.selectionAsync()
+                              }
+                              show('Adresse copiée')
+                              import('expo-clipboard').then(({ setStringAsync }) => setStringAsync(txt))
+                            }}
+                            style={salesStyles.copyBtn}
+                          >
+                            <Ionicons name="copy-outline" size={13} color={colors.textSecondary} />
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={salesStyles.addressText}>
+                          {item.shipping_address.full_name}
+                        </Text>
+                        <Text style={salesStyles.addressText}>
+                          {item.shipping_address.line1}
+                          {item.shipping_address.line2 ? `, ${item.shipping_address.line2}` : ''}
+                        </Text>
+                        <Text style={salesStyles.addressText}>
+                          {item.shipping_address.postal_code} {item.shipping_address.city}, {item.shipping_address.country}
+                        </Text>
+                        {item.shipping_address.phone && (
+                          <Text style={salesStyles.addressTextMuted}>
+                            {item.shipping_address.phone}
+                          </Text>
+                        )}
+                      </View>
+                    ) : item.status === 'sold' ? (
+                      <View style={salesStyles.addressPending}>
+                        <Ionicons name="time-outline" size={13} color="#FFA502" />
+                        <Text style={salesStyles.addressPendingText}>
+                          En attente de l'adresse de l'acheteur
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {item.status === 'sold' && item.shipping_address && (
                       <TouchableOpacity
                         style={salesStyles.shipBtn}
                         onPress={() => setShipModal({ id: item.id, title: item.title })}
@@ -816,6 +872,60 @@ const salesStyles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: 14,
     color: colors.primary,
+  },
+  addressBox: {
+    backgroundColor: 'rgba(0,210,184,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.20)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 8,
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
+  addressHeaderText: {
+    flex: 1,
+    fontFamily: fontFamily.semiBold,
+    fontSize: 11,
+    color: colors.primary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  copyBtn: {
+    padding: 2,
+  },
+  addressText: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  addressTextMuted: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  addressPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,165,2,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,165,2,0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 8,
+  },
+  addressPendingText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: '#FFA502',
   },
   shipBtn: {
     flexDirection: 'row',

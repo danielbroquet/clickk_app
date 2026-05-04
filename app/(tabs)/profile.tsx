@@ -934,6 +934,15 @@ export default function ProfileScreen() {
             <Text style={styles.quickLabel}>Paiement</Text>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.quickCard}
+            onPress={() => router.push('/profile/addresses')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="location-outline" size={20} color={colors.primary} />
+            <Text style={styles.quickLabel}>Adresses</Text>
+          </TouchableOpacity>
+
           {profile?.role === 'seller' && (
             <TouchableOpacity
               style={styles.quickCard}
