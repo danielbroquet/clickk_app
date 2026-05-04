@@ -800,7 +800,6 @@ function DropItem({
           <Text style={styles.productTitle} numberOfLines={2}>
             {story.title}
           </Text>
-          <Ionicons name="chevron-up" size={14} color="rgba(255,255,255,0.5)" style={styles.titleChevron} />
         </TouchableOpacity>
 
         {!!story.description && (

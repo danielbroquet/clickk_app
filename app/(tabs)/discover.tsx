@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -61,6 +62,7 @@ export default function DiscoverScreen() {
 
   const [stories, setStories] = useState<StoryWithSeller[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const pageRef = useRef(0)
@@ -108,6 +110,14 @@ export default function DiscoverScreen() {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
+  }, [query, fetchStories])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    pageRef.current = 0
+    setHasMore(true)
+    await fetchStories(0, query, true)
+    setRefreshing(false)
   }, [query, fetchStories])
 
   const handleEndReached = useCallback(async () => {
@@ -159,6 +169,9 @@ export default function DiscoverScreen() {
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.4}
           ListEmptyComponent={<EmptyState />}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+          }
           ListFooterComponent={loadingMore ? (
             <View style={styles.footer}>
               <ActivityIndicator size="small" color={colors.primary} />

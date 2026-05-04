@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Alert,
+  RefreshControl,
 } from 'react-native'
 import Reanimated, {
   useSharedValue,
@@ -550,6 +551,154 @@ const sheetStyles = StyleSheet.create({
   avatarHint: { fontSize: 12, color: colors.primary, marginTop: 6 },
 })
 
+// ── Followers Modal ──────────────────────────────────────────────────────────
+
+interface FollowerProfile {
+  id: string
+  username: string | null
+  display_name: string | null
+  avatar_url: string | null
+}
+
+function FollowersModal({
+  visible,
+  onClose,
+  userId,
+}: {
+  visible: boolean
+  onClose: () => void
+  userId: string
+}) {
+  const insets = useSafeAreaInsets()
+  const [followers, setFollowers] = useState<FollowerProfile[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!visible) return
+    setLoading(true)
+    supabase
+      .from('follows')
+      .select('profiles:follower_id(id, username, display_name, avatar_url)')
+      .eq('following_id', userId)
+      .then(({ data }) => {
+        const list = (data ?? []).map((r: any) => r.profiles).filter(Boolean)
+        setFollowers(list as FollowerProfile[])
+        setLoading(false)
+      })
+  }, [visible, userId])
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[followersStyles.root, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={followersStyles.header}>
+          <View style={followersStyles.handle} />
+          <View style={followersStyles.headerRow}>
+            <View style={{ width: 32 }} />
+            <Text style={followersStyles.title}>Abonnés</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {loading ? (
+          <View style={followersStyles.center}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : followers.length === 0 ? (
+          <View style={followersStyles.center}>
+            <Ionicons name="people-outline" size={44} color={colors.border} />
+            <Text style={followersStyles.emptyText}>Aucun abonné pour l'instant</Text>
+          </View>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={followersStyles.list}>
+            {followers.map(f => {
+              const name = f.display_name ?? f.username ?? 'Utilisateur'
+              const initial = name.charAt(0).toUpperCase()
+              return (
+                <TouchableOpacity
+                  key={f.id}
+                  style={followersStyles.row}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    onClose()
+                    router.push(`/profile/${f.id}`)
+                  }}
+                >
+                  {f.avatar_url ? (
+                    <Image source={{ uri: f.avatar_url }} style={followersStyles.avatar} />
+                  ) : (
+                    <View style={followersStyles.avatarFallback}>
+                      <Text style={followersStyles.avatarInitial}>{initial}</Text>
+                    </View>
+                  )}
+                  <View style={followersStyles.info}>
+                    <Text style={followersStyles.name}>{name}</Text>
+                    {f.username && (
+                      <Text style={followersStyles.username}>@{f.username}</Text>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
+              )
+            })}
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
+  )
+}
+
+const followersStyles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    paddingTop: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  title: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.text },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10 },
+  emptyText: { fontSize: 14, color: colors.textSecondary },
+  list: { paddingVertical: 8 },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.primary },
+  info: { flex: 1 },
+  name: { fontFamily: fontFamily.semiBold, fontSize: 14, color: colors.text },
+  username: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+})
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 type TabKey = 'drops' | 'achats'
@@ -565,41 +714,45 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState<TabKey>('drops')
   const [bioExpanded, setBioExpanded] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [followersVisible, setFollowersVisible] = useState(false)
 
   const currentUserId = session?.user?.id ?? ''
 
-  useEffect(() => {
+  const loadProfileData = useCallback(async () => {
     if (!currentUserId) return
 
-    supabase
-      .from('stories')
-      .select('*', { count: 'exact', head: true })
-      .eq('seller_id', currentUserId)
-      .then(({ count }) => setDropsCount(count ?? 0))
+    await Promise.all([
+      supabase
+        .from('stories')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', currentUserId)
+        .then(({ count }) => setDropsCount(count ?? 0)),
 
-    supabase
-      .from('stories')
-      .select('*', { count: 'exact', head: true })
-      .eq('seller_id', currentUserId)
-      .eq('status', 'sold')
-      .then(({ count }) => setVentesCount(count ?? 0))
+      supabase
+        .from('stories')
+        .select('*', { count: 'exact', head: true })
+        .eq('seller_id', currentUserId)
+        .eq('status', 'sold')
+        .then(({ count }) => setVentesCount(count ?? 0)),
 
-    supabase
-      .from('stories')
-      .select('id, thumbnail_url, video_url, current_price_chf, status')
-      .eq('seller_id', currentUserId)
-      .neq('status', 'expired')
-      .order('created_at', { ascending: false })
-      .limit(60)
-      .then(({ data }) => setOwnDrops((data ?? []) as DropCell[]))
+      supabase
+        .from('stories')
+        .select('id, thumbnail_url, video_url, current_price_chf, status')
+        .eq('seller_id', currentUserId)
+        .neq('status', 'expired')
+        .order('created_at', { ascending: false })
+        .limit(60)
+        .then(({ data }) => setOwnDrops((data ?? []) as DropCell[])),
 
-    supabase
-      .from('stories')
-      .select('id, thumbnail_url, video_url, current_price_chf, status, buyer_id, updated_at')
-      .eq('buyer_id', currentUserId)
-      .order('updated_at', { ascending: false })
-      .limit(60)
-      .then(({ data }) => setPurchases((data ?? []) as DropCell[]))
+      supabase
+        .from('stories')
+        .select('id, thumbnail_url, video_url, current_price_chf, status, buyer_id, updated_at')
+        .eq('buyer_id', currentUserId)
+        .order('updated_at', { ascending: false })
+        .limit(60)
+        .then(({ data }) => setPurchases((data ?? []) as DropCell[])),
+    ])
 
     if (profile?.role === 'seller') {
       callEdgeFunction<{ available_chf: number }>('get-seller-wallet')
@@ -607,6 +760,14 @@ export default function ProfileScreen() {
         .catch(() => setWalletBalance(null))
     }
   }, [currentUserId, profile?.role])
+
+  useEffect(() => { loadProfileData() }, [loadProfileData])
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await Promise.all([refreshProfile(), loadProfileData()])
+    setRefreshing(false)
+  }, [refreshProfile, loadProfileData])
 
   const { followersCount, loading: followLoading } = useFollow(currentUserId)
 
@@ -633,7 +794,13 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+        }
+      >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.topHeader}>
           <Text style={styles.topHeaderUsername} numberOfLines={1}>@{username}</Text>
@@ -684,12 +851,12 @@ export default function ProfileScreen() {
               <Text style={styles.statNum}>{dropsCount === null ? '--' : dropsCount}</Text>
               <Text style={styles.statLabel}>Drops</Text>
             </View>
-            <View style={styles.stat}>
+            <TouchableOpacity style={styles.stat} onPress={() => setFollowersVisible(true)} activeOpacity={0.7}>
               <Text style={styles.statNum}>
                 {followLoading ? '--' : followersCount}
               </Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
-            </View>
+              <Text style={[styles.statLabel, styles.statLabelClickable]}>Abonnés</Text>
+            </TouchableOpacity>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{ventesCount === null ? '--' : ventesCount}</Text>
               <Text style={styles.statLabel}>Ventes</Text>
@@ -849,6 +1016,13 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* Followers modal */}
+        <FollowersModal
+          visible={followersVisible}
+          onClose={() => setFollowersVisible(false)}
+          userId={currentUserId}
+        />
+
         {/* Edit profile sheet */}
         <EditProfileSheet
           visible={editVisible}
@@ -946,6 +1120,7 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center' },
   statNum: { fontFamily: fontFamily.bold, fontSize: 18, color: colors.text },
   statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  statLabelClickable: { color: colors.primary },
 
   // Buttons
   editBtn: {
