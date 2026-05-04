@@ -235,26 +235,36 @@ function OrderCard({
           ) : null}
 
           {awaitingConfirm ? (
-            <View style={styles.confirmRow}>
-              <TouchableOpacity
-                style={styles.confirmCancelBtn}
-                onPress={() => setAwaitingConfirm(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.confirmCancelText}>Annuler</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.confirmDestructiveBtn, confirming && styles.receivedBtnDisabled]}
-                onPress={handleConfirmDelivery}
-                disabled={confirming}
-                activeOpacity={0.8}
-              >
-                {confirming ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.confirmDestructiveText}>Confirmer ✓</Text>
-                )}
-              </TouchableOpacity>
+            <View style={styles.confirmBlock}>
+              <View style={styles.confirmWarning}>
+                <Ionicons name="warning-outline" size={16} color="#FFA502" />
+                <Text style={styles.confirmWarningText}>
+                  En confirmant, l'argent est immédiatement envoyé au vendeur.
+                  Aucun retour ou remboursement ne sera possible ensuite.
+                  Si quelque chose ne va pas, annule et utilise "Signaler un problème".
+                </Text>
+              </View>
+              <View style={styles.confirmRow}>
+                <TouchableOpacity
+                  style={styles.confirmCancelBtn}
+                  onPress={() => setAwaitingConfirm(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.confirmCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.confirmDestructiveBtn, confirming && styles.receivedBtnDisabled]}
+                  onPress={handleConfirmDelivery}
+                  disabled={confirming}
+                  activeOpacity={0.8}
+                >
+                  {confirming ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.confirmDestructiveText}>Je confirme</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <TouchableOpacity
@@ -270,28 +280,20 @@ function OrderCard({
         </View>
       )}
 
-      {/* Dispute trigger — available for sold/shipped and delivered within 7 days */}
-      {(() => {
-        const isLive = item.displayStatus === 'sold' ||
-          item.displayStatus === 'paid' ||
-          item.displayStatus === 'shipped'
-        const isReturnable = item.displayStatus === 'delivered' &&
-          !!item.delivered_at &&
-          Date.now() - new Date(item.delivered_at).getTime() < 7 * 24 * 3600 * 1000
-        if (!isLive && !isReturnable) return null
-        return (
-          <TouchableOpacity
-            style={styles.disputeLink}
-            onPress={() => onOpenDispute(item.story_id, item.title)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
-            <Text style={styles.disputeLinkText}>
-              {isReturnable ? 'Demander un retour' : 'Signaler un problème'}
-            </Text>
-          </TouchableOpacity>
-        )
-      })()}
+      {/* Dispute trigger — only available before the buyer confirms delivery.
+          Once confirmed, funds are released to the seller and the order is final. */}
+      {(item.displayStatus === 'sold' ||
+        item.displayStatus === 'paid' ||
+        item.displayStatus === 'shipped') && (
+        <TouchableOpacity
+          style={styles.disputeLink}
+          onPress={() => onOpenDispute(item.story_id, item.title)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
+          <Text style={styles.disputeLinkText}>Signaler un problème</Text>
+        </TouchableOpacity>
+      )}
 
       {item.displayStatus === 'disputed' && (
         <View style={styles.disputeNotice}>
@@ -1015,6 +1017,26 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.label,
     color: '#0F0F0F',
+  },
+  confirmBlock: {
+    gap: spacing.sm,
+  },
+  confirmWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(255,165,2,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,165,2,0.30)',
+    borderRadius: 10,
+    padding: 10,
+  },
+  confirmWarningText: {
+    flex: 1,
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: '#FFA502',
+    lineHeight: 17,
   },
   confirmRow: {
     flexDirection: 'row',
