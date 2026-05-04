@@ -858,7 +858,13 @@ function DropItem({
         )}
 
         <View style={styles.priceBlock}>
-          <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
+          <View style={styles.priceTopRow}>
+            <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
+            <View style={styles.freeShipBadge}>
+              <Ionicons name="cube-outline" size={11} color="#00D2B8" />
+              <Text style={styles.freeShipText}>Livraison offerte</Text>
+            </View>
+          </View>
           <View style={styles.priceMeta}>
             <Text style={styles.priceDrop}>↓ -CHF {perMin.toFixed(2)}/min</Text>
             <Text style={styles.priceMin}>Min: CHF {story.floor_price_chf.toFixed(2)}</Text>
@@ -1037,7 +1043,13 @@ function DropItem({
 
             {/* Price section */}
             <Text style={detailStyles.priceLabel}>PRIX ACTUEL</Text>
-            <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
+            <View style={detailStyles.priceLine}>
+              <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
+              <View style={detailStyles.freeShipBadge}>
+                <Ionicons name="cube-outline" size={12} color="#00D2B8" />
+                <Text style={detailStyles.freeShipText}>Livraison offerte</Text>
+              </View>
+            </View>
             {dropPerMinute(story) > 0 && (
               <Text style={detailStyles.priceDrop}>
                 ↓ baisse toutes les {story.price_drop_seconds ?? 60}s
@@ -1625,7 +1637,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
+  priceTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   priceBig: { color: '#00D2B8', fontSize: 36, fontWeight: '500', letterSpacing: -1 },
+  freeShipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,210,184,0.10)',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.25)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  freeShipText: {
+    color: '#00D2B8',
+    fontSize: 10,
+    fontWeight: '600',
+  },
   priceMeta: { alignItems: 'flex-end', marginBottom: 6 },
   priceDrop: { color: '#FFA502', fontSize: 12, fontWeight: '600' },
   priceMin: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 },
@@ -1940,12 +1973,33 @@ const detailStyles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 6,
   },
+  priceLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
   priceBig: {
     color: '#00D2B8',
     fontSize: 36,
     fontWeight: '700',
     letterSpacing: -1,
-    marginBottom: 4,
+  },
+  freeShipBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,210,184,0.10)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.25)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  freeShipText: {
+    color: '#00D2B8',
+    fontSize: 11,
+    fontWeight: '600',
   },
   priceDrop: {
     color: '#FFA502',

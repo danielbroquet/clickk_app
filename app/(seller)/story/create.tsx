@@ -710,8 +710,17 @@ function Step3({
               onChangeText={onFloor}
             />
           </View>
-          <Text style={s.floorHint}>Minimum accepté</Text>
+          <Text style={s.floorHint}>Prix minimum accepté</Text>
         </View>
+      </View>
+
+      {/* Shipping reminder */}
+      <View style={s.shippingBanner}>
+        <Ionicons name="cube-outline" size={14} color="#00D2B8" style={{ marginTop: 1 }} />
+        <Text style={s.shippingBannerText}>
+          <Text style={s.shippingBold}>Livraison offerte obligatoire.</Text>
+          {' '}Inclus les frais d'envoi dans ton prix plancher (env. CHF 7 via La Poste).
+        </Text>
       </View>
 
       {floorGtStart && (
@@ -1073,6 +1082,29 @@ const s = StyleSheet.create({
   priceArrow: { alignSelf: 'center', marginTop: 24, paddingHorizontal: 2 },
   floorHint: { fontFamily: fontFamily.regular, fontSize: 10, color: colors.textSecondary, marginTop: 4 },
   priceError: { fontFamily: fontFamily.medium, fontSize: 12, color: colors.error, marginTop: 8 },
+  shippingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(0,210,184,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.20)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 14,
+  },
+  shippingBannerText: {
+    flex: 1,
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
+  },
+  shippingBold: {
+    fontFamily: fontFamily.semiBold,
+    color: '#00D2B8',
+  },
 
   // Presets
   presetRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
