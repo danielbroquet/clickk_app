@@ -35,6 +35,7 @@ import Animated, {
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../lib/auth'
 import { colors, fontFamily, spacing, fontSize } from '../../../lib/theme'
 
 const { width: SW } = Dimensions.get('window')
@@ -208,6 +209,13 @@ function CategoryPicker({
 
 export default function CreateDropScreen() {
   const router = useRouter()
+  const { profile } = useAuth()
+
+  useEffect(() => {
+    if (profile && profile.role !== 'seller') {
+      router.replace('/become-seller')
+    }
+  }, [profile])
 
   // Step state
   const [step, setStep] = useState(1)

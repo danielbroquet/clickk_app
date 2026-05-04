@@ -19,6 +19,7 @@ import { useState, useEffect } from 'react'
 import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import i18n from '../../lib/i18n'
 
 const C = {
@@ -39,6 +40,14 @@ type DurationHours = 24 | 72 | 168
 
 export default function CreateStoryScreen() {
   const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
+  const { profile } = useAuth()
+
+  useEffect(() => {
+    if (profile && profile.role !== 'seller') {
+      router.replace('/become-seller')
+    }
+  }, [profile])
+
   const [step, setStep] = useState<Step>(1)
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [reusedVideoUrl, setReusedVideoUrl] = useState<string | null>(null)
