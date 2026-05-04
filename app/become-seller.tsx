@@ -57,13 +57,9 @@ export default function BecomeSellerScreen() {
     }
   }
 
-  const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!
-
   const fetchOnboardingUrl = async (): Promise<string | null> => {
-    // Stripe requires HTTPS URLs — use our edge function as redirect intermediary
-    // The edge function serves an HTML page that deep-links back into the app
-    const returnUrl = `${SUPABASE_URL}/functions/v1/stripe-redirect?type=complete`
-    const refreshUrl = `${SUPABASE_URL}/functions/v1/stripe-redirect?type=refresh`
+    const returnUrl = 'https://clickk.ch/onboarding-complete'
+    const refreshUrl = 'https://clickk.ch/onboarding-refresh'
 
     let data: { status?: string; onboarding_url?: string }
     try {
