@@ -37,6 +37,8 @@ interface Profile {
   role: string | null
   followers_count: number
   following_count: number
+  rating_avg: number
+  rating_count: number
   created_at: string
 }
 
@@ -209,7 +211,7 @@ export default function PublicProfileScreen() {
     Promise.all([
       supabase
         .from('profiles')
-        .select('id, username, display_name, avatar_url, bio, role, followers_count, following_count, created_at')
+        .select('id, username, display_name, avatar_url, bio, role, followers_count, following_count, rating_avg, rating_count, created_at')
         .eq('id', id)
         .maybeSingle(),
 
@@ -405,6 +407,17 @@ export default function PublicProfileScreen() {
 
           <Text style={styles.displayName}>{displayName}</Text>
           <Text style={styles.username}>@{profile.username}</Text>
+
+          {profile.rating_count > 0 && (
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={13} color="#FFD700" />
+              <Text style={styles.ratingBadgeText}>
+                {Number(profile.rating_avg).toFixed(1)}
+              </Text>
+              <Text style={styles.ratingBadgeCount}>({profile.rating_count})</Text>
+            </View>
+          )}
+
           {profile.bio ? <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text> : null}
 
           <View style={styles.statsRow}>
@@ -647,6 +660,27 @@ const styles = StyleSheet.create({
     marginTop: 10,
     lineHeight: 18,
     paddingHorizontal: 8,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    backgroundColor: 'rgba(255,215,0,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.30)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  ratingBadgeText: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  ratingBadgeCount: {
+    color: colors.textSecondary,
+    fontSize: 12,
   },
 
   statsRow: {

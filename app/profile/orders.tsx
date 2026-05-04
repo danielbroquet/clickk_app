@@ -35,6 +35,7 @@ interface SellerInfo {
 interface OrderItem {
   id: string
   story_id: string
+  seller_id: string
   title: string
   thumbnail: string | null
   hasVideo: boolean
@@ -45,6 +46,7 @@ interface OrderItem {
   delivered_at: string | null
   tracking_number: string | null
   created_at: string
+  myRating: number | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,10 +107,12 @@ function OrderCard({
   item,
   onDelivered,
   onOpenDispute,
+  onOpenReview,
 }: {
   item: OrderItem
   onDelivered: (id: string) => void
   onOpenDispute: (storyId: string, title: string) => void
+  onOpenReview: (storyId: string, sellerId: string, sellerUsername: string, title: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
@@ -266,19 +270,28 @@ function OrderCard({
         </View>
       )}
 
-      {/* Dispute trigger — available for sold/shipped but not delivered/refunded/disputed */}
-      {(item.displayStatus === 'sold' ||
-        item.displayStatus === 'paid' ||
-        item.displayStatus === 'shipped') && (
-        <TouchableOpacity
-          style={styles.disputeLink}
-          onPress={() => onOpenDispute(item.story_id, item.title)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
-          <Text style={styles.disputeLinkText}>Signaler un problème</Text>
-        </TouchableOpacity>
-      )}
+      {/* Dispute trigger — available for sold/shipped and delivered within 7 days */}
+      {(() => {
+        const isLive = item.displayStatus === 'sold' ||
+          item.displayStatus === 'paid' ||
+          item.displayStatus === 'shipped'
+        const isReturnable = item.displayStatus === 'delivered' &&
+          !!item.delivered_at &&
+          Date.now() - new Date(item.delivered_at).getTime() < 7 * 24 * 3600 * 1000
+        if (!isLive && !isReturnable) return null
+        return (
+          <TouchableOpacity
+            style={styles.disputeLink}
+            onPress={() => onOpenDispute(item.story_id, item.title)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
+            <Text style={styles.disputeLinkText}>
+              {isReturnable ? 'Demander un retour' : 'Signaler un problème'}
+            </Text>
+          </TouchableOpacity>
+        )
+      })()}
 
       {item.displayStatus === 'disputed' && (
         <View style={styles.disputeNotice}>
@@ -287,6 +300,33 @@ function OrderCard({
             Notre équipe examine ton dossier. Réponse sous 48 h.
           </Text>
         </View>
+      )}
+
+      {item.displayStatus === 'delivered' && (
+        item.myRating ? (
+          <View style={styles.reviewedRow}>
+            <Ionicons name="star" size={13} color="#FFD700" />
+            <Text style={styles.reviewedText}>
+              Tu as donné {item.myRating}/5 au vendeur
+            </Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.reviewCta}
+            onPress={() =>
+              onOpenReview(
+                item.story_id,
+                item.seller_id,
+                item.seller?.username ?? 'vendeur',
+                item.title,
+              )
+            }
+            activeOpacity={0.85}
+          >
+            <Ionicons name="star-outline" size={15} color="#0F0F0F" />
+            <Text style={styles.reviewCtaText}>Noter le vendeur</Text>
+          </TouchableOpacity>
+        )
       )}
     </View>
   )
@@ -422,6 +462,149 @@ function DisputeModal({
   )
 }
 
+// ─── Review modal ─────────────────────────────────────────────────────────────
+
+function ReviewModal({
+  visible,
+  storyId,
+  sellerId,
+  sellerUsername,
+  title,
+  onClose,
+  onSubmitted,
+}: {
+  visible: boolean
+  storyId: string | null
+  sellerId: string | null
+  sellerUsername: string
+  title: string
+  onClose: () => void
+  onSubmitted: (storyId: string, rating: number) => void
+}) {
+  const [rating, setRating] = useState(0)
+  const [comment, setComment] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!visible) {
+      setRating(0)
+      setComment('')
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [visible])
+
+  const handleSubmit = async () => {
+    if (!storyId || !sellerId) return
+    if (rating < 1) {
+      setError('Choisis une note entre 1 et 5')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Non authentifié')
+
+      const { error: insErr } = await supabase.from('reviews').insert({
+        story_id: storyId,
+        buyer_id: user.id,
+        seller_id: sellerId,
+        rating,
+        comment: comment.trim() || null,
+      })
+      if (insErr) throw insErr
+
+      if (Platform.OS !== 'web') {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      }
+      onSubmitted(storyId, rating)
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalSheet}
+        >
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Noter @{sellerUsername}</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.modalSubtitle} numberOfLines={2}>{title}</Text>
+
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map(n => (
+              <TouchableOpacity
+                key={n}
+                onPress={() => {
+                  setRating(n)
+                  if (Platform.OS !== 'web') Haptics.selectionAsync()
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              >
+                <Ionicons
+                  name={n <= rating ? 'star' : 'star-outline'}
+                  size={40}
+                  color={n <= rating ? '#FFD700' : colors.textSecondary}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+          {rating > 0 && (
+            <Text style={styles.ratingHint}>
+              {rating === 5 ? 'Parfait' : rating === 4 ? 'Très bien' : rating === 3 ? 'Correct' : rating === 2 ? 'Décevant' : 'Mauvais'}
+            </Text>
+          )}
+
+          <Text style={[styles.modalLabel, { marginTop: 16 }]}>Commentaire (optionnel)</Text>
+          <TextInput
+            style={styles.modalTextarea}
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            numberOfLines={4}
+            maxLength={500}
+            placeholder="Partage ton expérience..."
+            placeholderTextColor={colors.textSecondary}
+          />
+
+          {error && <Text style={styles.modalError}>{error}</Text>}
+
+          <TouchableOpacity
+            style={[styles.reviewSubmitBtn, submitting && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
+            activeOpacity={0.85}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#0F0F0F" />
+            ) : (
+              <Text style={styles.reviewSubmitText}>Publier l'avis</Text>
+            )}
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  )
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OrdersScreen() {
@@ -436,7 +619,7 @@ export default function OrdersScreen() {
 
     const storiesRes = await supabase
       .from('stories')
-      .select('id, created_at, final_price_chf, status, title, video_url, thumbnail_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
+      .select('id, seller_id, created_at, final_price_chf, status, title, video_url, thumbnail_url, shipped_at, delivered_at, tracking_number, seller:profiles!seller_id(username, avatar_url)')
       .eq('buyer_id', userId)
       .order('created_at', { ascending: false })
 
@@ -444,9 +627,21 @@ export default function OrdersScreen() {
       console.error('[fetchOrders] stories query failed:', storiesRes.error)
     }
 
+    const storyIds = (storiesRes.data ?? []).map((s: any) => s.id)
+    const reviewsRes = storyIds.length > 0
+      ? await supabase
+          .from('reviews')
+          .select('story_id, rating')
+          .eq('buyer_id', userId)
+          .in('story_id', storyIds)
+      : { data: [] as { story_id: string; rating: number }[] }
+    const myRatings = new Map<string, number>()
+    ;(reviewsRes.data ?? []).forEach((r: any) => myRatings.set(r.story_id, r.rating))
+
     const storyOrders: OrderItem[] = (storiesRes.data ?? []).map((s: any) => ({
       id:             `story-${s.id}`,
       story_id:       s.id,
+      seller_id:      s.seller_id,
       title:          s.title ?? 'Drop',
       thumbnail:      s.thumbnail_url ?? null,
       hasVideo:       !s.thumbnail_url && !!s.video_url,
@@ -457,6 +652,7 @@ export default function OrdersScreen() {
       delivered_at:   s.delivered_at ?? null,
       tracking_number: s.tracking_number ?? null,
       created_at:     s.created_at,
+      myRating:       myRatings.get(s.id) ?? null,
     }))
 
     setOrders(storyOrders)
@@ -496,6 +692,27 @@ export default function OrdersScreen() {
       prev.map(o =>
         o.story_id === storyId ? { ...o, displayStatus: 'disputed' } : o,
       ),
+    )
+  }, [])
+
+  const [review, setReview] = useState<{
+    storyId: string
+    sellerId: string
+    sellerUsername: string
+    title: string
+  } | null>(null)
+
+  const handleOpenReview = useCallback(
+    (storyId: string, sellerId: string, sellerUsername: string, title: string) => {
+      setReview({ storyId, sellerId, sellerUsername, title })
+    },
+    [],
+  )
+
+  const handleReviewSubmitted = useCallback((storyId: string, rating: number) => {
+    setReview(null)
+    setOrders(prev =>
+      prev.map(o => (o.story_id === storyId ? { ...o, myRating: rating } : o)),
     )
   }, [])
 
@@ -542,6 +759,7 @@ export default function OrdersScreen() {
               item={item}
               onDelivered={handleDelivered}
               onOpenDispute={handleOpenDispute}
+              onOpenReview={handleOpenReview}
             />
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -554,6 +772,16 @@ export default function OrdersScreen() {
         title={dispute?.title ?? ''}
         onClose={() => setDispute(null)}
         onSubmitted={handleDisputeSubmitted}
+      />
+
+      <ReviewModal
+        visible={!!review}
+        storyId={review?.storyId ?? null}
+        sellerId={review?.sellerId ?? null}
+        sellerUsername={review?.sellerUsername ?? ''}
+        title={review?.title ?? ''}
+        onClose={() => setReview(null)}
+        onSubmitted={handleReviewSubmitted}
       />
     </SafeAreaView>
   )
@@ -967,6 +1195,60 @@ const styles = StyleSheet.create({
   },
   modalSubmitText: {
     color: '#fff',
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
+  },
+
+  reviewCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FFD700',
+    borderRadius: 12,
+    paddingVertical: 11,
+    marginTop: 4,
+  },
+  reviewCtaText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 13,
+    color: '#0F0F0F',
+  },
+  reviewedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: 2,
+  },
+  reviewedText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginVertical: 12,
+  },
+  ratingHint: {
+    textAlign: 'center',
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.primary,
+  },
+  reviewSubmitBtn: {
+    backgroundColor: '#FFD700',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  reviewSubmitText: {
+    color: '#0F0F0F',
     fontFamily: fontFamily.bold,
     fontSize: 15,
   },
