@@ -328,7 +328,8 @@ function CommentsSheet({
     >
       <KeyboardAvoidingView
         style={commentStyles.root}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View style={commentStyles.header}>
@@ -363,6 +364,7 @@ function CommentsSheet({
             renderItem={renderItem}
             ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
             contentContainerStyle={{ paddingVertical: 8 }}
+            automaticallyAdjustKeyboardInsets
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
             }
