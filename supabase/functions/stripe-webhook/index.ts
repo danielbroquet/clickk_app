@@ -81,7 +81,8 @@ async function processPurchase(
   supabase: ReturnType<typeof createClient>,
   storyId: string,
   buyerId: string,
-  amountChf: number
+  amountChf: number,
+  paymentIntentId?: string
 ): Promise<void> {
   if (!UUID_RE.test(storyId)) {
     console.warn(`[stripe-webhook] story_id "${storyId}" is not a valid UUID — skipping`);
@@ -109,14 +110,19 @@ async function processPurchase(
     return;
   }
 
+  const updatePayload: Record<string, unknown> = {
+    status: "sold",
+    buyer_id: buyerId,
+    final_price_chf: amountChf,
+    updated_at: new Date().toISOString(),
+  };
+  if (paymentIntentId) {
+    updatePayload.stripe_payment_intent_id = paymentIntentId;
+  }
+
   const { data: updatedRows, error: updateError } = await supabase
     .from("stories")
-    .update({
-      status: "sold",
-      buyer_id: buyerId,
-      final_price_chf: amountChf,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", storyId)
     .eq("status", "active")
     .is("buyer_id", null)
@@ -253,7 +259,8 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      await processPurchase(supabase, story_id.trim(), buyer_id.trim(), parseFloat(amount_chf));
+      const sessionPI = (event.data.object as { payment_intent?: string }).payment_intent;
+      await processPurchase(supabase, story_id.trim(), buyer_id.trim(), parseFloat(amount_chf), sessionPI);
     } else if (event.type === "payment_intent.succeeded") {
       const pi = event.data.object;
       const paymentIntentId = pi.id ?? "";
@@ -341,6 +348,7 @@ Deno.serve(async (req: Request) => {
             status: "sold",
             buyer_id,
             final_price_chf: amountChf,
+            stripe_payment_intent_id: paymentIntentId || null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", story_id)

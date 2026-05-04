@@ -150,6 +150,21 @@ export default function CreateStoryScreen() {
 
   const handlePublish = async () => {
     if (!userId || !videoUri) return
+
+    const { data: sellerProfile } = await supabase
+      .from('seller_profiles')
+      .select('stripe_onboarding_complete, stripe_account_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (!sellerProfile?.stripe_onboarding_complete || !sellerProfile?.stripe_account_id) {
+      setErrors(e => ({
+        ...e,
+        publish: "Ton compte vendeur n'est pas encore configuré. Termine l'inscription Stripe avant de publier.",
+      }))
+      return
+    }
+
     setPublishing(true)
     setErrors(e => ({ ...e, publish: '' }))
 

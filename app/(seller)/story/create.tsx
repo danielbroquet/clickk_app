@@ -315,6 +315,24 @@ export default function CreateDropScreen() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return Alert.alert('Erreur', 'Non authentifié')
 
+    const { data: sellerProfile } = await supabase
+      .from('seller_profiles')
+      .select('stripe_onboarding_complete, stripe_account_id')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!sellerProfile?.stripe_onboarding_complete || !sellerProfile?.stripe_account_id) {
+      Alert.alert(
+        'Compte vendeur incomplet',
+        "Tu dois d'abord terminer ton inscription vendeur (Stripe) pour pouvoir recevoir des paiements.",
+        [
+          { text: 'Plus tard', style: 'cancel' },
+          { text: 'Configurer', onPress: () => router.replace('/become-seller') },
+        ]
+      )
+      return
+    }
+
     setLoading(true)
     setUploadPercent(0)
     setUploadPhase('Préparation…')

@@ -10,6 +10,10 @@ import {
   StyleSheet,
   Linking,
   Platform,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -21,7 +25,7 @@ import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DisplayStatus = 'paid' | 'sold' | 'shipped' | 'delivered' | 'refunded'
+type DisplayStatus = 'paid' | 'sold' | 'shipped' | 'delivered' | 'refunded' | 'disputed'
 
 interface SellerInfo {
   username: string
@@ -75,7 +79,16 @@ const STATUS_CONFIG: Record<DisplayStatus, { label: string; color: string; bg: s
   shipped:   { label: 'Expédié',                 color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'   },
   delivered: { label: 'Reçu',                    color: '#10B981', bg: 'rgba(16,185,129,0.12)'   },
   refunded:  { label: 'Remboursé',               color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
+  disputed:  { label: 'Litige en cours',         color: '#FFA502', bg: 'rgba(255,165,2,0.12)'    },
 }
+
+const DISPUTE_REASONS: { key: string; label: string }[] = [
+  { key: 'not_received',    label: "Je n'ai pas reçu le colis" },
+  { key: 'not_as_described', label: "L'article ne correspond pas à la description" },
+  { key: 'damaged',         label: "L'article est endommagé" },
+  { key: 'counterfeit',     label: 'Article contrefait' },
+  { key: 'other',           label: 'Autre problème' },
+]
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.paid
@@ -91,9 +104,11 @@ function StatusBadge({ status }: { status: DisplayStatus }) {
 function OrderCard({
   item,
   onDelivered,
+  onOpenDispute,
 }: {
   item: OrderItem
   onDelivered: (id: string) => void
+  onOpenDispute: (storyId: string, title: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
@@ -250,7 +265,160 @@ function OrderCard({
           )}
         </View>
       )}
+
+      {/* Dispute trigger — available for sold/shipped but not delivered/refunded/disputed */}
+      {(item.displayStatus === 'sold' ||
+        item.displayStatus === 'paid' ||
+        item.displayStatus === 'shipped') && (
+        <TouchableOpacity
+          style={styles.disputeLink}
+          onPress={() => onOpenDispute(item.story_id, item.title)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
+          <Text style={styles.disputeLinkText}>Signaler un problème</Text>
+        </TouchableOpacity>
+      )}
+
+      {item.displayStatus === 'disputed' && (
+        <View style={styles.disputeNotice}>
+          <Ionicons name="shield-checkmark-outline" size={13} color="#FFA502" />
+          <Text style={styles.disputeNoticeText}>
+            Notre équipe examine ton dossier. Réponse sous 48 h.
+          </Text>
+        </View>
+      )}
     </View>
+  )
+}
+
+// ─── Dispute modal ────────────────────────────────────────────────────────────
+
+function DisputeModal({
+  visible,
+  storyId,
+  title,
+  onClose,
+  onSubmitted,
+}: {
+  visible: boolean
+  storyId: string | null
+  title: string
+  onClose: () => void
+  onSubmitted: (storyId: string) => void
+}) {
+  const [reason, setReason] = useState<string>('')
+  const [description, setDescription] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!visible) {
+      setReason('')
+      setDescription('')
+      setError(null)
+      setSubmitting(false)
+    }
+  }, [visible])
+
+  const handleSubmit = async () => {
+    if (!storyId || !reason) {
+      setError('Sélectionne un motif')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Non authentifié')
+
+      const { error: insErr } = await supabase.from('disputes').insert({
+        story_id: storyId,
+        opened_by: user.id,
+        reason,
+        description: description.trim() || null,
+        status: 'open',
+      })
+      if (insErr) throw insErr
+
+      onSubmitted(storyId)
+    } catch (e: any) {
+      setError(e.message ?? 'Erreur')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalSheet}
+        >
+          <View style={styles.modalHandle} />
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Signaler un problème</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.modalSubtitle} numberOfLines={2}>{title}</Text>
+
+          <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+            <Text style={styles.modalLabel}>Motif</Text>
+            {DISPUTE_REASONS.map((r) => {
+              const active = reason === r.key
+              return (
+                <TouchableOpacity
+                  key={r.key}
+                  style={[styles.reasonRow, active && styles.reasonRowActive]}
+                  onPress={() => setReason(r.key)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.reasonRadio, active && styles.reasonRadioActive]}>
+                    {active && <View style={styles.reasonRadioInner} />}
+                  </View>
+                  <Text style={styles.reasonLabel}>{r.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Détails (optionnel)</Text>
+            <TextInput
+              style={styles.modalTextarea}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              maxLength={500}
+              placeholder="Explique ce qui s'est passé..."
+              placeholderTextColor={colors.textSecondary}
+            />
+
+            {error && <Text style={styles.modalError}>{error}</Text>}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[styles.modalSubmit, submitting && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={submitting}
+            activeOpacity={0.85}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.modalSubmitText}>Envoyer le signalement</Text>
+            )}
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
   )
 }
 
@@ -316,6 +484,21 @@ export default function OrdersScreen() {
     )
   }, [])
 
+  const [dispute, setDispute] = useState<{ storyId: string; title: string } | null>(null)
+
+  const handleOpenDispute = useCallback((storyId: string, title: string) => {
+    setDispute({ storyId, title })
+  }, [])
+
+  const handleDisputeSubmitted = useCallback((storyId: string) => {
+    setDispute(null)
+    setOrders(prev =>
+      prev.map(o =>
+        o.story_id === storyId ? { ...o, displayStatus: 'disputed' } : o,
+      ),
+    )
+  }, [])
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -355,11 +538,23 @@ export default function OrdersScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <OrderCard item={item} onDelivered={handleDelivered} />
+            <OrderCard
+              item={item}
+              onDelivered={handleDelivered}
+              onOpenDispute={handleOpenDispute}
+            />
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
+
+      <DisputeModal
+        visible={!!dispute}
+        storyId={dispute?.storyId ?? null}
+        title={dispute?.title ?? ''}
+        onClose={() => setDispute(null)}
+        onSubmitted={handleDisputeSubmitted}
+      />
     </SafeAreaView>
   )
 }
@@ -623,5 +818,156 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: fontSize.label,
     color: '#fff',
+  },
+
+  disputeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    alignSelf: 'flex-start',
+    paddingVertical: 4,
+  },
+  disputeLinkText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  disputeNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,165,2,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,165,2,0.20)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  disputeNoticeText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: '#FFA502',
+    flex: 1,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    maxHeight: '90%',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modalTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 18,
+    color: colors.text,
+  },
+  modalSubtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 11,
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  reasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginBottom: 6,
+  },
+  reasonRowActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(0,210,184,0.06)',
+  },
+  reasonRadio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  reasonRadioActive: {
+    borderColor: colors.primary,
+  },
+  reasonRadioInner: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: colors.primary,
+  },
+  reasonLabel: {
+    fontFamily: fontFamily.medium,
+    fontSize: 14,
+    color: colors.text,
+    flex: 1,
+  },
+  modalTextarea: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+    fontSize: 14,
+    minHeight: 90,
+    textAlignVertical: 'top',
+    fontFamily: fontFamily.regular,
+  },
+  modalError: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  modalSubmit: {
+    backgroundColor: '#FFA502',
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalSubmitText: {
+    color: '#fff',
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
   },
 })
