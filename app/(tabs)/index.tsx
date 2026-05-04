@@ -163,7 +163,9 @@ function CommentsSheet({
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [count, setCount] = useState(initialCount)
+  const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null)
   const listRef = useRef<FlatList<Comment>>(null)
+  const inputRef = useRef<TextInput>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   useEffect(() => setCount(initialCount), [initialCount])
@@ -220,11 +222,24 @@ function CommentsSheet({
     }
   }, [visible, storyId, fetchComments, currentUserId, onCommentAdded])
 
+  const handleReply = (c: Comment) => {
+    const username = c.profiles?.username ?? 'user'
+    setReplyTo({ id: c.id, username })
+    setInput(`@${username} `)
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  const cancelReply = () => {
+    setReplyTo(null)
+    setInput('')
+  }
+
   const handleSend = async () => {
     const text = input.trim()
     if (!text || !currentUserId || sending) return
     setSending(true)
     setInput('')
+    setReplyTo(null)
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
@@ -305,6 +320,13 @@ function CommentsSheet({
             <Text style={commentStyles.timeAgo}>{formatTimeAgo(item.created_at)}</Text>
           </View>
           <Text style={commentStyles.content}>{item.content}</Text>
+          <TouchableOpacity
+            onPress={() => handleReply(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            style={commentStyles.replyBtn}
+          >
+            <Text style={commentStyles.replyBtnText}>Répondre</Text>
+          </TouchableOpacity>
         </View>
         {isOwn && (
           <TouchableOpacity
@@ -371,6 +393,18 @@ function CommentsSheet({
           />
         )}
 
+        {/* Reply banner */}
+        {replyTo && (
+          <View style={commentStyles.replyBanner}>
+            <Text style={commentStyles.replyBannerText}>
+              Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
+            </Text>
+            <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color="#888" />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Input bar */}
         <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
           {currentUserProfile.avatar_url ? (
@@ -383,6 +417,7 @@ function CommentsSheet({
             </View>
           )}
           <TextInput
+            ref={inputRef}
             style={commentStyles.input}
             placeholder={i18n.t('comments.placeholder')}
             placeholderTextColor="#666"
@@ -1989,6 +2024,20 @@ const commentStyles = StyleSheet.create({
   content: { color: '#FFFFFF', fontSize: 14, lineHeight: 21 },
   deleteBtn: { padding: 4, marginLeft: 4 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: '#2A2A2A', marginLeft: 54 },
+  replyBtn: { marginTop: 4 },
+  replyBtnText: { fontSize: 12, color: '#888', fontWeight: '600' },
+  replyBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#222',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#333',
+  },
+  replyBannerText: { fontSize: 13, color: '#aaa' },
+  replyBannerUsername: { color: '#00D2B8', fontWeight: '700' },
 
   inputBar: {
     flexDirection: 'row',

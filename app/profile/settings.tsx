@@ -98,7 +98,7 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="person-outline"
             label="Modifier mon profil"
-            onPress={() => router.push('/profile/about')}
+            onPress={() => router.push('/profile/edit')}
           />
           <Divider />
           <SettingsRow
