@@ -305,18 +305,29 @@ function CommentsSheet({
     const username = item.profiles?.username ?? 'user'
     const initial = username.charAt(0).toUpperCase()
     const avatar = item.profiles?.avatar_url
+    const goToProfile = () => {
+      if (item.user_id && item.user_id !== currentUserId) {
+        onClose()
+        router.push(`/profile/${item.user_id}`)
+      }
+    }
+
     return (
       <View style={commentStyles.row}>
-        {avatar ? (
-          <Image source={{ uri: avatar }} style={commentStyles.avatar} />
-        ) : (
-          <View style={commentStyles.avatarFallback}>
-            <Text style={commentStyles.avatarInitial}>{initial}</Text>
-          </View>
-        )}
+        <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
+          {avatar ? (
+            <Image source={{ uri: avatar }} style={commentStyles.avatar} />
+          ) : (
+            <View style={commentStyles.avatarFallback}>
+              <Text style={commentStyles.avatarInitial}>{initial}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <View style={commentStyles.body}>
           <View style={commentStyles.headerRow}>
-            <Text style={commentStyles.username}>@{username}</Text>
+            <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
+              <Text style={commentStyles.username}>@{username}</Text>
+            </TouchableOpacity>
             <Text style={commentStyles.timeAgo}>{formatTimeAgo(item.created_at)}</Text>
           </View>
           <Text style={commentStyles.content}>{item.content}</Text>
@@ -931,7 +942,6 @@ function DropItem({
       {/* ── Detail sheet ───────────────────────────────────────────────── */}
       <Modal
         visible={detailVisible}
-        transparent
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => setDetailVisible(false)}
@@ -1806,9 +1816,6 @@ const detailStyles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    marginTop: 60,
   },
   handleRow: {
     alignItems: 'center',
