@@ -44,7 +44,6 @@ import { useDropPresence } from '../../hooks/useDropPresence'
 import ReportModal from '../../components/ui/ReportModal'
 import { SaleToast, SaleToastPayload } from '../../components/ui/SaleToast'
 import { getOrCreateConversation } from '../../lib/utils'
-import { useUnreadMessages } from '../../hooks/useUnreadMessages'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -1084,8 +1083,6 @@ export default function FeedScreen() {
   const currentUserId = session?.user?.id ?? ''
   const insets = useSafeAreaInsets()
   const params = useLocalSearchParams<{ initialStoryId?: string }>()
-  const { unreadCount } = useUnreadMessages()
-
   const [activeTab, setActiveTab] = useState<FeedTab>('foryou')
 
   // Per-tab state
@@ -1314,20 +1311,6 @@ export default function FeedScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Inbox shortcut — top right, like Instagram */}
-      <TouchableOpacity
-        style={[styles.inboxBtn, { top: insets.top + 6 }]}
-        onPress={() => router.push('/(tabs)/inbox')}
-        activeOpacity={0.8}
-        pointerEvents="box-only"
-      >
-        <Ionicons name="paper-plane-outline" size={22} color="#FFFFFF" />
-        {unreadCount > 0 && (
-          <View style={styles.inboxBadge}>
-            <Text style={styles.inboxBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-          </View>
-        )}
-      </TouchableOpacity>
     </View>
   )
 

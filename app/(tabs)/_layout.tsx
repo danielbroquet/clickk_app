@@ -73,17 +73,24 @@ export default function TabLayout() {
         <Tabs.Screen
           name="inbox"
           options={{
-            title: 'Inbox',
-            href: null,
+            title: 'Messages',
+            tabBarIcon: ({ focused, color }) => (
+              <View>
+                <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
+                {totalInboxBadge > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{totalInboxBadge > 99 ? '99+' : totalInboxBadge}</Text>
+                  </View>
+                )}
+              </View>
+            ),
           }}
         />
         <Tabs.Screen
           name="watchlist"
           options={{
             title: 'Watchlist',
-            tabBarIcon: ({ focused, color }) => (
-              <Ionicons name={focused ? 'heart' : 'heart-outline'} size={22} color={color} />
-            ),
+            href: null,
           }}
         />
         <Tabs.Screen
@@ -195,4 +202,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   cancelText: { fontFamily: fontFamily.semiBold, fontSize: 15, color: colors.text },
+  tabBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#FF4757',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  tabBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontFamily: fontFamily.bold,
+    lineHeight: 11,
+  },
 })

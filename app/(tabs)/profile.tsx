@@ -701,14 +701,22 @@ const followersStyles = StyleSheet.create({
 
 // ── Screen ───────────────────────────────────────────────────────────────────
 
-type TabKey = 'drops' | 'achats'
+type TabKey = 'drops' | 'favoris'
+
+interface LikedStory {
+  id: string
+  title: string
+  thumbnail_url: string | null
+  video_url: string | null
+  current_price_chf: number
+  status: string
+}
 
 export default function ProfileScreen() {
   const { profile, session, refreshProfile } = useAuth()
   const [dropsCount, setDropsCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
   const [ownDrops, setOwnDrops] = useState<DropCell[]>([])
-  const [purchases, setPurchases] = useState<DropCell[]>([])
   const [editVisible, setEditVisible] = useState(false)
   const [walletBalance, setWalletBalance] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('drops')
@@ -716,6 +724,7 @@ export default function ProfileScreen() {
   const [editMode, setEditMode] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [followersVisible, setFollowersVisible] = useState(false)
+  const [likedStories, setLikedStories] = useState<LikedStory[]>([])
 
   const currentUserId = session?.user?.id ?? ''
 
@@ -746,12 +755,15 @@ export default function ProfileScreen() {
         .then(({ data }) => setOwnDrops((data ?? []) as DropCell[])),
 
       supabase
-        .from('stories')
-        .select('id, thumbnail_url, video_url, current_price_chf, status, buyer_id, updated_at')
-        .eq('buyer_id', currentUserId)
-        .order('updated_at', { ascending: false })
+        .from('likes')
+        .select('story:story_id(id, title, thumbnail_url, video_url, current_price_chf, status)')
+        .eq('user_id', currentUserId)
+        .order('created_at', { ascending: false })
         .limit(60)
-        .then(({ data }) => setPurchases((data ?? []) as DropCell[])),
+        .then(({ data }) => {
+          const list = (data ?? []).map((r: any) => r.story).filter(Boolean)
+          setLikedStories(list as LikedStory[])
+        }),
     ])
 
     if (profile?.role === 'seller') {
@@ -952,17 +964,17 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'achats' && styles.tabItemActive]}
-            onPress={() => setActiveTab('achats')}
+            style={[styles.tabItem, activeTab === 'favoris' && styles.tabItemActive]}
+            onPress={() => setActiveTab('favoris')}
             activeOpacity={0.8}
           >
             <Ionicons
-              name="bag-outline"
+              name="heart-outline"
               size={20}
-              color={activeTab === 'achats' ? colors.primary : colors.textSecondary}
+              color={activeTab === 'favoris' ? colors.primary : colors.textSecondary}
             />
-            <Text style={[styles.tabLabel, activeTab === 'achats' && styles.tabLabelActive]}>
-              Achats
+            <Text style={[styles.tabLabel, activeTab === 'favoris' && styles.tabLabelActive]}>
+              Favoris
             </Text>
           </TouchableOpacity>
         </View>
@@ -996,17 +1008,17 @@ export default function ProfileScreen() {
               ))}
             </View>
           )
-        ) : purchases.length === 0 ? (
+        ) : likedStories.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="bag-outline" size={48} color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>Aucun achat pour l'instant</Text>
+            <Ionicons name="heart-outline" size={48} color={colors.textSecondary} />
+            <Text style={styles.emptyTitle}>Aucun favori pour l'instant</Text>
           </View>
         ) : (
           <View style={gridStyles.grid}>
-            {purchases.map(drop => (
+            {likedStories.map(s => (
               <DropGridCell
-                key={drop.id}
-                drop={drop}
+                key={s.id}
+                drop={{ id: s.id, thumbnail_url: s.thumbnail_url, video_url: s.video_url, current_price_chf: s.current_price_chf, status: s.status }}
                 variant="purchase"
                 editMode={false}
                 onLongPress={() => {}}
