@@ -7,8 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const REFRESH_URL = "clickk://onboarding-refresh";
-const RETURN_URL = "clickk://onboarding-complete";
+const DEFAULT_REFRESH_URL = "clickk://onboarding-refresh";
+const DEFAULT_RETURN_URL = "clickk://onboarding-complete";
 
 async function stripeRequest(path: string, key: string, body?: URLSearchParams) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
@@ -24,11 +24,11 @@ async function stripeRequest(path: string, key: string, body?: URLSearchParams) 
   return json;
 }
 
-async function createAccountLink(key: string, accountId: string): Promise<string> {
+async function createAccountLink(key: string, accountId: string, returnUrl: string, refreshUrl: string): Promise<string> {
   const params = new URLSearchParams({
     account: accountId,
-    refresh_url: REFRESH_URL,
-    return_url: RETURN_URL,
+    refresh_url: refreshUrl,
+    return_url: returnUrl,
     type: "account_onboarding",
   });
   const link = await stripeRequest("/account_links", key, params);
@@ -59,6 +59,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Read optional redirect URLs from request body
+    let returnUrl = DEFAULT_RETURN_URL;
+    let refreshUrl = DEFAULT_REFRESH_URL;
+    try {
+      const body = await req.json();
+      if (body?.return_url) returnUrl = body.return_url;
+      if (body?.refresh_url) refreshUrl = body.refresh_url;
+    } catch { /* no body — use defaults */ }
+
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("stripe_not_configured");
 
@@ -83,7 +92,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (existing.status === "pending" && existing.onboarding_url && existing.stripe_account_id) {
-        const freshUrl = await createAccountLink(stripeKey, existing.stripe_account_id);
+        const freshUrl = await createAccountLink(stripeKey, existing.stripe_account_id, returnUrl, refreshUrl);
 
         await supabase
           .from("seller_onboarding")
@@ -109,7 +118,7 @@ Deno.serve(async (req: Request) => {
     const account = await stripeRequest("/accounts", stripeKey, accountParams);
     const accountId = account.id as string;
 
-    const onboardingUrl = await createAccountLink(stripeKey, accountId);
+    const onboardingUrl = await createAccountLink(stripeKey, accountId, returnUrl, refreshUrl);
 
     const { error: insertErr } = await supabase
       .from("seller_onboarding")

@@ -230,6 +230,8 @@ export default function CreateDropScreen() {
 
   // Step 4
   const [loading, setLoading] = useState(false)
+  const [uploadPhase, setUploadPhase] = useState<string>('')
+  const [uploadPercent, setUploadPercent] = useState(0)
 
   const { hours: durationHours, ms: durationMs, label: durationLabel } = DURATION[preset]
 
@@ -306,25 +308,42 @@ export default function CreateDropScreen() {
     if (!user) return Alert.alert('Erreur', 'Non authentifié')
 
     setLoading(true)
+    setUploadPercent(0)
+    setUploadPhase('Préparation…')
     try {
+      // Step 1 — copy to cache if needed (5%)
       const path = `${user.id}/${Date.now()}.mp4`
       let localUri = videoUri!
       if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
+        setUploadPhase('Copie du fichier…')
+        setUploadPercent(5)
         const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
         await FileSystem.copyAsync({ from: localUri, to: cacheUri })
         localUri = cacheUri
       }
+
+      // Step 2 — read video (15%)
+      setUploadPhase('Lecture de la vidéo…')
+      setUploadPercent(15)
       const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
+
+      // Step 3 — upload video (60%)
+      setUploadPhase('Envoi de la vidéo…')
+      setUploadPercent(30)
       const { error: uploadError } = await supabase.storage
         .from('story-videos')
         .upload(path, decode(base64), { contentType: 'video/mp4' })
       if (uploadError) throw uploadError
+      setUploadPercent(60)
 
       const { data: { publicUrl } } = supabase.storage.from('story-videos').getPublicUrl(path)
 
+      // Step 4 — upload thumbnail (75%)
       let thumbnailPublicUrl: string | null = null
       if (thumbnailUri) {
         try {
+          setUploadPhase('Envoi de la miniature…')
+          setUploadPercent(65)
           const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
           const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
           const { error: te } = await supabase.storage
@@ -334,9 +353,15 @@ export default function CreateDropScreen() {
             const { data: { publicUrl: tu } } = supabase.storage.from('story-thumbnails').getPublicUrl(thumbPath)
             thumbnailPublicUrl = tu
           }
+          setUploadPercent(75)
         } catch {}
+      } else {
+        setUploadPercent(75)
       }
 
+      // Step 5 — insert record (100%)
+      setUploadPhase('Finalisation…')
+      setUploadPercent(85)
       const categoryValue = category || 'autre'
       const insertPayload = {
         seller_id: user.id,
@@ -356,15 +381,18 @@ export default function CreateDropScreen() {
         expires_at: new Date(Date.now() + durationMs).toISOString(),
         status: 'active',
       }
-      console.log('[create drop] full insert payload:', JSON.stringify(insertPayload, null, 2))
       const { error: insertError } = await supabase.from('stories').insert(insertPayload)
       if (insertError) throw insertError
 
+      setUploadPercent(100)
+      setUploadPhase('Publié !')
       setLoading(false)
       setSuccess(true)
     } catch (err: any) {
       Alert.alert('Erreur', err.message ?? 'Une erreur est survenue')
       setLoading(false)
+      setUploadPercent(0)
+      setUploadPhase('')
     }
   }
 
@@ -451,6 +479,8 @@ export default function CreateDropScreen() {
               preset={preset}
               durationLabel={durationLabel}
               loading={loading}
+              uploadPhase={uploadPhase}
+              uploadPercent={uploadPercent}
               onPublish={handlePublish}
             />
           )}
@@ -733,7 +763,7 @@ function Step3({
 // ─── Step 4: Publish ──────────────────────────────────────────────────────────
 
 function Step4({
-  title, thumbnailUri, sp, fp, preset, durationLabel, loading, onPublish,
+  title, thumbnailUri, sp, fp, preset, durationLabel, loading, uploadPhase, uploadPercent, onPublish,
 }: {
   title: string
   thumbnailUri: string | null
@@ -742,6 +772,8 @@ function Step4({
   preset: SpeedPreset
   durationLabel: string
   loading: boolean
+  uploadPhase: string
+  uploadPercent: number
   onPublish: () => void
 }) {
   const accent = PRESET_ACCENT[preset]
@@ -778,15 +810,20 @@ function Step4({
 
       {/* Publish button */}
       <TouchableOpacity
-        style={[s.publishBtn, loading && { opacity: 0.6 }]}
+        style={[s.publishBtn, loading && s.publishBtnLoading]}
         onPress={onPublish}
         disabled={loading}
         activeOpacity={0.85}
       >
         {loading ? (
-          <View style={s.publishLoading}>
-            <ActivityIndicator color="#0F0F0F" />
-            <Text style={s.publishBtnText}>Publication en cours…</Text>
+          <View style={s.publishLoadingWrap}>
+            <View style={s.publishProgressRow}>
+              <Text style={s.publishBtnText}>{uploadPhase}</Text>
+              <Text style={s.publishPercentText}>{uploadPercent}%</Text>
+            </View>
+            <View style={s.publishProgressTrack}>
+              <View style={[s.publishProgressFill, { width: `${uploadPercent}%` }]} />
+            </View>
           </View>
         ) : (
           <>
@@ -1098,7 +1135,36 @@ const s = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 14,
   },
-  publishLoading: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  publishBtnLoading: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    height: 64,
+  },
+  publishLoadingWrap: { width: '100%' },
+  publishProgressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  publishProgressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  publishProgressFill: {
+    height: 4,
+    backgroundColor: '#0F0F0F',
+    borderRadius: 2,
+  },
+  publishPercentText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 14,
+    color: '#0F0F0F',
+  },
   publishBtnText: { fontFamily: fontFamily.bold, fontSize: 17, color: '#0F0F0F' },
   publishDisclaimer: {
     fontFamily: fontFamily.regular,

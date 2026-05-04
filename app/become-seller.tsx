@@ -6,11 +6,13 @@ import {
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  Platform,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as WebBrowser from 'expo-web-browser'
+import * as Linking from 'expo-linking'
 import { supabase } from '../lib/supabase'
 import { callEdgeFunction } from '../lib/edgeFunction'
 import { colors, fontFamily, spacing } from '../lib/theme'
@@ -58,10 +60,20 @@ export default function BecomeSellerScreen() {
   }
 
   const fetchOnboardingUrl = async (): Promise<string | null> => {
+    // Build redirect URLs that Stripe accepts (must be HTTPS or valid deep link)
+    // On native builds, use the Expo-hosted redirect proxy which forwards back via deep link
+    const returnUrl = Platform.OS === 'web'
+      ? `${window.location.origin}/onboarding-complete`
+      : Linking.createURL('onboarding-complete')
+    const refreshUrl = Platform.OS === 'web'
+      ? `${window.location.origin}/onboarding-refresh`
+      : Linking.createURL('onboarding-refresh')
+
     let data: { status?: string; onboarding_url?: string }
     try {
       data = await callEdgeFunction<{ status?: string; onboarding_url?: string }>(
-        'create-connect-account'
+        'create-connect-account',
+        { return_url: returnUrl, refresh_url: refreshUrl }
       )
     } catch (err: unknown) {
       if (err instanceof Error && err.message === 'already_onboarded') {
@@ -86,24 +98,28 @@ export default function BecomeSellerScreen() {
       if (!url) return
 
       setStatus('redirecting')
+      const completeUrl = Linking.createURL('onboarding-complete')
       const result = await WebBrowser.openAuthSessionAsync(
         url,
-        'clickk://onboarding-complete',
+        completeUrl,
         { preferEphemeralSession: false }
       )
 
       if (result.type === 'success') {
         const redirectUrl = (result as WebBrowser.WebBrowserAuthSessionResult & { url?: string }).url ?? ''
-        if (redirectUrl.startsWith('clickk://onboarding-complete')) {
+        const returnBase = Linking.createURL('onboarding-complete')
+        const refreshBase = Linking.createURL('onboarding-refresh')
+        if (redirectUrl.startsWith(returnBase) || redirectUrl.includes('onboarding-complete')) {
           await checkOnboardingStatus()
-        } else if (redirectUrl.startsWith('clickk://onboarding-refresh')) {
+        } else if (redirectUrl.startsWith(refreshBase) || redirectUrl.includes('onboarding-refresh')) {
           setStatus('loading')
           const newUrl = await fetchOnboardingUrl()
           if (newUrl) {
             setStatus('redirecting')
+            const completeUrl = Linking.createURL('onboarding-complete')
             const refreshResult = await WebBrowser.openAuthSessionAsync(
               newUrl,
-              'clickk://onboarding-complete',
+              completeUrl,
               { preferEphemeralSession: false }
             )
             if (refreshResult.type === 'success') {
