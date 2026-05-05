@@ -360,61 +360,64 @@ function CommentsSheet({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        style={commentStyles.root}
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {/* Header */}
-        <View style={commentStyles.header}>
-          <View style={commentStyles.handle} />
-          <View style={commentStyles.headerInner}>
-            <View style={{ width: 32 }} />
-            <Text style={commentStyles.title}>
-              {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
-            </Text>
-            <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
-            </TouchableOpacity>
+        <View style={commentStyles.root}>
+          {/* Header */}
+          <View style={commentStyles.header}>
+            <View style={commentStyles.handle} />
+            <View style={commentStyles.headerInner}>
+              <View style={{ width: 32 }} />
+              <Text style={commentStyles.title}>
+                {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
+              </Text>
+              <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+              </TouchableOpacity>
+            </View>
           </View>
+
+          {/* List */}
+          {loading ? (
+            <View style={commentStyles.centerFill}>
+              <ActivityIndicator color="#00D2B8" />
+            </View>
+          ) : comments.length === 0 ? (
+            <View style={commentStyles.centerFill}>
+              <Ionicons name="chatbubble-outline" size={48} color="#444" />
+              <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
+              <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={comments}
+              keyExtractor={(c) => c.id}
+              renderItem={renderItem}
+              ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
+              contentContainerStyle={{ paddingVertical: 8 }}
+              style={{ flex: 1 }}
+              automaticallyAdjustKeyboardInsets={true}
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
+              }
+            />
+          )}
+
+          {/* Reply banner */}
+          {replyTo && (
+            <View style={commentStyles.replyBanner}>
+              <Text style={commentStyles.replyBannerText}>
+                Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
+              </Text>
+              <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close-circle" size={18} color="#888" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-
-        {/* List */}
-        {loading ? (
-          <View style={commentStyles.centerFill}>
-            <ActivityIndicator color="#00D2B8" />
-          </View>
-        ) : comments.length === 0 ? (
-          <View style={commentStyles.centerFill}>
-            <Ionicons name="chatbubble-outline" size={48} color="#444" />
-            <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
-            <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
-          </View>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={comments}
-            keyExtractor={(c) => c.id}
-            renderItem={renderItem}
-            ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
-            contentContainerStyle={{ paddingVertical: 8 }}
-            automaticallyAdjustKeyboardInsets
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
-            }
-          />
-        )}
-
-        {/* Reply banner */}
-        {replyTo && (
-          <View style={commentStyles.replyBanner}>
-            <Text style={commentStyles.replyBannerText}>
-              Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
-            </Text>
-            <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={18} color="#888" />
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Input bar */}
         <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
