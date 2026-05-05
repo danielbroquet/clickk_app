@@ -19,10 +19,10 @@ import { useAuth } from '../lib/auth'
 type Status = 'idle' | 'loading' | 'redirecting' | 'complete' | 'error'
 
 const BENEFITS = [
-  { icon: 'flash' as const, title: 'Stories hollandaises', desc: 'Prix qui descend — le premier qui clique achète' },
-  { icon: 'shield-checkmark' as const, title: 'Paiements sécurisés', desc: 'Stripe gère tout — conforme LPD Suisse' },
-  { icon: 'wallet' as const, title: 'Virements automatiques', desc: '92% du prix de vente sur ton compte' },
-  { icon: 'time' as const, title: 'Protection acheteur', desc: "Argent retenu jusqu'à confirmation de réception" },
+  { icon: 'shield-checkmark' as const, title: 'Vérification d\'identité', desc: 'Stripe vérifie ton identité de façon sécurisée — standard bancaire européen' },
+  { icon: 'time' as const, title: 'Moins de 5 minutes', desc: 'Carte d\'identité ou passeport suffisent — processus guidé étape par étape' },
+  { icon: 'lock-closed' as const, title: 'Données protégées', desc: 'Tes informations sont chiffrées et gérées par Stripe, jamais stockées par Clickk' },
+  { icon: 'checkmark-circle' as const, title: 'Vérification unique', desc: 'Une seule fois, puis tu peux publier autant de drops que tu veux' },
 ]
 
 export default function BecomeSellerScreen() {
@@ -162,9 +162,9 @@ export default function BecomeSellerScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Deviens vendeur</Text>
+        <Text style={styles.title}>Vérifie ton identité</Text>
         <Text style={styles.subtitle}>
-          Crée ton compte vendeur et commence à vendre en quelques minutes.
+          Pour vendre sur Clickk, notre partenaire de paiement Stripe doit vérifier ton identité. C'est rapide, sécurisé, et ne prend que quelques minutes.
         </Text>
 
         {BENEFITS.map((item, i) => (
@@ -196,7 +196,7 @@ export default function BecomeSellerScreen() {
           ) : status === 'redirecting' ? (
             <Text style={styles.mainBtnText}>Ouverture Stripe...</Text>
           ) : (
-            <Text style={styles.mainBtnText}>Créer mon compte vendeur →</Text>
+            <Text style={styles.mainBtnText}>Vérifier mon identité →</Text>
           )}
         </TouchableOpacity>
 
