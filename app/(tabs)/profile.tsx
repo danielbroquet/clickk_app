@@ -867,7 +867,7 @@ export default function ProfileScreen() {
               <Text style={styles.statNum}>
                 {followLoading ? '--' : followersCount}
               </Text>
-              <Text style={[styles.statLabel, styles.statLabelClickable]}>Abonnés</Text>
+              <Text style={styles.statLabel}>Abonnés</Text>
             </TouchableOpacity>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{ventesCount === null ? '--' : ventesCount}</Text>
@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
   stat: { alignItems: 'center' },
   statNum: { fontFamily: fontFamily.bold, fontSize: 18, color: colors.text },
   statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  statLabelClickable: { color: colors.primary },
+
 
   // Buttons
   editBtn: {
