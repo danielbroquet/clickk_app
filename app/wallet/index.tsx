@@ -155,10 +155,16 @@ export default function WalletScreen() {
     <>
       <Stack.Screen
         options={{
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
+            </TouchableOpacity>
+          ),
           title: 'Mon Wallet',
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: fontFamily.bold },
+          headerShadowVisible: false,
         }}
       />
       <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
