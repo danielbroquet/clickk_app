@@ -99,6 +99,7 @@ interface Comment {
   content: string
   created_at: string
   user_id: string
+  reply_to_id: string | null
   profiles: { username: string | null; avatar_url?: string | null } | null
 }
 
@@ -173,7 +174,7 @@ function CommentsSheet({
   const fetchComments = useCallback(async () => {
     const { data } = await supabase
       .from('comments')
-      .select('id, content, created_at, user_id, profiles:user_id(username, avatar_url)')
+      .select('id, content, created_at, user_id, reply_to_id, profiles:user_id(username, avatar_url)')
       .eq('story_id', storyId)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -207,6 +208,7 @@ function CommentsSheet({
             content: row.content,
             created_at: row.created_at,
             user_id: row.user_id,
+            reply_to_id: (payload.new as { reply_to_id?: string | null }).reply_to_id ?? null,
             profiles: prof ?? { username: null, avatar_url: null },
           }
           setComments(prev => [newComment, ...prev])
@@ -253,8 +255,8 @@ function CommentsSheet({
 
     const { data, error } = await supabase
       .from('comments')
-      .insert({ story_id: storyId, user_id: currentUserId, content: text })
-      .select('id, content, created_at, user_id')
+      .insert({ story_id: storyId, user_id: currentUserId, content: text, reply_to_id: replyTo?.id ?? null })
+      .select('id, content, created_at, user_id, reply_to_id')
       .maybeSingle()
 
     console.log('[comments] insert result:', { data, error })
@@ -271,6 +273,7 @@ function CommentsSheet({
       content: data.content,
       created_at: data.created_at,
       user_id: data.user_id,
+      reply_to_id: data.reply_to_id ?? null,
       profiles: {
         username: currentUserProfile.username,
         avatar_url: currentUserProfile.avatar_url,
@@ -312,8 +315,10 @@ function CommentsSheet({
       }
     }
 
+    const isReply = item.reply_to_id !== null
+
     return (
-      <View style={commentStyles.row}>
+      <View style={[commentStyles.row, isReply && { marginLeft: 40, borderLeftWidth: 2, borderLeftColor: colors.border, paddingLeft: 10 }]}>
         <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={commentStyles.avatar} />
@@ -324,6 +329,9 @@ function CommentsSheet({
           )}
         </TouchableOpacity>
         <View style={commentStyles.body}>
+          {isReply && (
+            <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>↳ réponse</Text>
+          )}
           <View style={commentStyles.headerRow}>
             <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
               <Text style={commentStyles.username}>@{username}</Text>
