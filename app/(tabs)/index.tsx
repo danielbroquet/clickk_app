@@ -1081,12 +1081,10 @@ function DropItem({
 
             {/* Price section */}
             <Text style={detailStyles.priceLabel}>PRIX ACTUEL</Text>
-            <View style={detailStyles.priceLine}>
-              <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
-              <View style={detailStyles.freeShipBadge}>
-                <Ionicons name="cube-outline" size={12} color="#00D2B8" />
-                <Text style={detailStyles.freeShipText}>Livraison offerte</Text>
-              </View>
+            <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
+            <View style={[detailStyles.freeShipBadge, { alignSelf: 'flex-start', marginTop: 6 }]}>
+              <Ionicons name="cube-outline" size={12} color="#00D2B8" />
+              <Text style={detailStyles.freeShipText}>Livraison offerte</Text>
             </View>
             {dropPerMinute(story) > 0 && (
               <Text style={detailStyles.priceDrop}>
