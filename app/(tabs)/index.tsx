@@ -173,12 +173,39 @@ function CommentsSheet({
   const fetchComments = useCallback(async () => {
     const { data, error } = await supabase
       .from('comments')
-      .select('id, content, created_at, user_id, profiles:user_id(username, avatar_url)')
+      .select('id, content, created_at, user_id')
       .eq('story_id', storyId)
       .order('created_at', { ascending: false })
       .limit(100)
-    if (error) console.log('[comments] fetch error:', error)
-    setComments((data as unknown as Comment[]) ?? [])
+    if (error) {
+      console.log('[comments] fetch error:', error)
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+    const rows = data ?? []
+    if (rows.length === 0) {
+      setComments([])
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+    const userIds = [...new Set(rows.map((r: any) => r.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds)
+    const profileMap = new Map(
+      (profiles ?? []).map((p: any) => [p.id, p])
+    )
+    const withProfiles = rows.map((r: any) => ({
+      id: r.id,
+      content: r.content,
+      created_at: r.created_at,
+      user_id: r.user_id,
+      profiles: profileMap.get(r.user_id) ?? { username: null, avatar_url: null },
+    }))
+    setComments(withProfiles as Comment[])
     setLoading(false)
     setRefreshing(false)
   }, [storyId])
