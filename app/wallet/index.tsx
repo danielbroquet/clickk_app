@@ -161,7 +161,7 @@ export default function WalletScreen() {
           headerTitleStyle: { fontFamily: fontFamily.bold },
         }}
       />
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -200,7 +200,7 @@ export default function WalletScreen() {
                       <View style={styles.balanceDetail}>
                         <View style={[styles.detailDot, { backgroundColor: '#3B82F6' }]} />
                         <Text style={styles.balanceDetailText}>
-                          En escrow : CHF {(data?.escrow_pending_chf ?? 0).toFixed(2)}
+                          En attente de livraison : CHF {(data?.escrow_pending_chf ?? 0).toFixed(2)}
                         </Text>
                       </View>
                     )}

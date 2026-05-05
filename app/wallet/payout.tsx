@@ -83,7 +83,7 @@ export default function PayoutScreen() {
           headerTitleStyle: { fontFamily: fontFamily.bold },
         }}
       />
-      <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
