@@ -66,6 +66,8 @@ interface FeedStory {
   seller: { id: string; username: string; avatar_url: string | null } | null
 }
 
+const PAGE_SIZE = 15
+
 const STORY_SELECT = `
   id, seller_id, title, description, category, start_price_chf, floor_price_chf, current_price_chf,
   video_url, thumbnail_url, status, buyer_id, created_at, expires_at, price_drop_seconds,
@@ -1185,11 +1187,17 @@ export default function FeedScreen() {
   const [forYouLoading, setForYouLoading] = useState(true)
   const [forYouLoaded, setForYouLoaded] = useState(false)
   const [forYouRefreshing, setForYouRefreshing] = useState(false)
+  const [forYouCursor, setForYouCursor] = useState<string | null>(null)
+  const [forYouHasMore, setForYouHasMore] = useState(true)
+  const [forYouLoadingMore, setForYouLoadingMore] = useState(false)
 
   const [followingStories, setFollowingStories] = useState<FeedStory[]>([])
   const [followingLoading, setFollowingLoading] = useState(false)
   const [followingLoaded, setFollowingLoaded] = useState(false)
   const [followingRefreshing, setFollowingRefreshing] = useState(false)
+  const [followingCursor, setFollowingCursor] = useState<string | null>(null)
+  const [followingHasMore, setFollowingHasMore] = useState(true)
+  const [followingLoadingMore, setFollowingLoadingMore] = useState(false)
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [tabFocused, setTabFocused] = useState(true)
@@ -1205,28 +1213,62 @@ export default function FeedScreen() {
   )
 
   // ── Fetch "Pour toi" ────────────────────────────────────────────────────────
-  const fetchForYou = useCallback(async () => {
-    const { data, error } = await supabase
+  const fetchForYou = useCallback(async (mode: 'initial' | 'more' = 'initial') => {
+    if (mode === 'more' && (!forYouHasMore || forYouLoadingMore)) return
+    if (mode === 'more') setForYouLoadingMore(true)
+
+    let q = supabase
       .from('stories')
       .select(STORY_SELECT)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
-      .limit(30)
-    if (!error) setForYouStories((data as unknown as FeedStory[]) ?? [])
-    setForYouLoading(false)
-    setForYouLoaded(true)
-    setForYouRefreshing(false)
-  }, [])
+      .limit(PAGE_SIZE)
+
+    if (mode === 'more' && forYouCursor) {
+      q = q.lt('created_at', forYouCursor)
+    }
+
+    const { data, error } = await q
+
+    if (!error && data) {
+      const rows = data as unknown as FeedStory[]
+      if (mode === 'initial') {
+        setForYouStories(rows)
+      } else {
+        setForYouStories((prev) => {
+          const seen = new Set(prev.map((s) => s.id))
+          const fresh = rows.filter((s) => !seen.has(s.id))
+          return [...prev, ...fresh]
+        })
+      }
+      if (rows.length < PAGE_SIZE) setForYouHasMore(false)
+      else setForYouHasMore(true)
+      const last = rows[rows.length - 1]
+      if (last) setForYouCursor(last.created_at)
+    }
+
+    if (mode === 'initial') {
+      setForYouLoading(false)
+      setForYouLoaded(true)
+      setForYouRefreshing(false)
+    } else {
+      setForYouLoadingMore(false)
+    }
+  }, [forYouCursor, forYouHasMore, forYouLoadingMore])
 
   // ── Fetch "Abonnements" ─────────────────────────────────────────────────────
-  const fetchFollowing = useCallback(async () => {
+  const fetchFollowing = useCallback(async (mode: 'initial' | 'more' = 'initial') => {
     if (!currentUserId) {
       setFollowingLoading(false)
       setFollowingLoaded(true)
       setFollowingRefreshing(false)
+      setFollowingHasMore(false)
       return
     }
+    if (mode === 'more' && (!followingHasMore || followingLoadingMore)) return
+    if (mode === 'more') setFollowingLoadingMore(true)
+
     const { data: follows } = await supabase
       .from('follows')
       .select('following_id')
@@ -1239,23 +1281,51 @@ export default function FeedScreen() {
       setFollowingLoading(false)
       setFollowingLoaded(true)
       setFollowingRefreshing(false)
+      setFollowingHasMore(false)
+      setFollowingLoadingMore(false)
       return
     }
 
-    const { data, error } = await supabase
+    let q = supabase
       .from('stories')
       .select(STORY_SELECT)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
       .in('seller_id', ids)
       .order('created_at', { ascending: false })
-      .limit(30)
+      .limit(PAGE_SIZE)
 
-    if (!error) setFollowingStories((data as unknown as FeedStory[]) ?? [])
-    setFollowingLoading(false)
-    setFollowingLoaded(true)
-    setFollowingRefreshing(false)
-  }, [currentUserId])
+    if (mode === 'more' && followingCursor) {
+      q = q.lt('created_at', followingCursor)
+    }
+
+    const { data, error } = await q
+
+    if (!error && data) {
+      const rows = data as unknown as FeedStory[]
+      if (mode === 'initial') {
+        setFollowingStories(rows)
+      } else {
+        setFollowingStories((prev) => {
+          const seen = new Set(prev.map((s) => s.id))
+          const fresh = rows.filter((s) => !seen.has(s.id))
+          return [...prev, ...fresh]
+        })
+      }
+      if (rows.length < PAGE_SIZE) setFollowingHasMore(false)
+      else setFollowingHasMore(true)
+      const last = rows[rows.length - 1]
+      if (last) setFollowingCursor(last.created_at)
+    }
+
+    if (mode === 'initial') {
+      setFollowingLoading(false)
+      setFollowingLoaded(true)
+      setFollowingRefreshing(false)
+    } else {
+      setFollowingLoadingMore(false)
+    }
+  }, [currentUserId, followingCursor, followingHasMore, followingLoadingMore])
 
   // Initial load
   useEffect(() => { fetchForYou() }, [fetchForYou])
@@ -1473,16 +1543,35 @@ export default function FeedScreen() {
         initialNumToRender={1}
         maxToRenderPerBatch={2}
         removeClippedSubviews
+        onEndReached={() => {
+          if (activeTab === 'foryou') {
+            fetchForYou('more')
+          } else {
+            fetchFollowing('more')
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          (activeTab === 'foryou' ? forYouLoadingMore : followingLoadingMore) ? (
+            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#00D2B8" />
+            </View>
+          ) : null
+        }
         refreshControl={
           <RefreshControl
             refreshing={activeTab === 'foryou' ? forYouRefreshing : followingRefreshing}
             onRefresh={() => {
               if (activeTab === 'foryou') {
+                setForYouCursor(null)
+                setForYouHasMore(true)
                 setForYouRefreshing(true)
-                fetchForYou()
+                fetchForYou('initial')
               } else {
+                setFollowingCursor(null)
+                setFollowingHasMore(true)
                 setFollowingRefreshing(true)
-                fetchFollowing()
+                fetchFollowing('initial')
               }
             }}
             tintColor="#00D2B8"
