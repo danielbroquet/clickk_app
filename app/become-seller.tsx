@@ -41,17 +41,31 @@ export default function BecomeSellerScreen() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return false
 
-    const { data } = await supabase
+    const { data: onboardingData } = await supabase
       .from('seller_onboarding')
-      .select('status')
+      .select('status, stripe_account_id')
       .eq('user_id', session.user.id)
       .maybeSingle()
 
-    if (data?.status === 'complete') {
+    if (onboardingData?.status === 'complete') {
       await supabase
         .from('profiles')
         .update({ role: 'seller' })
         .eq('id', session.user.id)
+
+      if (onboardingData.stripe_account_id) {
+        await supabase
+          .from('seller_profiles')
+          .upsert(
+            {
+              user_id: session.user.id,
+              stripe_account_id: onboardingData.stripe_account_id,
+              stripe_onboarding_complete: true,
+            },
+            { onConflict: 'user_id' }
+          )
+      }
+
       await refreshProfile()
       setStatus('complete')
       return true

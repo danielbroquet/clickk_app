@@ -463,7 +463,7 @@ Deno.serve(async (req: Request) => {
           const stripeAccountId = accountId as string;
           const { error: spErr } = await supabase
             .from("seller_profiles")
-            .upsert({ user_id: userId, stripe_account_id: stripeAccountId }, { onConflict: "user_id" });
+            .upsert({ user_id: userId, stripe_account_id: stripeAccountId, stripe_onboarding_complete: true }, { onConflict: "user_id" });
 
           if (spErr) {
             console.error("[stripe-webhook] seller_profiles upsert failed:", spErr.message);

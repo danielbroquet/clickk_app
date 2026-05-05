@@ -321,13 +321,23 @@ export default function CreateDropScreen() {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (!sellerProfile?.stripe_onboarding_complete || !sellerProfile?.stripe_account_id) {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    const isOnboarded =
+      (sellerProfile?.stripe_onboarding_complete && sellerProfile?.stripe_account_id) ||
+      profileData?.role === 'seller'
+
+    if (!isOnboarded) {
       Alert.alert(
         'Compte vendeur incomplet',
         "Tu dois d'abord terminer ton inscription vendeur (Stripe) pour pouvoir recevoir des paiements.",
         [
           { text: 'Plus tard', style: 'cancel' },
-          { text: 'Configurer', onPress: () => router.replace('/become-seller') },
+          { text: 'Configurer', onPress: () => router.push('/become-seller') },
         ]
       )
       return
