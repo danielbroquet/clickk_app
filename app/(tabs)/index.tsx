@@ -389,16 +389,16 @@ function CommentsSheet({
       onRequestClose={onClose}
       presentationStyle="overFullScreen"
     >
-      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-        <Pressable
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          onPress={onClose}
-        />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={0}
-          style={{ width: '100%' }}
-        >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+        style={{ flex: 1 }}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            onPress={onClose}
+          />
           <View style={commentStyles.sheet}>
             {/* Header */}
             <View style={commentStyles.header}>
@@ -485,8 +485,8 @@ function CommentsSheet({
               )}
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
@@ -2077,7 +2077,7 @@ const detailStyles = StyleSheet.create({
 
 const commentStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1A1A1A' },
-  sheet: { maxHeight: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+  sheet: { height: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
   header: { paddingTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2A2A2A' },
   handle: {
     width: 40,
