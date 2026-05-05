@@ -193,7 +193,9 @@ export default function DiscoverScreen() {
               </TouchableOpacity>
             )
           })}
+        </ScrollView>
 
+        <View style={styles.priceRow}>
           <TouchableOpacity
             style={[styles.pill, priceActive ? styles.pillActive : styles.pillInactive, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
             onPress={() => setShowPriceInput(v => !v)}
@@ -209,7 +211,7 @@ export default function DiscoverScreen() {
             </Text>
             {priceActive && <View style={styles.activeDot} />}
           </TouchableOpacity>
-        </ScrollView>
+        </View>
 
         {showPriceInput && (
           <View style={styles.priceInputRow}>
@@ -300,6 +302,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 2,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
   pill: {
     paddingHorizontal: 14,
