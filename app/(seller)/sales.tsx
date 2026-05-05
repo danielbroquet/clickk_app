@@ -507,7 +507,7 @@ export default function SalesScreen() {
   )
 
   const handleRelaunch = useCallback((dropId: string) => {
-    router.push({ pathname: '/story/create', params: { relaunchId: dropId } })
+    router.push({ pathname: '/(seller)/story/create', params: { relaunchId: dropId } })
   }, [])
 
   const handleHardDelete = useCallback(async (dropId: string) => {
