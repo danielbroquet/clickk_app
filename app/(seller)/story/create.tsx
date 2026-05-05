@@ -16,7 +16,7 @@ import {
   Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouter } from 'expo-router'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as VideoThumbnails from 'expo-video-thumbnails'
@@ -210,6 +210,7 @@ function CategoryPicker({
 export default function CreateDropScreen() {
   const router = useRouter()
   const { profile } = useAuth()
+  const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
 
   useEffect(() => {
     if (profile && profile.role !== 'seller') {
@@ -230,11 +231,40 @@ export default function CreateDropScreen() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+  const [, setCondition] = useState('')
 
   // Step 3
   const [startPrice, setStartPrice] = useState('')
   const [floorPrice, setFloorPrice] = useState('')
   const [preset, setPreset] = useState<SpeedPreset>('STANDARD')
+  const [, setDurationHours] = useState<number | null>(null)
+
+  // Relaunch: prefill all fields from previous drop
+  useEffect(() => {
+    if (!relaunchId) return
+    let mounted = true
+    ;(async () => {
+      const { data } = await supabase
+        .from('stories')
+        .select('title, description, category, condition, start_price_chf, floor_price_chf, price_drop_seconds, duration_hours, speed_preset, thumbnail_url, video_url')
+        .eq('id', relaunchId)
+        .maybeSingle()
+      if (!mounted || !data) return
+      setTitle(data.title ?? '')
+      setDescription(data.description ?? '')
+      setCategory(data.category ?? '')
+      setCondition((data as any).condition ?? '')
+      setStartPrice(data.start_price_chf?.toString() ?? '')
+      setFloorPrice(data.floor_price_chf?.toString() ?? '')
+      const sp = (data.speed_preset as SpeedPreset) ?? 'STANDARD'
+      setPreset(sp && DURATION[sp] ? sp : 'STANDARD')
+      setDurationHours(data.duration_hours ?? 72)
+      if (data.video_url) setVideoUri(data.video_url)
+      if (data.thumbnail_url) setThumbnailUri(data.thumbnail_url)
+      setStep(1)
+    })()
+    return () => { mounted = false }
+  }, [relaunchId])
 
   // Step 4
   const [loading, setLoading] = useState(false)
@@ -347,52 +377,70 @@ export default function CreateDropScreen() {
     setUploadPercent(0)
     setUploadPhase('Préparation…')
     try {
-      // Step 1 — copy to cache if needed (5%)
-      const path = `${user.id}/${Date.now()}.mp4`
-      let localUri = videoUri!
-      if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
-        setUploadPhase('Copie du fichier…')
-        setUploadPercent(5)
-        const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
-        await FileSystem.copyAsync({ from: localUri, to: cacheUri })
-        localUri = cacheUri
-      }
+      const isLocalVideo =
+        !!videoUri && (videoUri.startsWith('file://') || videoUri.startsWith('ph://'))
+      const isRelaunchReuse = !!relaunchId && !isLocalVideo
 
-      // Step 2 — read video (15%)
-      setUploadPhase('Lecture de la vidéo…')
-      setUploadPercent(15)
-      const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
-
-      // Step 3 — upload video (60%)
-      setUploadPhase('Envoi de la vidéo…')
-      setUploadPercent(30)
-      const { error: uploadError } = await supabase.storage
-        .from('story-videos')
-        .upload(path, decode(base64), { contentType: 'video/mp4' })
-      if (uploadError) throw uploadError
-      setUploadPercent(60)
-
-      const { data: { publicUrl } } = supabase.storage.from('story-videos').getPublicUrl(path)
-
-      // Step 4 — upload thumbnail (75%)
+      let publicUrl: string
       let thumbnailPublicUrl: string | null = null
-      if (thumbnailUri) {
-        try {
-          setUploadPhase('Envoi de la miniature…')
-          setUploadPercent(65)
-          const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
-          const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
-          const { error: te } = await supabase.storage
-            .from('story-thumbnails')
-            .upload(thumbPath, decode(thumbBase64), { contentType: 'image/jpeg' })
-          if (!te) {
-            const { data: { publicUrl: tu } } = supabase.storage.from('story-thumbnails').getPublicUrl(thumbPath)
-            thumbnailPublicUrl = tu
-          }
-          setUploadPercent(75)
-        } catch {}
-      } else {
+
+      if (isRelaunchReuse) {
+        // Reuse existing assets from the previous drop
+        setUploadPhase('Réutilisation des médias…')
         setUploadPercent(75)
+        publicUrl = videoUri!
+        thumbnailPublicUrl = thumbnailUri ?? null
+      } else {
+        // Step 1 — copy to cache if needed (5%)
+        const path = `${user.id}/${Date.now()}.mp4`
+        let localUri = videoUri!
+        if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
+          setUploadPhase('Copie du fichier…')
+          setUploadPercent(5)
+          const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
+          await FileSystem.copyAsync({ from: localUri, to: cacheUri })
+          localUri = cacheUri
+        }
+
+        // Step 2 — read video (15%)
+        setUploadPhase('Lecture de la vidéo…')
+        setUploadPercent(15)
+        const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
+
+        // Step 3 — upload video (60%)
+        setUploadPhase('Envoi de la vidéo…')
+        setUploadPercent(30)
+        const { error: uploadError } = await supabase.storage
+          .from('story-videos')
+          .upload(path, decode(base64), { contentType: 'video/mp4' })
+        if (uploadError) throw uploadError
+        setUploadPercent(60)
+
+        const { data: { publicUrl: uploadedUrl } } = supabase.storage.from('story-videos').getPublicUrl(path)
+        publicUrl = uploadedUrl
+
+        // Step 4 — upload thumbnail (75%)
+        if (thumbnailUri && (thumbnailUri.startsWith('file://') || thumbnailUri.startsWith('ph://'))) {
+          try {
+            setUploadPhase('Envoi de la miniature…')
+            setUploadPercent(65)
+            const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
+            const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
+            const { error: te } = await supabase.storage
+              .from('story-thumbnails')
+              .upload(thumbPath, decode(thumbBase64), { contentType: 'image/jpeg' })
+            if (!te) {
+              const { data: { publicUrl: tu } } = supabase.storage.from('story-thumbnails').getPublicUrl(thumbPath)
+              thumbnailPublicUrl = tu
+            }
+            setUploadPercent(75)
+          } catch {}
+        } else if (thumbnailUri) {
+          thumbnailPublicUrl = thumbnailUri
+          setUploadPercent(75)
+        } else {
+          setUploadPercent(75)
+        }
       }
 
       // Step 5 — insert record (100%)
@@ -486,6 +534,7 @@ export default function CreateDropScreen() {
               onCamera={launchCamera}
               onGallery={launchGallery}
               onClear={() => { setVideoUri(null); setThumbnailUri(null); setVideoDurationSeconds(30) }}
+              isRelaunch={!!relaunchId}
             />
           )}
           {step === 2 && (
@@ -562,16 +611,29 @@ function Step1({
   onCamera,
   onGallery,
   onClear,
+  isRelaunch,
 }: {
   videoUri: string | null
   thumbnailUri: string | null
   onCamera: () => void
   onGallery: () => void
   onClear: () => void
+  isRelaunch?: boolean
 }) {
   if (videoUri) {
     return (
       <View>
+        {isRelaunch && (
+          <View style={s.relaunchBanner}>
+            <Ionicons name="cube-outline" size={14} color="#00D2B8" style={{ marginTop: 1 }} />
+            <Text style={s.relaunchBannerText}>
+              Relance — vidéo précédente chargée. Tu peux en choisir une nouvelle ou continuer.
+            </Text>
+            <TouchableOpacity onPress={onGallery} style={s.relaunchBannerAction}>
+              <Text style={s.relaunchBannerActionText}>Changer</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={s.videoWrap}>
           <AvVideo
             source={{ uri: videoUri }}
@@ -1008,6 +1070,37 @@ const s = StyleSheet.create({
   thumbLabel: { fontFamily: fontFamily.semiBold, fontSize: 13, color: colors.text },
   thumbSub: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   hintText: { fontFamily: fontFamily.regular, fontSize: 12, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.md },
+
+  // Relaunch banner
+  relaunchBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: 'rgba(0,210,184,0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,210,184,0.20)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  relaunchBannerText: {
+    flex: 1,
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
+  },
+  relaunchBannerAction: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  relaunchBannerActionText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 12,
+    color: '#00D2B8',
+  },
 
   // Step 2
   formWrap: { paddingTop: spacing.md },
