@@ -99,7 +99,6 @@ interface Comment {
   content: string
   created_at: string
   user_id: string
-  reply_to_id: string | null
   profiles: { username: string | null; avatar_url?: string | null } | null
 }
 
@@ -172,12 +171,13 @@ function CommentsSheet({
   useEffect(() => setCount(initialCount), [initialCount])
 
   const fetchComments = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('comments')
-      .select('id, content, created_at, user_id, reply_to_id, profiles:user_id(username, avatar_url)')
+      .select('id, content, created_at, user_id, profiles:user_id(username, avatar_url)')
       .eq('story_id', storyId)
       .order('created_at', { ascending: false })
       .limit(100)
+    if (error) console.log('[comments] fetch error:', error)
     setComments((data as unknown as Comment[]) ?? [])
     setLoading(false)
     setRefreshing(false)
@@ -208,7 +208,6 @@ function CommentsSheet({
             content: row.content,
             created_at: row.created_at,
             user_id: row.user_id,
-            reply_to_id: (payload.new as { reply_to_id?: string | null }).reply_to_id ?? null,
             profiles: prof ?? { username: null, avatar_url: null },
           }
           setComments(prev => [newComment, ...prev])
@@ -255,10 +254,11 @@ function CommentsSheet({
 
     const { data, error } = await supabase
       .from('comments')
-      .insert({ story_id: storyId, user_id: currentUserId, content: text, reply_to_id: replyTo?.id ?? null })
-      .select('id, content, created_at, user_id, reply_to_id')
+      .insert({ story_id: storyId, user_id: currentUserId, content: text })
+      .select('id, content, created_at, user_id')
       .maybeSingle()
 
+    if (error) console.log('[comments] insert error:', error)
     console.log('[comments] insert result:', { data, error })
 
     setSending(false)
@@ -273,7 +273,6 @@ function CommentsSheet({
       content: data.content,
       created_at: data.created_at,
       user_id: data.user_id,
-      reply_to_id: data.reply_to_id ?? null,
       profiles: {
         username: currentUserProfile.username,
         avatar_url: currentUserProfile.avatar_url,
@@ -315,10 +314,8 @@ function CommentsSheet({
       }
     }
 
-    const isReply = item.reply_to_id !== null
-
     return (
-      <View style={[commentStyles.row, isReply && { marginLeft: 40, borderLeftWidth: 2, borderLeftColor: colors.border, paddingLeft: 10 }]}>
+      <View style={commentStyles.row}>
         <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={commentStyles.avatar} />
@@ -329,9 +326,6 @@ function CommentsSheet({
           )}
         </TouchableOpacity>
         <View style={commentStyles.body}>
-          {isReply && (
-            <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>↳ réponse</Text>
-          )}
           <View style={commentStyles.headerRow}>
             <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
               <Text style={commentStyles.username}>@{username}</Text>
@@ -363,103 +357,109 @@ function CommentsSheet({
   return (
     <Modal
       visible={visible}
+      transparent
       animationType="slide"
-      presentationStyle="pageSheet"
       onRequestClose={onClose}
+      presentationStyle="overFullScreen"
     >
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
-      >
-        <View style={commentStyles.root}>
-          {/* Header */}
-          <View style={commentStyles.header}>
-            <View style={commentStyles.handle} />
-            <View style={commentStyles.headerInner}>
-              <View style={{ width: 32 }} />
-              <Text style={commentStyles.title}>
-                {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
-              </Text>
-              <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
-              </TouchableOpacity>
+      <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+        <Pressable
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          onPress={onClose}
+        />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
+          style={{ width: '100%' }}
+        >
+          <View style={commentStyles.sheet}>
+            {/* Header */}
+            <View style={commentStyles.header}>
+              <View style={commentStyles.handle} />
+              <View style={commentStyles.headerInner}>
+                <View style={{ width: 32 }} />
+                <Text style={commentStyles.title}>
+                  {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
+                </Text>
+                <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* List */}
+            {loading ? (
+              <View style={commentStyles.centerFill}>
+                <ActivityIndicator color="#00D2B8" />
+              </View>
+            ) : comments.length === 0 ? (
+              <View style={commentStyles.centerFill}>
+                <Ionicons name="chatbubble-outline" size={48} color="#444" />
+                <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
+                <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={listRef}
+                data={comments}
+                keyExtractor={(c) => c.id}
+                renderItem={renderItem}
+                ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                style={{ flex: 1 }}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
+                }
+              />
+            )}
+
+            {/* Reply banner */}
+            {replyTo && (
+              <View style={commentStyles.replyBanner}>
+                <Text style={commentStyles.replyBannerText}>
+                  Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
+                </Text>
+                <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle" size={18} color="#888" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Input bar */}
+            <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+              {currentUserProfile.avatar_url ? (
+                <Image source={{ uri: currentUserProfile.avatar_url }} style={commentStyles.avatar} />
+              ) : (
+                <View style={commentStyles.inputAvatarFallback}>
+                  <Text style={commentStyles.inputAvatarInitial}>
+                    {(currentUserProfile.username ?? 'U').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <TextInput
+                ref={inputRef}
+                style={commentStyles.input}
+                placeholder={i18n.t('comments.placeholder')}
+                placeholderTextColor="#666"
+                value={input}
+                onChangeText={setInput}
+                maxLength={300}
+                multiline
+                editable={!!currentUserId && !sending}
+              />
+              {input.trim().length > 0 && (
+                <TouchableOpacity style={commentStyles.sendBtn} onPress={handleSend} disabled={sending}>
+                  {sending ? (
+                    <ActivityIndicator size="small" color="#0F0F0F" />
+                  ) : (
+                    <Ionicons name="arrow-up" size={18} color="#0F0F0F" />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
-
-          {/* List */}
-          {loading ? (
-            <View style={commentStyles.centerFill}>
-              <ActivityIndicator color="#00D2B8" />
-            </View>
-          ) : comments.length === 0 ? (
-            <View style={commentStyles.centerFill}>
-              <Ionicons name="chatbubble-outline" size={48} color="#444" />
-              <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
-              <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={listRef}
-              data={comments}
-              keyExtractor={(c) => c.id}
-              renderItem={renderItem}
-              ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
-              contentContainerStyle={{ paddingVertical: 8 }}
-              style={{ flex: 1 }}
-              automaticallyAdjustKeyboardInsets={true}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
-              }
-            />
-          )}
-
-          {/* Reply banner */}
-          {replyTo && (
-            <View style={commentStyles.replyBanner}>
-              <Text style={commentStyles.replyBannerText}>
-                Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
-              </Text>
-              <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Ionicons name="close-circle" size={18} color="#888" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Input bar */}
-        <View style={[commentStyles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-          {currentUserProfile.avatar_url ? (
-            <Image source={{ uri: currentUserProfile.avatar_url }} style={commentStyles.avatar} />
-          ) : (
-            <View style={commentStyles.inputAvatarFallback}>
-              <Text style={commentStyles.inputAvatarInitial}>
-                {(currentUserProfile.username ?? 'U').charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <TextInput
-            ref={inputRef}
-            style={commentStyles.input}
-            placeholder={i18n.t('comments.placeholder')}
-            placeholderTextColor="#666"
-            value={input}
-            onChangeText={setInput}
-            maxLength={300}
-            multiline
-            editable={!!currentUserId && !sending}
-          />
-          {input.trim().length > 0 && (
-            <TouchableOpacity style={commentStyles.sendBtn} onPress={handleSend} disabled={sending}>
-              {sending ? (
-                <ActivityIndicator size="small" color="#0F0F0F" />
-              ) : (
-                <Ionicons name="arrow-up" size={18} color="#0F0F0F" />
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
@@ -2050,6 +2050,7 @@ const detailStyles = StyleSheet.create({
 
 const commentStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1A1A1A' },
+  sheet: { maxHeight: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
   header: { paddingTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2A2A2A' },
   handle: {
     width: 40,
