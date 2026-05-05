@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   Alert,
   StyleSheet,
+  Modal,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -14,6 +16,8 @@ import * as Linking from 'expo-linking'
 import Constants from 'expo-constants'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
+import { useLocale } from '../../lib/LocaleContext'
+import { LOCALE_LABELS, LOCALE_FLAGS, SUPPORTED_LOCALES, Locale } from '../../lib/i18n'
 
 type RowProps = {
   icon: string
@@ -55,6 +59,8 @@ function Divider() {
 
 export default function SettingsScreen() {
   const appVersion = Constants.expoConfig?.version ?? '—'
+  const { locale, setLocale } = useLocale()
+  const [languageModalVisible, setLanguageModalVisible] = useState(false)
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -99,6 +105,13 @@ export default function SettingsScreen() {
             icon="person-outline"
             label="Modifier mon profil"
             onPress={() => router.push('/profile/edit')}
+          />
+          <Divider />
+          <SettingsRow
+            icon="language-outline"
+            label="Langue"
+            value={`${LOCALE_FLAGS[locale]} ${LOCALE_LABELS[locale]}`}
+            onPress={() => setLanguageModalVisible(true)}
           />
           <Divider />
           <SettingsRow
@@ -156,6 +169,41 @@ export default function SettingsScreen() {
           />
         </View>
       </ScrollView>
+
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="slide"
+        presentationStyle="overFullScreen"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setLanguageModalVisible(false)} />
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHandle} />
+          <Text style={styles.modalTitle}>Langue</Text>
+          {SUPPORTED_LOCALES.map((l: Locale, idx) => {
+            const active = l === locale
+            return (
+              <TouchableOpacity
+                key={l}
+                style={[styles.langRow, idx < SUPPORTED_LOCALES.length - 1 && styles.langRowBorder]}
+                onPress={async () => {
+                  await setLocale(l)
+                  setLanguageModalVisible(false)
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.langLabel}>
+                  {LOCALE_FLAGS[l]}  {LOCALE_LABELS[l]}
+                </Text>
+                {active && (
+                  <Ionicons name="checkmark" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -231,5 +279,45 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginHorizontal: 16,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginVertical: 12,
+  },
+  modalTitle: {
+    fontFamily: fontFamily.bold,
+    fontSize: 18,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  langRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  langLabel: {
+    fontFamily: fontFamily.medium,
+    fontSize: 15,
+    color: colors.text,
   },
 })

@@ -22,6 +22,7 @@ import Reanimated, {
   Easing,
 } from 'react-native-reanimated'
 import { AuthProvider, useAuth } from '../lib/auth'
+import { LocaleProvider } from '../lib/LocaleContext'
 import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 import { usePushNotifications } from '../hooks/usePushNotifications'
@@ -167,15 +168,17 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StripeWrapper>
-        <AuthProvider>
-          <StatusBar style="light" backgroundColor="#0F0F0F" />
-          <View style={{ flex: 1 }}>
-            <RootRedirector />
-            <NetworkBanner />
-          </View>
-        </AuthProvider>
-      </StripeWrapper>
+      <LocaleProvider>
+        <StripeWrapper>
+          <AuthProvider>
+            <StatusBar style="light" backgroundColor="#0F0F0F" />
+            <View style={{ flex: 1 }}>
+              <RootRedirector />
+              <NetworkBanner />
+            </View>
+          </AuthProvider>
+        </StripeWrapper>
+      </LocaleProvider>
       {!splashDone && (
         <AnimatedSplash onFinished={() => setSplashDone(true)} />
       )}
