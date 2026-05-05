@@ -37,9 +37,9 @@ export default function BecomeSellerScreen() {
     }
   }, [params.success])
 
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = async (): Promise<boolean> => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
+    if (!session) return false
 
     const { data } = await supabase
       .from('seller_onboarding')
@@ -54,7 +54,20 @@ export default function BecomeSellerScreen() {
         .eq('id', session.user.id)
       await refreshProfile()
       setStatus('complete')
+      return true
     }
+    return false
+  }
+
+  const pollOnboardingStatus = async () => {
+    setStatus('loading')
+    for (let i = 0; i < 8; i++) {
+      if (i > 0) await new Promise(resolve => setTimeout(resolve, 2000))
+      const done = await checkOnboardingStatus()
+      if (done) return
+    }
+    setStatus('idle')
+    setErrorMsg('Vérification en cours. Reviens dans quelques secondes ou réessaie.')
   }
 
   const fetchOnboardingUrl = async (): Promise<string | null> => {
@@ -99,7 +112,7 @@ export default function BecomeSellerScreen() {
       if (result.type === 'success') {
         const redirectUrl = (result as WebBrowser.WebBrowserAuthSessionResult & { url?: string }).url ?? ''
         if (redirectUrl.includes('onboarding-complete')) {
-          await checkOnboardingStatus()
+          await pollOnboardingStatus()
         } else if (redirectUrl.includes('onboarding-refresh')) {
           setStatus('loading')
           const newUrl = await fetchOnboardingUrl()
