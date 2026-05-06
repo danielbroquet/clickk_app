@@ -21,6 +21,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { formatRelativeTime } from '../../lib/utils'
+import { useTranslation } from '../../lib/i18n'
 import type { Notification } from '../../types'
 
 // ─── Shared types ────────────────────────────────────────────────────────────
@@ -137,6 +138,7 @@ function ConversationRow({
 }
 
 function MessagesTab({ userId }: { userId: string }) {
+  const { t } = useTranslation()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -214,7 +216,7 @@ function MessagesTab({ userId }: { userId: string }) {
     return (
       <View style={msgStyles.centered}>
         <MessageSquare size={48} color={colors.border} strokeWidth={1.5} />
-        <Text style={msgStyles.emptyTitle}>Aucun message</Text>
+        <Text style={msgStyles.emptyTitle}>{t('inbox.no_messages')}</Text>
         <Text style={msgStyles.emptySubtitle}>Tes conversations apparaîtront ici</Text>
       </View>
     )
@@ -403,6 +405,7 @@ function SwipeableNotifRow({ notif, onDelete, onPress }: {
 const notifKeyExtractor = (item: Notification) => item.id
 
 function NotificationsTab({ userId }: { userId: string }) {
+  const { t } = useTranslation()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -477,7 +480,7 @@ function NotificationsTab({ userId }: { userId: string }) {
           onPress={handleClearAll}
           activeOpacity={0.7}
         >
-          <Text style={notifStyles.clearAllText}>Tout supprimer</Text>
+          <Text style={notifStyles.clearAllText}>{t('inbox.clear_all')}</Text>
         </TouchableOpacity>
       )}
       <FlatList
@@ -495,7 +498,7 @@ function NotificationsTab({ userId }: { userId: string }) {
         ListEmptyComponent={
           <View style={notifStyles.empty}>
             <Ionicons name="notifications-outline" size={52} color={colors.border} />
-            <Text style={notifStyles.emptyText}>Aucune notification</Text>
+            <Text style={notifStyles.emptyText}>{t('inbox.no_notifications')}</Text>
           </View>
         }
       />
@@ -577,6 +580,7 @@ function useUnreadNotifCount(userId: string): number {
 export { useUnreadNotifCount }
 
 export default function InboxScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const userId = session?.user?.id ?? ''
   const [activeTab, setActiveTab] = useState<'messages' | 'notifications'>('messages')
@@ -596,7 +600,7 @@ export default function InboxScreen() {
           activeOpacity={0.8}
         >
           <Text style={[inboxStyles.pillText, activeTab === 'messages' && inboxStyles.pillTextActive]}>
-            Messages
+            {t('inbox.tab_messages')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -605,7 +609,7 @@ export default function InboxScreen() {
           activeOpacity={0.8}
         >
           <Text style={[inboxStyles.pillText, activeTab === 'notifications' && inboxStyles.pillTextActive]}>
-            Notifications
+            {t('inbox.tab_notifications')}
           </Text>
         </TouchableOpacity>
       </View>
