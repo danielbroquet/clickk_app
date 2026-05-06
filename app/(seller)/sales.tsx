@@ -23,6 +23,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
+import { useTranslation } from '../../lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -302,6 +303,7 @@ function ArchiveCard({
   onRelaunch: (id: string) => void
   onDelete: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const thumb = drop.thumbnail_url ?? drop.video_url
   const days = daysLeft(drop.archived_at)
 
@@ -347,7 +349,7 @@ function ArchiveCard({
             activeOpacity={0.85}
           >
             <Ionicons name="refresh" size={14} color="#0F0F0F" />
-            <Text style={archiveStyles.relaunchText}>Relancer</Text>
+            <Text style={archiveStyles.relaunchText}>{t('sales.relaunch')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={archiveStyles.trashBtn}
@@ -448,6 +450,7 @@ const archiveStyles = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SalesScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
 
@@ -527,7 +530,7 @@ export default function SalesScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={salesStyles.headerTitle}>
-          {activeTab === 'ventes' ? 'Mes ventes' : 'Archive'}
+          {activeTab === 'ventes' ? t('sales.title') : t('sales.tab_archive')}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -540,7 +543,7 @@ export default function SalesScreen() {
           activeOpacity={0.8}
         >
           <Text style={[salesStyles.tabLabel, activeTab === 'ventes' && salesStyles.tabLabelActive]}>
-            Ventes
+            {t('sales.tab_sales')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -549,7 +552,7 @@ export default function SalesScreen() {
           activeOpacity={0.8}
         >
           <Text style={[salesStyles.tabLabel, activeTab === 'archive' && salesStyles.tabLabelActive]}>
-            Archive{archived.length > 0 ? ` (${archived.length})` : ''}
+            {t('sales.tab_archive')}{archived.length > 0 ? ` (${archived.length})` : ''}
           </Text>
         </TouchableOpacity>
       </View>
@@ -574,7 +577,7 @@ export default function SalesScreen() {
           ListEmptyComponent={
             <View style={salesStyles.emptyState}>
               <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
-              <Text style={salesStyles.emptyText}>Aucune vente</Text>
+              <Text style={salesStyles.emptyText}>{t('sales.no_sales')}</Text>
               <Text style={salesStyles.emptySubtext}>Vos drops vendus apparaîtront ici.</Text>
             </View>
           }
@@ -672,7 +675,7 @@ export default function SalesScreen() {
                         activeOpacity={0.85}
                       >
                         <Ionicons name="send-outline" size={15} color="#0F0F0F" />
-                        <Text style={salesStyles.shipBtnText}>Marquer comme expédié</Text>
+                        <Text style={salesStyles.shipBtnText}>{t('sales.ship')}</Text>
                       </TouchableOpacity>
                     )}
 
@@ -707,10 +710,8 @@ export default function SalesScreen() {
           ListEmptyComponent={
             <View style={salesStyles.emptyState}>
               <Ionicons name="archive-outline" size={52} color={colors.textSecondary} />
-              <Text style={salesStyles.emptyText}>Aucun drop archivé</Text>
-              <Text style={salesStyles.emptySubtext}>
-                Les drops expirés restent ici 7 jours avant suppression définitive.
-              </Text>
+              <Text style={salesStyles.emptyText}>{t('sales.no_archive')}</Text>
+              <Text style={salesStyles.emptySubtext}>{t('sales.archive_hint')}</Text>
             </View>
           }
           renderItem={({ item }) => (
