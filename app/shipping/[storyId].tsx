@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
+import { useTranslation } from '../../lib/i18n'
 
 type Address = {
   id: string
@@ -39,6 +40,7 @@ const C = {
 
 export default function ShippingAddressScreen() {
   const { storyId } = useLocalSearchParams<{ storyId: string }>()
+  const { t } = useTranslation()
 
   const [existing, setExisting] = useState<Address[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -240,7 +242,7 @@ export default function ShippingAddressScreen() {
 
               <Text style={styles.sectionLabel}>Nouvelle adresse</Text>
 
-              <Text style={styles.fieldLabel}>Nom et prénom</Text>
+              <Text style={styles.fieldLabel}>{t('shipping.full_name')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Marc Dupont"
@@ -250,7 +252,7 @@ export default function ShippingAddressScreen() {
                 autoCapitalize="words"
               />
 
-              <Text style={styles.fieldLabel}>Adresse</Text>
+              <Text style={styles.fieldLabel}>{t('shipping.address')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Rue du Lac 12"
@@ -259,7 +261,7 @@ export default function ShippingAddressScreen() {
                 onChangeText={setLine1}
               />
 
-              <Text style={styles.fieldLabel}>Complément (optionnel)</Text>
+              <Text style={styles.fieldLabel}>{t('shipping.complement')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="Appartement, étage, code..."
@@ -270,7 +272,7 @@ export default function ShippingAddressScreen() {
 
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>NPA</Text>
+                  <Text style={styles.fieldLabel}>{t('shipping.postal_code')}</Text>
                   <TextInput
                     style={styles.input}
                     placeholder="1003"
@@ -281,7 +283,7 @@ export default function ShippingAddressScreen() {
                   />
                 </View>
                 <View style={{ flex: 2, marginLeft: 10 }}>
-                  <Text style={styles.fieldLabel}>Ville</Text>
+                  <Text style={styles.fieldLabel}>{t('shipping.city')}</Text>
                   <TextInput
                     style={styles.input}
                     placeholder="Lausanne"
@@ -292,7 +294,7 @@ export default function ShippingAddressScreen() {
                 </View>
               </View>
 
-              <Text style={styles.fieldLabel}>Téléphone (optionnel)</Text>
+              <Text style={styles.fieldLabel}>{t('shipping.phone')}</Text>
               <TextInput
                 style={styles.input}
                 placeholder="+41 79 000 00 00"
@@ -305,7 +307,7 @@ export default function ShippingAddressScreen() {
               <View style={styles.countryHint}>
                 <Ionicons name="flag-outline" size={14} color={C.muted} />
                 <Text style={styles.countryHintText}>
-                  Livraison en Suisse uniquement pour le moment
+                  {t('shipping.ch_only')}
                 </Text>
               </View>
             </>
@@ -326,7 +328,7 @@ export default function ShippingAddressScreen() {
             ) : (
               <>
                 <Text style={styles.ctaText}>
-                  {mode === 'pick' ? 'Confirmer cette adresse' : 'Enregistrer et confirmer'}
+                  {mode === 'pick' ? t('shipping.confirm') : 'Enregistrer et confirmer'}
                 </Text>
                 <Ionicons name="arrow-forward" size={18} color="#000" />
               </>

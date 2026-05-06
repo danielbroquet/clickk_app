@@ -89,10 +89,12 @@ function ConversationRow({
   conv,
   userId,
   onPress,
+  t,
 }: {
   conv: Conversation
   userId: string
   onPress: () => void
+  t: (key: string) => string
 }) {
   const other = otherUser(conv, userId)
   const preview = lastMessage(conv.messages)
@@ -126,7 +128,7 @@ function ConversationRow({
           style={[msgStyles.preview, badge > 0 && msgStyles.previewUnread]}
           numberOfLines={1}
         >
-          {preview || 'Aucun message'}
+          {preview || t('inbox.no_messages')}
         </Text>
       </View>
       {badge > 0 && (
@@ -138,11 +140,12 @@ function ConversationRow({
   )
 }
 
-function SwipeableConversationRow({ conv, userId, onPress, onDelete }: {
+function SwipeableConversationRow({ conv, userId, onPress, onDelete, t }: {
   conv: Conversation
   userId: string
   onPress: () => void
   onDelete: () => void
+  t: (key: string) => string
 }) {
   const translateX = useRef(new Animated.Value(0)).current
   const DELETE_THRESHOLD = -80
@@ -157,18 +160,18 @@ function SwipeableConversationRow({ conv, userId, onPress, onDelete }: {
       onPanResponderRelease: (_, g) => {
         if (g.dx < DELETE_THRESHOLD) {
           Alert.alert(
-            'Supprimer la conversation ?',
-            'Tous les messages seront supprimés définitivement.',
+            t('conversation.delete_conv_title'),
+            t('conversation.delete_conv_body'),
             [
               {
-                text: 'Annuler',
+                text: t('common.cancel'),
                 style: 'cancel',
                 onPress: () => Animated.spring(translateX, {
                   toValue: 0, useNativeDriver: true,
                 }).start(),
               },
               {
-                text: 'Supprimer',
+                text: t('common.confirm'),
                 style: 'destructive',
                 onPress: () => {
                   Animated.timing(translateX, {
@@ -200,7 +203,7 @@ function SwipeableConversationRow({ conv, userId, onPress, onDelete }: {
         style={{ transform: [{ translateX }], backgroundColor: colors.bg }}
         {...panResponder.panHandlers}
       >
-        <ConversationRow conv={conv} userId={userId} onPress={onPress} />
+        <ConversationRow conv={conv} userId={userId} onPress={onPress} t={t} />
       </Animated.View>
     </View>
   )
@@ -309,6 +312,7 @@ function MessagesTab({ userId }: { userId: string }) {
           userId={userId}
           onPress={() => router.push(`/conversation/${item.id}`)}
           onDelete={() => handleDeleteConversation(item.id)}
+          t={t}
         />
       )}
       ListEmptyComponent={renderEmpty}

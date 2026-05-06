@@ -268,7 +268,7 @@ export default function CreateStoryScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.headerSide}>
               <Ionicons name="arrow-back" size={22} color={C.text} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Relancer le drop</Text>
+            <Text style={styles.headerTitle}>{t('relaunch.title')}</Text>
             <View style={styles.headerSide} />
           </View>
 
@@ -409,6 +409,7 @@ function RelaunchForm({
   onPublish: () => void
   onPickVideo: () => void
 }) {
+  const { t } = useTranslation()
   const durations: DurationHours[] = [24, 72, 168]
   const speeds: { key: SpeedPreset; icon: string; label: string; sub: string }[] = [
     { key: 'FLASH',    icon: 'flash-outline', label: 'Flash',    sub: '−20% / drop' },
@@ -449,16 +450,16 @@ function RelaunchForm({
             </Text>
             <TouchableOpacity style={rlStyles.changeVideoBtn} onPress={onPickVideo}>
               <Ionicons name="swap-horizontal" size={13} color={C.primary} />
-              <Text style={rlStyles.changeVideoBtnText}>Changer la vidéo</Text>
+              <Text style={rlStyles.changeVideoBtnText}>{t('relaunch.change_video')}</Text>
             </TouchableOpacity>
           </View>
         </View>
         <Text style={{ color: C.muted, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
-          Vidéo du drop original · Tape "Changer" pour en choisir une autre
+          {t('relaunch.video_hint')}
         </Text>
 
         {/* Title */}
-        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Titre</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('relaunch.product_name')}</Text>
         <TextInput
           style={[styles.input, !!errors.title && styles.inputError]}
           placeholder="Nom du produit"
@@ -469,7 +470,7 @@ function RelaunchForm({
         {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
         {/* Description */}
-        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>Description</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('story.create.description')}</Text>
         <TextInput
           style={[styles.input, styles.inputMulti]}
           placeholder="Décrivez le produit (optionnel)"
@@ -483,7 +484,7 @@ function RelaunchForm({
         {/* Prices */}
         <View style={rlStyles.pricesRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.fieldLabel}>Prix de départ</Text>
+            <Text style={styles.fieldLabel}>{t('relaunch.start_price')}</Text>
             <View style={[styles.priceRow, { marginTop: 6 }, !!errors.startPrice && styles.inputError]}>
               <Text style={styles.chfPrefix}>CHF</Text>
               <TextInput
@@ -498,7 +499,7 @@ function RelaunchForm({
             {!!errors.startPrice && <Text style={styles.errorText}>{errors.startPrice}</Text>}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.fieldLabel}>Prix plancher</Text>
+            <Text style={styles.fieldLabel}>{t('relaunch.floor_price')}</Text>
             <View style={[styles.priceRow, { marginTop: 6 }, !!errors.floorPrice && styles.inputError]}>
               <Text style={styles.chfPrefix}>CHF</Text>
               <TextInput

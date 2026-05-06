@@ -138,6 +138,7 @@ function ShipModal({
   onClose: () => void
   onSuccess: () => void
 }) {
+  const { t } = useTranslation()
   const [tracking, setTracking] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -196,7 +197,7 @@ function ShipModal({
               {loading ? (
                 <ActivityIndicator size="small" color="#0F0F0F" />
               ) : (
-                <Text style={shipStyles.submitText}>Confirmer</Text>
+                <Text style={shipStyles.submitText}>{t('sales_status.confirm_ship')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -279,10 +280,11 @@ const shipStyles = StyleSheet.create({
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation()
   const cfg: Record<string, { label: string; color: string; bg: string }> = {
-    sold:      { label: "À expédier",   color: '#FFA755', bg: 'rgba(255,167,85,0.12)' },
-    shipped:   { label: 'Expédié',      color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
-    delivered: { label: 'Livré',        color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
+    sold:      { label: t('sales_status.to_ship'), color: '#FFA755', bg: 'rgba(255,167,85,0.12)' },
+    shipped:   { label: t('sales_status.shipped'), color: '#3B82F6', bg: 'rgba(59,130,246,0.12)' },
+    delivered: { label: t('sales_status.delivered'), color: '#10B981', bg: 'rgba(16,185,129,0.12)' },
   }
   const c = cfg[status] ?? cfg.sold
   return (
@@ -308,9 +310,9 @@ function ArchiveCard({
   const days = daysLeft(drop.archived_at)
 
   const confirmDelete = () =>
-    Alert.alert('Supprimer définitivement ?', 'Ce drop sera supprimé immédiatement.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+    Alert.alert(t('sales_status.delete_confirm_title'), t('sales_status.delete_confirm_body'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.confirm'), style: 'destructive', onPress: () => onDelete(drop.id) },
     ])
 
   return (
