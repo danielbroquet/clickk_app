@@ -327,15 +327,35 @@ export default function CreateDropScreen() {
   // ── AI generation ──────────────────────────────────────────────────────────
 
   const handleGenerate = useCallback(async () => {
-    if (!thumbnailUri) return
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        Alert.alert('Erreur', 'Non authentifié')
-        return
+      if (!session) throw new Error('Non authentifié')
+
+      let imageBase64: string | null = null
+
+      const isLocal = (uri: string) =>
+        uri.startsWith('file://') || uri.startsWith('ph://')
+
+      if (thumbnailUri && isLocal(thumbnailUri)) {
+        imageBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
+      } else if (videoUri && isLocal(videoUri)) {
+        try {
+          const { uri: frameUri } = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 1000, quality: 0.7 })
+          imageBase64 = await FileSystem.readAsStringAsync(frameUri, { encoding: 'base64' })
+        } catch {
+          imageBase64 = null
+        }
+      } else if (thumbnailUri && thumbnailUri.startsWith('https://')) {
+        const cacheUri = FileSystem.cacheDirectory + `thumb_ai_${Date.now()}.jpg`
+        const { uri: downloaded } = await FileSystem.downloadAsync(thumbnailUri, cacheUri)
+        imageBase64 = await FileSystem.readAsStringAsync(downloaded, { encoding: 'base64' })
       }
-      const base64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
+
+      const body = imageBase64
+        ? JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
+        : JSON.stringify({ textOnly: true, hint: title || 'article à vendre' })
+
       const res = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-drop-info`,
         {
@@ -344,22 +364,20 @@ export default function CreateDropScreen() {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+          body,
         }
       )
       const data = await res.json()
-      if (!res.ok) {
-        Alert.alert('Erreur', "L'IA n'a pas pu analyser l'image")
-        return
-      }
-      setTitle(data.title ?? '')
-      setDescription(data.description ?? '')
-    } catch {
-      Alert.alert('Erreur', "L'IA n'a pas pu analyser l'image")
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Erreur')
+
+      if (data.title) setTitle(data.title)
+      if (data.description) setDescription(data.description)
+    } catch (err: any) {
+      Alert.alert('Erreur IA', err.message ?? "L'IA n'a pas pu analyser l'image")
     } finally {
       setGenerating(false)
     }
-  }, [thumbnailUri])
+  }, [thumbnailUri, videoUri, title])
 
   // ── navigation ─────────────────────────────────────────────────────────────
 
