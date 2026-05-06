@@ -11,6 +11,7 @@ import {
   ListRenderItem,
   Animated,
   PanResponder,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -137,6 +138,74 @@ function ConversationRow({
   )
 }
 
+function SwipeableConversationRow({ conv, userId, onPress, onDelete }: {
+  conv: Conversation
+  userId: string
+  onPress: () => void
+  onDelete: () => void
+}) {
+  const translateX = useRef(new Animated.Value(0)).current
+  const DELETE_THRESHOLD = -80
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_, g) => {
+        if (g.dx < 0) translateX.setValue(Math.max(g.dx, -100))
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < DELETE_THRESHOLD) {
+          Alert.alert(
+            'Supprimer la conversation ?',
+            'Tous les messages seront supprimés définitivement.',
+            [
+              {
+                text: 'Annuler',
+                style: 'cancel',
+                onPress: () => Animated.spring(translateX, {
+                  toValue: 0, useNativeDriver: true,
+                }).start(),
+              },
+              {
+                text: 'Supprimer',
+                style: 'destructive',
+                onPress: () => {
+                  Animated.timing(translateX, {
+                    toValue: -500,
+                    duration: 250,
+                    useNativeDriver: true,
+                  }).start(onDelete)
+                },
+              },
+            ]
+          )
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start()
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start()
+        }
+      },
+    })
+  ).current
+
+  return (
+    <View style={{ overflow: 'hidden', backgroundColor: colors.bg }}>
+      <View style={msgStyles.swipeDeleteBg}>
+        <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
+        <Text style={{ color: '#FFFFFF', fontSize: 11, marginTop: 3, fontFamily: fontFamily.medium }}>
+          Supprimer
+        </Text>
+      </View>
+      <Animated.View
+        style={{ transform: [{ translateX }], backgroundColor: colors.bg }}
+        {...panResponder.panHandlers}
+      >
+        <ConversationRow conv={conv} userId={userId} onPress={onPress} />
+      </Animated.View>
+    </View>
+  )
+}
+
 function MessagesTab({ userId }: { userId: string }) {
   const { t } = useTranslation()
   const [conversations, setConversations] = useState<Conversation[]>([])
@@ -177,6 +246,14 @@ function MessagesTab({ userId }: { userId: string }) {
     await fetchConversations()
     setRefreshing(false)
   }, [fetchConversations])
+
+  const handleDeleteConversation = useCallback(async (convId: string) => {
+    setConversations(prev => prev.filter(c => c.id !== convId))
+    await supabase
+      .from('conversations')
+      .delete()
+      .eq('id', convId)
+  }, [])
 
   if (loading) {
     return (
@@ -227,10 +304,11 @@ function MessagesTab({ userId }: { userId: string }) {
       data={conversations}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
-        <ConversationRow
+        <SwipeableConversationRow
           conv={item}
           userId={userId}
           onPress={() => router.push(`/conversation/${item.id}`)}
+          onDelete={() => handleDeleteConversation(item.id)}
         />
       )}
       ListEmptyComponent={renderEmpty}
@@ -306,6 +384,17 @@ const msgStyles = StyleSheet.create({
   skeletonAvatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, backgroundColor: colors.surface, opacity: 0.5 },
   skeletonLines: { flex: 1, marginLeft: 12 },
   skeletonLine: { height: 12, backgroundColor: colors.surface, borderRadius: 6, opacity: 0.5 },
+  swipeDeleteBg: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 90,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+  },
 })
 
 // ─── Notifications sub-screen ─────────────────────────────────────────────────
