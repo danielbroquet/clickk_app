@@ -30,6 +30,7 @@ import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ function StoryCard({ story }: { story: StorySnippet }) {
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
+function MessageBubble({ msg, isMe, t }: { msg: Message; isMe: boolean; t: (key: string) => string }) {
   const [sound, setSound] = useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = useState(false)
 
@@ -162,7 +163,7 @@ function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
             />
             <View>
               <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther, { fontSize: 13 }]}>
-                Message vocal
+                {t('conversation.voice_message')}
               </Text>
               <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
                 {[...Array(12)].map((_, i) => (
@@ -191,11 +192,12 @@ function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
 
 // ── Swipeable message bubble ──────────────────────────────────────────────────
 
-function SwipeableMessageBubble({ msg, isMe, onDelete }: {
+function SwipeableMessageBubble({ msg, isMe, onDelete, t }: {
   msg: Message
   isMe: boolean
   currentUserId: string
   onDelete: (id: string) => void
+  t: (key: string) => string
 }) {
   const translateX = useRef(new Animated.Value(0)).current
 
@@ -209,13 +211,13 @@ function SwipeableMessageBubble({ msg, isMe, onDelete }: {
       onPanResponderRelease: (_, g) => {
         if (g.dx < -60) {
           Alert.alert(
-            'Supprimer ce message ?',
-            'Cette action est irréversible.',
+            t('conversation.delete_message_title'),
+            t('conversation.delete_message_body'),
             [
-              { text: 'Annuler', style: 'cancel', onPress: () => {
+              { text: t('common.cancel'), style: 'cancel', onPress: () => {
                 Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start()
               }},
-              { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(msg.id) },
+              { text: t('common.confirm'), style: 'destructive', onPress: () => onDelete(msg.id) },
             ]
           )
         } else {
@@ -226,7 +228,7 @@ function SwipeableMessageBubble({ msg, isMe, onDelete }: {
   ).current
 
   if (!isMe) {
-    return <MessageBubble msg={msg} isMe={false} />
+    return <MessageBubble msg={msg} isMe={false} t={t} />
   }
 
   return (
@@ -246,7 +248,7 @@ function SwipeableMessageBubble({ msg, isMe, onDelete }: {
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
       >
-        <MessageBubble msg={msg} isMe={true} />
+        <MessageBubble msg={msg} isMe={true} t={t} />
       </Animated.View>
     </View>
   )
@@ -257,6 +259,7 @@ function SwipeableMessageBubble({ msg, isMe, onDelete }: {
 export default function ConversationScreen() {
   const { id: conversationId } = useLocalSearchParams<{ id: string }>()
   const { session } = useAuth()
+  const { t } = useTranslation()
   const currentUserId = session?.user?.id ?? ''
 
   const [conv, setConv] = useState<ConversationDetail | null>(null)
@@ -427,7 +430,7 @@ export default function ConversationScreen() {
     setSendingMedia(true)
     const mediaUrl = await uploadMedia(mediaUri, type)
     if (!mediaUrl) {
-      Alert.alert('Erreur', "Impossible d'envoyer le média.")
+      Alert.alert('Erreur', t('conversation.media_error'))
       setSendingMedia(false)
       return
     }
@@ -455,7 +458,7 @@ export default function ConversationScreen() {
     try {
       const { granted } = await Audio.requestPermissionsAsync()
       if (!granted) {
-        Alert.alert('Permission refusée', 'Active le micro dans les réglages.')
+        Alert.alert('Permission refusée', t('conversation.mic_permission'))
         return
       }
       await Audio.setAudioModeAsync({
@@ -506,7 +509,7 @@ export default function ConversationScreen() {
   const handlePickImage = useCallback(async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!granted) {
-      Alert.alert('Permission refusée', 'Active la galerie dans les réglages.')
+      Alert.alert('Permission refusée', t('conversation.gallery_permission'))
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -523,7 +526,7 @@ export default function ConversationScreen() {
   const handleTakePhoto = useCallback(async () => {
     const { granted } = await ImagePicker.requestCameraPermissionsAsync()
     if (!granted) {
-      Alert.alert('Permission refusée', 'Active la caméra dans les réglages.')
+      Alert.alert('Permission refusée', t('conversation.camera_permission'))
       return
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -631,11 +634,12 @@ export default function ConversationScreen() {
               isMe={item.sender_id === currentUserId}
               currentUserId={currentUserId}
               onDelete={handleDeleteMessage}
+              t={t}
             />
           )}
           ListEmptyComponent={
             <View style={styles.emptyMessages}>
-              <Text style={styles.emptyText}>Commencez la conversation</Text>
+              <Text style={styles.emptyText}>{t('conversation.no_messages')}</Text>
             </View>
           }
         />
@@ -682,7 +686,7 @@ export default function ConversationScreen() {
                 style={[styles.input, { flex: 1 }]}
                 value={text}
                 onChangeText={setText}
-                placeholder="Message…"
+                placeholder={t('conversation.placeholder')}
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={1}
