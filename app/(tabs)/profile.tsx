@@ -52,6 +52,7 @@ type DropCell = {
 // ── Grid cell ────────────────────────────────────────────────────────────────
 
 function AddCell() {
+  const { t } = useTranslation()
   return (
     <TouchableOpacity
       style={[gridStyles.cell, gridStyles.addCell]}
@@ -59,7 +60,7 @@ function AddCell() {
       onPress={() => router.push('/story/create')}
     >
       <Ionicons name="add" size={44} color="#0F0F0F" />
-      <Text style={gridStyles.addCellLabel}>Nouveau drop</Text>
+      <Text style={gridStyles.addCellLabel}>{t('profile.new_story')}</Text>
     </TouchableOpacity>
   )
 }
@@ -926,17 +927,17 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{dropsCount === null ? '--' : dropsCount}</Text>
-              <Text style={styles.statLabel}>Drops</Text>
+              <Text style={styles.statLabel}>{t('profile.drops')}</Text>
             </View>
             <TouchableOpacity style={styles.stat} onPress={() => setFollowersVisible(true)} activeOpacity={0.7}>
               <Text style={styles.statNum}>
                 {followLoading ? '--' : followersCount}
               </Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
+              <Text style={styles.statLabel}>{t('profile.followers')}</Text>
             </TouchableOpacity>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{ventesCount === null ? '--' : ventesCount}</Text>
-              <Text style={styles.statLabel}>Ventes</Text>
+              <Text style={styles.statLabel}>{t('profile.sales')}</Text>
             </View>
           </View>
 
@@ -968,7 +969,7 @@ export default function ProfileScreen() {
           >
             <View style={styles.walletLeft}>
               <Ionicons name="wallet-outline" size={22} color={colors.primary} />
-              <Text style={styles.walletLabel}>Mon wallet</Text>
+              <Text style={styles.walletLabel}>{t('wallet.title')}</Text>
             </View>
             <View style={styles.walletRight}>
               <Text style={styles.walletAmount}>
@@ -1015,7 +1016,7 @@ export default function ProfileScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="receipt-outline" size={20} color={colors.primary} />
-              <Text style={styles.quickLabel}>Ventes</Text>
+              <Text style={styles.quickLabel}>{t('profile.sales')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1033,7 +1034,7 @@ export default function ProfileScreen() {
               color={activeTab === 'drops' ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabLabel, activeTab === 'drops' && styles.tabLabelActive]}>
-              Drops
+              {t('profile.drops')}
             </Text>
           </TouchableOpacity>
 
@@ -1058,13 +1059,13 @@ export default function ProfileScreen() {
           ownDrops.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="videocam-outline" size={48} color={colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Publie ton premier drop</Text>
+              <Text style={styles.emptyTitle}>{t('profile.no_publications')}</Text>
               <TouchableOpacity
                 style={styles.emptyCta}
                 onPress={() => router.push('/story/create')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.emptyCtaText}>Créer un drop</Text>
+                <Text style={styles.emptyCtaText}>{t('story.create.title')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
