@@ -15,6 +15,9 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  Animated,
+  PanResponder,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -55,6 +58,7 @@ interface Message {
   sender_id: string
   created_at: string
   read_at: string | null
+  deleted_at: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -113,6 +117,69 @@ function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
   )
 }
 
+// ── Swipeable message bubble ──────────────────────────────────────────────────
+
+function SwipeableMessageBubble({ msg, isMe, onDelete }: {
+  msg: Message
+  isMe: boolean
+  currentUserId: string
+  onDelete: (id: string) => void
+}) {
+  const translateX = useRef(new Animated.Value(0)).current
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        isMe && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_, g) => {
+        if (g.dx < 0) translateX.setValue(Math.max(g.dx, -80))
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -60) {
+          Alert.alert(
+            'Supprimer ce message ?',
+            'Cette action est irréversible.',
+            [
+              { text: 'Annuler', style: 'cancel', onPress: () => {
+                Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start()
+              }},
+              { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(msg.id) },
+            ]
+          )
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start()
+        }
+      },
+    })
+  ).current
+
+  if (!isMe) {
+    return <MessageBubble msg={msg} isMe={false} />
+  }
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      <View style={{
+        position: 'absolute',
+        right: 16,
+        top: 0,
+        bottom: 0,
+        width: 60,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+      </View>
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        {...panResponder.panHandlers}
+      >
+        <MessageBubble msg={msg} isMe={true} />
+      </Animated.View>
+    </View>
+  )
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function ConversationScreen() {
@@ -154,8 +221,9 @@ export default function ConversationScreen() {
     if (!conversationId) return
     const { data, error: err } = await supabase
       .from('messages')
-      .select('id, content, sender_id, created_at, read_at')
+      .select('id, content, sender_id, created_at, read_at, deleted_at')
       .eq('conversation_id', conversationId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: true })
 
     if (err) { setError(err.message); return }
@@ -247,6 +315,17 @@ export default function ConversationScreen() {
     }
   }
 
+  // ── Delete message ─────────────────────────────────────────────────────────
+
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+    await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('sender_id', currentUserId)
+  }, [currentUserId])
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const otherUser = conv
@@ -326,7 +405,12 @@ export default function ConversationScreen() {
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={conv.story ? <StoryCard story={conv.story} /> : null}
           renderItem={({ item }) => (
-            <MessageBubble msg={item} isMe={item.sender_id === currentUserId} />
+            <SwipeableMessageBubble
+              msg={item}
+              isMe={item.sender_id === currentUserId}
+              currentUserId={currentUserId}
+              onDelete={handleDeleteMessage}
+            />
           )}
           ListEmptyComponent={
             <View style={styles.emptyMessages}>
