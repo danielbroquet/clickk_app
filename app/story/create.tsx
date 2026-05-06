@@ -170,11 +170,13 @@ export default function CreateStoryScreen() {
     setErrors(e => ({ ...e, publish: '' }))
 
     try {
-      let publicUrl: string
+      let finalVideoUrl: string
+      let finalThumbnailUrl: string | null
 
-      // If the user kept the original video from a relaunch, reuse its URL
-      if (reusedVideoUrl && videoUri === reusedVideoUrl) {
-        publicUrl = reusedVideoUrl
+      // If relaunching and video is already a remote URL, skip upload
+      if (relaunchId && reusedVideoUrl && videoUri === reusedVideoUrl) {
+        finalVideoUrl = reusedVideoUrl
+        finalThumbnailUrl = thumbnailUrl
       } else {
         const path = `${userId}/${Date.now()}.mp4`
         let localUri = videoUri
@@ -195,7 +197,8 @@ export default function CreateStoryScreen() {
         const { data: { publicUrl: newUrl } } = supabase.storage
           .from('stories')
           .getPublicUrl(path)
-        publicUrl = newUrl
+        finalVideoUrl = newUrl
+        finalThumbnailUrl = null
       }
 
       const expiresAt = new Date(
@@ -206,7 +209,8 @@ export default function CreateStoryScreen() {
         seller_id: userId,
         title,
         description,
-        video_url: publicUrl,
+        video_url: finalVideoUrl,
+        thumbnail_url: finalThumbnailUrl,
         start_price_chf: parseFloat(startPrice),
         floor_price_chf: parseFloat(floorPrice),
         current_price_chf: parseFloat(startPrice),
@@ -449,6 +453,9 @@ function RelaunchForm({
             </TouchableOpacity>
           </View>
         </View>
+        <Text style={{ color: C.muted, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+          Vidéo du drop original · Tape "Changer" pour en choisir une autre
+        </Text>
 
         {/* Title */}
         <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Titre</Text>

@@ -474,7 +474,7 @@ export default function SalesScreen() {
     if (!currentUserId) return
     const { data } = await supabase
       .from('stories')
-      .select('id, title, thumbnail_url, video_url, current_price_chf, start_price_chf, floor_price_chf, archived_at, status')
+      .select('id, title, description, thumbnail_url, video_url, current_price_chf, start_price_chf, floor_price_chf, speed_preset, duration_hours, archived_at, status, category')
       .eq('seller_id', currentUserId)
       .eq('status', 'expired')
       .order('archived_at', { ascending: false })
