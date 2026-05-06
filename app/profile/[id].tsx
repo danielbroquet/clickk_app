@@ -225,7 +225,8 @@ export default function PublicProfileScreen() {
       supabase
         .from('stories')
         .select('*', { count: 'exact', head: true })
-        .eq('seller_id', id),
+        .eq('seller_id', id)
+        .eq('status', 'active'),
 
       supabase
         .from('stories')
@@ -242,21 +243,8 @@ export default function PublicProfileScreen() {
       setDropsCount(dropsCountRes.count ?? 0)
       setVentesCount(ventesRes.count ?? 0)
 
-      const active = (activeRes.data ?? []) as Drop[]
-      if (active.length > 0) {
-        setDrops(active)
-        setLoading(false)
-      } else {
-        // Fallback: show all drops regardless of status
-        const { data: all } = await supabase
-          .from('stories')
-          .select('id, title, video_url, thumbnail_url, current_price_chf, status, expires_at, created_at')
-          .eq('seller_id', id)
-          .order('created_at', { ascending: false })
-          .limit(60)
-        setDrops((all ?? []) as Drop[])
-        setLoading(false)
-      }
+      setDrops((activeRes.data ?? []) as Drop[])
+      setLoading(false)
     })
   }, [id])
 
