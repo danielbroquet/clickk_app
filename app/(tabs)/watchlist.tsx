@@ -16,7 +16,7 @@ import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 interface WatchlistStory {
   id: string
@@ -154,6 +154,7 @@ function WatchlistCard({ row, onRemoved }: { row: WatchlistRow; onRemoved: (id: 
 const keyExtractor = (item: WatchlistRow) => item.id
 
 export default function WatchlistScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const userId = session?.user?.id ?? null
   const [rows, setRows] = useState<WatchlistRow[]>([])
@@ -242,7 +243,7 @@ export default function WatchlistScreen() {
     return (
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{i18n.t('watchlist.title')}</Text>
+          <Text style={styles.headerTitle}>{t('watchlist.title')}</Text>
         </View>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -254,7 +255,7 @@ export default function WatchlistScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{i18n.t('watchlist.title')}</Text>
+        <Text style={styles.headerTitle}>{t('watchlist.title')}</Text>
         {rows.length > 0 && (
           <Text style={styles.headerCount}>{rows.length} drop{rows.length > 1 ? 's' : ''}</Text>
         )}
@@ -263,8 +264,8 @@ export default function WatchlistScreen() {
       {rows.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="heart-outline" size={52} color={colors.border} />
-          <Text style={styles.emptyTitle}>{i18n.t('watchlist.empty_title')}</Text>
-          <Text style={styles.emptyMessage}>{i18n.t('watchlist.empty_message')}</Text>
+          <Text style={styles.emptyTitle}>{t('watchlist.empty_title')}</Text>
+          <Text style={styles.emptyMessage}>{t('watchlist.empty_message')}</Text>
         </View>
       ) : (
         <FlatList

@@ -22,7 +22,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -174,6 +174,7 @@ function CommentsSheet({
   onCommentAdded: (c: Comment) => void
   onCommentDeleted: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(false)
@@ -596,7 +597,7 @@ function CommentsSheet({
               <View style={commentStyles.headerInner}>
                 <View style={{ width: 32 }} />
                 <Text style={commentStyles.title}>
-                  {i18n.t('comments.title')}{count > 0 ? ` · ${count}` : ''}
+                  {t('comments.title')}{count > 0 ? ` · ${count}` : ''}
                 </Text>
                 <TouchableOpacity onPress={onClose} style={commentStyles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                   <Ionicons name="close" size={22} color="rgba(255,255,255,0.7)" />
@@ -612,8 +613,8 @@ function CommentsSheet({
             ) : comments.length === 0 ? (
               <View style={commentStyles.centerFill}>
                 <Ionicons name="chatbubble-outline" size={48} color="#444" />
-                <Text style={commentStyles.emptyTitle}>{i18n.t('comments.empty')}</Text>
-                <Text style={commentStyles.emptySub}>{i18n.t('comments.first')}</Text>
+                <Text style={commentStyles.emptyTitle}>{t('comments.empty')}</Text>
+                <Text style={commentStyles.emptySub}>{t('comments.first')}</Text>
               </View>
             ) : (
               <FlatList
@@ -662,7 +663,7 @@ function CommentsSheet({
               <TextInput
                 ref={inputRef}
                 style={commentStyles.input}
-                placeholder={i18n.t('comments.placeholder')}
+                placeholder={t('comments.placeholder')}
                 placeholderTextColor="#666"
                 value={input}
                 onChangeText={setInput}

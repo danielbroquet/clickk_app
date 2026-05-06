@@ -9,7 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { useActiveStories } from '../../hooks/useActiveStories'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 import { SpeedPreset, Story } from '../../types'
 
 const PRESET_COLOR: Record<SpeedPreset, string> = {
@@ -33,6 +33,7 @@ function formatExpiry(expiresAt: string | null | undefined): string {
 }
 
 function StoryCard({ story }: { story: Story }) {
+  const { t } = useTranslation()
   const [label, setLabel] = useState(() => formatExpiry(story.expires_at))
 
   useEffect(() => {
@@ -95,7 +96,7 @@ function StoryCard({ story }: { story: Story }) {
         }}
         numberOfLines={1}
       >
-        {i18n.t('story.chf', { price: story.current_price_chf.toLocaleString('fr-CH') })}
+        {t('story.chf', { price: story.current_price_chf.toLocaleString('fr-CH') })}
       </Text>
 
       {/* Countdown */}
@@ -161,5 +162,7 @@ export default function StoryCarousel() {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 16 }}
     />
+  )
+}
   )
 }

@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 type ReportReason =
   | 'inappropriate'
@@ -45,6 +45,7 @@ const REASONS: { key: ReportReason; labelKey: string }[] = [
 ]
 
 export default function ReportModal({ visible, onClose, targetType, targetId }: ReportModalProps) {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const [selectedReason, setSelectedReason] = useState<ReportReason | null>(null)
   const [description, setDescription] = useState('')
@@ -79,16 +80,16 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
 
     if (insertError) {
       if (insertError.code === '23505') {
-        setError(i18n.t('report.already_reported'))
+        setError(t('report.already_reported'))
       } else {
-        setError(i18n.t('common.error'))
+        setError(t('common.error'))
       }
       return
     }
 
     reset()
     onClose()
-    Alert.alert(i18n.t('report.success_title'), i18n.t('report.success_body'))
+    Alert.alert(t('report.success_title'), t('report.success_body'))
   }
 
   return (
@@ -101,7 +102,7 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>{i18n.t('report.title')}</Text>
+          <Text style={styles.title}>{t('report.title')}</Text>
           <TouchableOpacity onPress={handleClose} style={styles.closeBtn} hitSlop={8}>
             <Ionicons name="close" size={22} color={colors.text} />
           </TouchableOpacity>
@@ -113,7 +114,7 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.subtitle}>{i18n.t('report.subtitle')}</Text>
+          <Text style={styles.subtitle}>{t('report.subtitle')}</Text>
 
           {/* Reason list */}
           <View style={styles.reasonList}>
@@ -128,7 +129,7 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.reasonLabel, selected && styles.reasonLabelSelected]}>
-                    {i18n.t(item.labelKey)}
+                    {t(item.labelKey)}
                   </Text>
                   <View style={[styles.radio, selected && styles.radioSelected]}>
                     {selected && <View style={styles.radioDot} />}
@@ -140,10 +141,10 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
 
           {/* Description textarea */}
           <View style={styles.textareaWrapper}>
-            <Text style={styles.textareaLabel}>{i18n.t('report.details_label')}</Text>
+            <Text style={styles.textareaLabel}>{t('report.details_label')}</Text>
             <TextInput
               style={styles.textarea}
-              placeholder={i18n.t('report.details_placeholder')}
+              placeholder={t('report.details_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={description}
               onChangeText={text => setDescription(text.slice(0, 500))}
@@ -175,7 +176,7 @@ export default function ReportModal({ visible, onClose, targetType, targetId }: 
             {loading ? (
               <ActivityIndicator size="small" color={colors.bg} />
             ) : (
-              <Text style={styles.submitText}>{i18n.t('report.submit')}</Text>
+              <Text style={styles.submitText}>{t('report.submit')}</Text>
             )}
           </TouchableOpacity>
         </View>

@@ -32,7 +32,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 import { useFollow } from '../../hooks/useFollow'
 import { callEdgeFunction } from '../../lib/edgeFunction'
 
@@ -713,6 +713,7 @@ interface LikedStory {
 }
 
 export default function ProfileScreen() {
+  const { t } = useTranslation()
   const { profile, session, refreshProfile } = useAuth()
   const [dropsCount, setDropsCount] = useState<number | null>(null)
   const [ventesCount, setVentesCount] = useState<number | null>(null)
@@ -880,7 +881,7 @@ export default function ProfileScreen() {
             onPress={() => setEditVisible(true)}
             activeOpacity={0.85}
           >
-            <Text style={styles.editBtnText}>{i18n.t('profile.edit')}</Text>
+            <Text style={styles.editBtnText}>{t('profile.edit')}</Text>
           </TouchableOpacity>
 
           {profile?.role !== 'seller' && (
@@ -889,7 +890,7 @@ export default function ProfileScreen() {
               onPress={() => router.push('/become-seller')}
               activeOpacity={0.85}
             >
-              <Text style={styles.becomeSellerText}>{i18n.t('profile.become_seller')}</Text>
+              <Text style={styles.becomeSellerText}>{t('profile.become_seller')}</Text>
             </TouchableOpacity>
           )}
         </View>

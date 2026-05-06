@@ -17,7 +17,7 @@ import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
 import type { Story, Profile } from '../../types'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 const PAGE_SIZE = 12
 
@@ -59,16 +59,18 @@ function StoryCard({ item }: { item: StoryWithSeller }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation()
   return (
     <View style={styles.emptyContainer}>
       <Ionicons name="search-outline" size={48} color={colors.textSecondary} />
-      <Text style={styles.emptyTitle}>{i18n.t('discover.no_results')}</Text>
-      <Text style={styles.emptySubtitle}>{i18n.t('discover.empty_stories')}</Text>
+      <Text style={styles.emptyTitle}>{t('discover.no_results')}</Text>
+      <Text style={styles.emptySubtitle}>{t('discover.empty_stories')}</Text>
     </View>
   )
 }
 
 export default function DiscoverScreen() {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [focused, setFocused] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
@@ -152,13 +154,13 @@ export default function DiscoverScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <Text style={styles.title}>{i18n.t('discover.title')}</Text>
+      <Text style={styles.title}>{t('discover.title')}</Text>
 
       <View style={[styles.searchBar, focused && styles.searchFocus]}>
         <Ionicons name="search" size={18} color={colors.primary} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder={i18n.t('discover.search_placeholder')}
+          placeholder={t('discover.search_placeholder')}
           placeholderTextColor={colors.textSecondary}
           value={query}
           onChangeText={setQuery}

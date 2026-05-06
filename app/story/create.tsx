@@ -20,7 +20,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 const C = {
   bg: '#0F0F0F',
@@ -39,6 +39,7 @@ type DropInterval = 30 | 60 | 120
 type DurationHours = 24 | 72 | 168
 
 export default function CreateStoryScreen() {
+  const { t } = useTranslation()
   const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
   const { profile } = useAuth()
 
@@ -120,7 +121,7 @@ export default function CreateStoryScreen() {
 
   const validateStep1 = () => {
     if (!videoUri) {
-      setErrors(e => ({ ...e, video: i18n.t('story.create.error_video') }))
+      setErrors(e => ({ ...e, video: t('story.create.error_video') }))
       return false
     }
     return true
@@ -128,12 +129,12 @@ export default function CreateStoryScreen() {
 
   const validateStep2 = () => {
     const errs: Record<string, string> = {}
-    if (!title.trim()) errs.title = i18n.t('story.create.error_title')
+    if (!title.trim()) errs.title = t('story.create.error_title')
     const sp = parseFloat(startPrice)
     const fp = parseFloat(floorPrice)
-    if (!startPrice || isNaN(sp) || sp <= 0) errs.startPrice = i18n.t('story.create.error_price')
+    if (!startPrice || isNaN(sp) || sp <= 0) errs.startPrice = t('story.create.error_price')
     if (!floorPrice || isNaN(fp) || fp <= 0 || fp >= sp)
-      errs.floorPrice = i18n.t('story.create.error_price')
+      errs.floorPrice = t('story.create.error_price')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -232,7 +233,7 @@ export default function CreateStoryScreen() {
       router.replace('/(tabs)/index')
     } catch (err: any) {
       setPublishing(false)
-      setErrors(e => ({ ...e, publish: err.message ?? i18n.t('story.create.error_upload') }))
+      setErrors(e => ({ ...e, publish: err.message ?? t('story.create.error_upload') }))
     }
   }
 
@@ -304,7 +305,7 @@ export default function CreateStoryScreen() {
           <TouchableOpacity onPress={handleBack} style={styles.headerSide}>
             <Ionicons name="arrow-back" size={22} color={C.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{i18n.t('story.create.title')}</Text>
+          <Text style={styles.headerTitle}>{t('story.create.title')}</Text>
           <View style={styles.headerSide}>
             <Text style={styles.stepIndicator}>{step}/3</Text>
           </View>
@@ -665,6 +666,7 @@ function Step1({
   onRecordVideo: () => void
   onNext: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -676,11 +678,11 @@ function Step1({
           <View style={styles.step1EmptyWrap}>
             <TouchableOpacity style={styles.dashedBox} onPress={onPickVideo}>
               <Ionicons name="videocam-outline" size={48} color={C.muted} />
-              <Text style={styles.dashedBoxTitle}>{i18n.t('story.create.pick_video')}</Text>
-              <Text style={styles.dashedBoxTip}>{i18n.t('story.create.video_tip')}</Text>
+              <Text style={styles.dashedBoxTitle}>{t('story.create.pick_video')}</Text>
+              <Text style={styles.dashedBoxTip}>{t('story.create.video_tip')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.outlinedBtn} onPress={onRecordVideo}>
-              <Text style={styles.outlinedBtnText}>{i18n.t('story.create.record_video')}</Text>
+              <Text style={styles.outlinedBtnText}>{t('story.create.record_video')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -706,7 +708,7 @@ function Step1({
       </ScrollView>
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-          <Text style={styles.primaryBtnText}>{i18n.t('common.next')}</Text>
+          <Text style={styles.primaryBtnText}>{t('common.next')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -733,6 +735,7 @@ function Step2({
   sp: number; fp: number
   onNext: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <View style={styles.flex}>
       <ScrollView
@@ -741,10 +744,10 @@ function Step2({
         keyboardShouldPersistTaps="handled"
       >
         {/* Title */}
-        <Text style={styles.fieldLabel}>{i18n.t('story.create.listing_title')}</Text>
+        <Text style={styles.fieldLabel}>{t('story.create.listing_title')}</Text>
         <TextInput
           style={[styles.input, !!errors.title && styles.inputError]}
-          placeholder={i18n.t('story.create.listing_title_placeholder')}
+          placeholder={t('story.create.listing_title_placeholder')}
           placeholderTextColor={C.muted}
           value={title}
           onChangeText={setTitle}
@@ -752,10 +755,10 @@ function Step2({
         {!!errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
 
         {/* Description */}
-        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{i18n.t('story.create.description')}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('story.create.description')}</Text>
         <TextInput
           style={[styles.input, styles.inputMulti]}
-          placeholder={i18n.t('story.create.description_placeholder')}
+          placeholder={t('story.create.description_placeholder')}
           placeholderTextColor={C.muted}
           value={description}
           onChangeText={setDescription}
@@ -764,7 +767,7 @@ function Step2({
         />
 
         {/* Start price */}
-        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{i18n.t('story.create.start_price')}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('story.create.start_price')}</Text>
         <View style={[styles.priceRow, !!errors.startPrice && styles.inputError]}>
           <Text style={styles.chfPrefix}>CHF</Text>
           <TextInput
@@ -779,8 +782,8 @@ function Step2({
         {!!errors.startPrice && <Text style={styles.errorText}>{errors.startPrice}</Text>}
 
         {/* Floor price */}
-        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{i18n.t('story.create.floor_price')}</Text>
-        <Text style={styles.subLabel}>{i18n.t('story.create.floor_price_tip')}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 18 }]}>{t('story.create.floor_price')}</Text>
+        <Text style={styles.subLabel}>{t('story.create.floor_price_tip')}</Text>
         <View style={[styles.priceRow, !!errors.floorPrice && styles.inputError]}>
           <Text style={styles.chfPrefix}>CHF</Text>
           <TextInput
@@ -805,7 +808,7 @@ function Step2({
       </ScrollView>
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.primaryBtn} onPress={onNext}>
-          <Text style={styles.primaryBtnText}>{i18n.t('common.next')}</Text>
+          <Text style={styles.primaryBtnText}>{t('common.next')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -838,6 +841,7 @@ function Step3({
   publishing: boolean; publishError?: string
   onPublish: () => void
 }) {
+  const { t } = useTranslation()
   const intervals: DropInterval[] = [30, 60, 120]
   const durations: DurationHours[] = [24, 72, 168]
 
@@ -855,7 +859,7 @@ function Step3({
         keyboardShouldPersistTaps="handled"
       >
         {/* Interval */}
-        <Text style={styles.fieldLabel}>{i18n.t('story.create.price_drop_interval')}</Text>
+        <Text style={styles.fieldLabel}>{t('story.create.price_drop_interval')}</Text>
         <View style={styles.segmentedRow}>
           {intervals.map(iv => (
             <TouchableOpacity
@@ -892,7 +896,7 @@ function Step3({
         ))}
 
         {/* Duration */}
-        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{i18n.t('story.create.duration')}</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('story.create.duration')}</Text>
         <View style={styles.segmentedRow}>
           {durations.map(d => (
             <TouchableOpacity
@@ -933,11 +937,11 @@ function Step3({
             <>
               <ActivityIndicator color="#0F0F0F" />
               <Text style={[styles.publishBtnText, { marginLeft: 10 }]}>
-                {i18n.t('story.create.publishing')}
+                {t('story.create.publishing')}
               </Text>
             </>
           ) : (
-            <Text style={styles.publishBtnText}>{i18n.t('story.create.publish')}</Text>
+            <Text style={styles.publishBtnText}>{t('story.create.publish')}</Text>
           )}
         </TouchableOpacity>
       </View>

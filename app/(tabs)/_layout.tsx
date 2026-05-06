@@ -13,7 +13,7 @@ import {
 import { Tabs, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, fontFamily, spacing } from '../../lib/theme'
-import i18n from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 function SellButton({ onPress }: { onPress: () => void }) {
   return (
@@ -24,6 +24,7 @@ function SellButton({ onPress }: { onPress: () => void }) {
 }
 
 export default function TabLayout() {
+  const { t } = useTranslation()
   const [showSellModal, setShowSellModal] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { session } = useAuth()
@@ -114,7 +115,7 @@ export default function TabLayout() {
       >
         <Pressable style={styles.overlay} onPress={() => setShowSellModal(false)}>
           <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>{i18n.t('sell.modal_title')}</Text>
+            <Text style={styles.sheetTitle}>{t('sell.modal_title')}</Text>
             <TouchableOpacity
               style={styles.option}
               onPress={() => {
@@ -124,8 +125,8 @@ export default function TabLayout() {
             >
               <Ionicons name="videocam-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
               <View style={styles.optionText}>
-                <Text style={styles.optionTitle}>{i18n.t('sell.option_story_title')}</Text>
-                <Text style={styles.optionSub}>{i18n.t('sell.option_story_sub')}</Text>
+                <Text style={styles.optionTitle}>{t('sell.option_story_title')}</Text>
+                <Text style={styles.optionSub}>{t('sell.option_story_sub')}</Text>
               </View>
             </TouchableOpacity>
             <TouchableOpacity

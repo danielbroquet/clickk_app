@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import i18n, { Locale, SUPPORTED_LOCALES, getCurrentLocale, setLocale as setLocaleStorage } from './i18n'
+import i18n, { Locale, SUPPORTED_LOCALES, getCurrentLocale, setLocale as setLocaleStorage, notifyLocaleChange } from './i18n'
 
 type LocaleContextValue = {
   locale: Locale
   setLocale: (locale: Locale) => Promise<void>
-  t: (key: string, options?: any) => string
 }
 
 const LocaleContext = createContext<LocaleContextValue | null>(null)
@@ -18,6 +17,7 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
       if (saved && SUPPORTED_LOCALES.includes(saved as Locale)) {
         i18n.locale = saved
         setLocaleState(saved as Locale)
+        notifyLocaleChange(saved as Locale)
       }
     }).catch(() => {})
   }, [])
@@ -27,10 +27,8 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     setLocaleState(next)
   }, [])
 
-  const t = useCallback((key: string, options?: any) => i18n.t(key, options), [locale])
-
   return (
-    <LocaleContext.Provider value={{ locale, setLocale, t }}>
+    <LocaleContext.Provider value={{ locale, setLocale }}>
       {children}
     </LocaleContext.Provider>
   )
