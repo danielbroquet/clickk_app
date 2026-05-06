@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -103,19 +104,36 @@ export default function CreateStoryScreen() {
   const pickVideo = async (fromCamera = false) => {
     const opts: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 1,
+      quality: 0.5,
       videoMaxDuration: 60,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      allowsEditing: true,
+      ...(Platform.OS === 'android' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality }),
     }
     const result = fromCamera
       ? await ImagePicker.launchCameraAsync(opts)
       : await ImagePicker.launchImageLibraryAsync(opts)
 
     if (!result.canceled && result.assets[0]) {
-      setVideoUri(result.assets[0].uri)
+      const asset = result.assets[0]
+      setVideoUri(asset.uri)
       setReusedVideoUrl(null)
       setErrors(e => ({ ...e, video: '' }))
+
+      try {
+        const info = await FileSystem.getInfoAsync(asset.uri, { size: true })
+        const sizeMB = (info as any).size / (1024 * 1024)
+        if (sizeMB > 25) {
+          Alert.alert(
+            'Vidéo trop lourde',
+            `Cette vidéo fait ${sizeMB.toFixed(1)} MB. Privilégie une vidéo plus courte ou de qualité plus basse pour un upload plus rapide.`,
+            [
+              { text: 'Annuler', style: 'cancel', onPress: () => setVideoUri(null) },
+              { text: 'Continuer quand même', onPress: () => {} },
+            ]
+          )
+        }
+      } catch {}
     }
   }
 

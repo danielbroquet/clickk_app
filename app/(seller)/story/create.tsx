@@ -283,7 +283,7 @@ export default function CreateDropScreen() {
 
   const generateThumbnail = async (uri: string): Promise<string | null> => {
     try {
-      const { uri: t } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0, quality: 0.7 })
+      const { uri: t } = await VideoThumbnails.getThumbnailAsync(uri, { time: 0, quality: 0.6 })
       return t
     } catch { return null }
   }
@@ -297,6 +297,21 @@ export default function CreateDropScreen() {
     setVideoDurationSeconds(durationSec)
     const thumb = await generateThumbnail(asset.uri)
     setThumbnailUri(thumb)
+
+    try {
+      const info = await FileSystem.getInfoAsync(asset.uri, { size: true })
+      const sizeMB = (info as any).size / (1024 * 1024)
+      if (sizeMB > 25) {
+        Alert.alert(
+          'Vidéo trop lourde',
+          `Cette vidéo fait ${sizeMB.toFixed(1)} MB. Privilégie une vidéo plus courte ou de qualité plus basse pour un upload plus rapide.`,
+          [
+            { text: 'Annuler', style: 'cancel', onPress: () => setVideoUri(null) },
+            { text: 'Continuer quand même', onPress: () => {} },
+          ]
+        )
+      }
+    } catch {}
   }
 
   const launchCamera = async () => {
@@ -307,9 +322,11 @@ export default function CreateDropScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
+      quality: 0.5,
       videoMaxDuration: 60,
-      quality: 1,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      allowsEditing: true,
+      ...(Platform.OS === 'android' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality }),
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -317,9 +334,11 @@ export default function CreateDropScreen() {
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      allowsEditing: true,
+      quality: 0.5,
       videoMaxDuration: 60,
-      quality: 1,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      allowsEditing: true,
+      ...(Platform.OS === 'android' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality }),
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -341,7 +360,7 @@ export default function CreateDropScreen() {
         imageBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
       } else if (videoUri && isLocal(videoUri)) {
         try {
-          const { uri: frameUri } = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 1000, quality: 0.7 })
+          const { uri: frameUri } = await VideoThumbnails.getThumbnailAsync(videoUri, { time: 1000, quality: 0.6 })
           imageBase64 = await FileSystem.readAsStringAsync(frameUri, { encoding: 'base64' })
         } catch {
           imageBase64 = null
