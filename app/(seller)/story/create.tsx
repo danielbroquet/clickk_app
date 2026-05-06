@@ -232,6 +232,7 @@ export default function CreateDropScreen() {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
   const [, setCondition] = useState('')
+  const [generating, setGenerating] = useState(false)
 
   // Step 3
   const [startPrice, setStartPrice] = useState('')
@@ -322,6 +323,43 @@ export default function CreateDropScreen() {
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
+
+  // ── AI generation ──────────────────────────────────────────────────────────
+
+  const handleGenerate = useCallback(async () => {
+    if (!thumbnailUri) return
+    setGenerating(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        Alert.alert('Erreur', 'Non authentifié')
+        return
+      }
+      const base64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
+      const res = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-drop-info`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+        }
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        Alert.alert('Erreur', "L'IA n'a pas pu analyser l'image")
+        return
+      }
+      setTitle(data.title ?? '')
+      setDescription(data.description ?? '')
+    } catch {
+      Alert.alert('Erreur', "L'IA n'a pas pu analyser l'image")
+    } finally {
+      setGenerating(false)
+    }
+  }, [thumbnailUri])
 
   // ── navigation ─────────────────────────────────────────────────────────────
 
@@ -543,6 +581,8 @@ export default function CreateDropScreen() {
               description={description} onDescription={setDescription}
               category={category} onCategory={setCategory}
               thumbnailUri={thumbnailUri}
+              onGenerate={handleGenerate}
+              generating={generating}
             />
           )}
           {step === 3 && (
@@ -702,11 +742,15 @@ function Step2({
   description, onDescription,
   category, onCategory,
   thumbnailUri,
+  onGenerate,
+  generating,
 }: {
   title: string; onTitle: (s: string) => void
   description: string; onDescription: (s: string) => void
   category: string; onCategory: (s: string) => void
   thumbnailUri: string | null
+  onGenerate: () => void
+  generating: boolean
 }) {
   return (
     <View style={s.formWrap}>
@@ -725,6 +769,21 @@ function Step2({
         autoFocus
       />
       <Text style={s.counter}>{title.length}/80</Text>
+
+      {thumbnailUri && (
+        <TouchableOpacity
+          style={[s.generateBtn, generating && { opacity: 0.6 }]}
+          onPress={onGenerate}
+          disabled={generating}
+          activeOpacity={0.8}
+        >
+          {generating ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={s.generateBtnText}>✨ Générer avec l'IA</Text>
+          )}
+        </TouchableOpacity>
+      )}
 
       <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
       <TextInput
@@ -1146,6 +1205,23 @@ const s = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'right',
     marginTop: 4,
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 40,
+    backgroundColor: 'rgba(0,210,184,0.12)',
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  generateBtnText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 14,
+    color: colors.primary,
   },
 
   // Category
