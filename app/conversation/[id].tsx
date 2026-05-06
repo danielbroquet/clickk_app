@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { ArrowLeft, Send } from 'lucide-react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
@@ -28,6 +29,7 @@ import { colors, fontFamily, spacing } from '../../lib/theme'
 interface Participant {
   id: string
   display_name: string | null
+  username?: string | null
   avatar_url: string | null
 }
 
@@ -136,8 +138,8 @@ export default function ConversationScreen() {
       .select(`
         id, buyer_id, seller_id,
         story:story_id ( id, title, current_price_chf, video_url ),
-        buyer:buyer_id ( id, display_name, avatar_url ),
-        seller:seller_id ( id, display_name, avatar_url )
+        buyer:buyer_id ( id, display_name, username, avatar_url ),
+        seller:seller_id ( id, display_name, username, avatar_url )
       `)
       .eq('id', conversationId)
       .single()
@@ -289,16 +291,25 @@ export default function ConversationScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <View style={styles.headerInfo}>
-          <Text style={styles.headerName} numberOfLines={1}>
-            {otherUser?.display_name ?? 'Utilisateur'}
-          </Text>
+        <TouchableOpacity
+          style={styles.headerInfo}
+          onPress={() => {
+            if (otherUser?.id) router.push(`/profile/${otherUser.id}`)
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {otherUser?.display_name ?? otherUser?.username ?? 'Utilisateur'}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
+          </View>
           {conv.story && (
             <Text style={styles.headerSub} numberOfLines={1}>
               {conv.story.title}
             </Text>
           )}
-        </View>
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
