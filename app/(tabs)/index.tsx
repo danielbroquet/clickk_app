@@ -85,8 +85,9 @@ function computePrice(s: FeedStory): number {
 function computeProgress(s: FeedStory): number {
   const total = new Date(s.expires_at).getTime() - new Date(s.created_at).getTime()
   const elapsed = Date.now() - new Date(s.created_at).getTime()
-  if (total <= 0) return 1
-  return Math.min(Math.max(elapsed / total, 0), 1)
+  if (total <= 0) return 0
+  const ratio = Math.min(Math.max(elapsed / total, 0), 1)
+  return Math.max(1 - ratio, 0)
 }
 
 function dropPerMinute(s: FeedStory): number {
@@ -955,6 +956,9 @@ function DropItem({
   const username = story.seller?.username ?? 'vendeur'
   const avatar = story.seller?.avatar_url
   const perMin = dropPerMinute(story)
+  const savingsPct = story.start_price_chf > 0
+    ? Math.round(((story.start_price_chf - price) / story.start_price_chf) * 100)
+    : 0
   const ctaLabel = isSold
     ? 'Vendu'
     : isSeller
@@ -1093,15 +1097,17 @@ function DropItem({
         )}
 
         <View style={styles.priceBlock}>
-          <View style={styles.priceTopRow}>
-            <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
-            <View style={styles.freeShipBadge}>
-              <Ionicons name="cube-outline" size={11} color="#00D2B8" />
-              <Text style={styles.freeShipText}>Livraison offerte</Text>
-            </View>
+          <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
+          <View style={[styles.freeShipBadge, { alignSelf: 'flex-start', marginTop: 4 }]}>
+            <Ionicons name="cube-outline" size={12} color="#00D2B8" />
+            <Text style={styles.freeShipText}>Livraison offerte</Text>
           </View>
+          {savingsPct > 0 && (
+            <View style={styles.savingsBadge}>
+              <Text style={styles.savingsText}>-{savingsPct}%</Text>
+            </View>
+          )}
           <View style={styles.priceMeta}>
-            <Text style={styles.priceDrop}>↓ -CHF {perMin.toFixed(2)}/min</Text>
             <Text style={styles.priceMin}>Min: CHF {story.floor_price_chf.toFixed(2)}</Text>
           </View>
         </View>
@@ -1952,9 +1958,7 @@ const styles = StyleSheet.create({
   },
 
   priceBlock: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    flexDirection: 'column',
     marginBottom: 10,
   },
   priceTopRow: {
@@ -1979,9 +1983,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-  priceMeta: { alignItems: 'flex-end', marginBottom: 6 },
+  priceMeta: { marginTop: 4, marginBottom: 2 },
   priceDrop: { color: '#FFA502', fontSize: 12, fontWeight: '600' },
-  priceMin: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 2 },
+  priceMin: { color: 'rgba(255,255,255,0.5)', fontSize: 11 },
+  savingsBadge: {
+    backgroundColor: 'rgba(0, 210, 184, 0.15)',
+    borderWidth: 1,
+    borderColor: '#00D2B8',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  savingsText: {
+    color: '#00D2B8',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 
   progressTrack: {
     height: 3,
