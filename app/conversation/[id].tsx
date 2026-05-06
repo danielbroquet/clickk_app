@@ -23,6 +23,10 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { ArrowLeft, Send } from 'lucide-react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { Audio } from 'expo-av'
+import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system/legacy'
+import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
@@ -59,6 +63,8 @@ interface Message {
   created_at: string
   read_at: string | null
   deleted_at: string | null
+  message_type: 'text' | 'image' | 'audio'
+  media_url: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -103,12 +109,79 @@ function StoryCard({ story }: { story: StorySnippet }) {
 // ── Message bubble ────────────────────────────────────────────────────────────
 
 function MessageBubble({ msg, isMe }: { msg: Message; isMe: boolean }) {
+  const [sound, setSound] = useState<Audio.Sound | null>(null)
+  const [playing, setPlaying] = useState(false)
+
+  const playAudio = async () => {
+    if (!msg.media_url) return
+    if (sound) {
+      if (playing) {
+        await sound.pauseAsync()
+        setPlaying(false)
+      } else {
+        await sound.playAsync()
+        setPlaying(true)
+      }
+      return
+    }
+    const { sound: newSound } = await Audio.Sound.createAsync(
+      { uri: msg.media_url },
+      { shouldPlay: true }
+    )
+    setSound(newSound)
+    setPlaying(true)
+    newSound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        setPlaying(false)
+        setSound(null)
+      }
+    })
+  }
+
+  useEffect(() => {
+    return () => { sound?.unloadAsync() }
+  }, [sound])
+
   return (
     <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowOther]}>
       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-        <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]}>
-          {msg.content}
-        </Text>
+        {msg.message_type === 'image' && msg.media_url ? (
+          <Image
+            source={{ uri: msg.media_url }}
+            style={{ width: 200, height: 150, borderRadius: 8 }}
+            resizeMode="cover"
+          />
+        ) : msg.message_type === 'audio' && msg.media_url ? (
+          <TouchableOpacity
+            onPress={playAudio}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingHorizontal: 4 }}
+          >
+            <Ionicons
+              name={playing ? 'pause-circle' : 'play-circle'}
+              size={32}
+              color={isMe ? '#0F0F0F' : colors.primary}
+            />
+            <View>
+              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther, { fontSize: 13 }]}>
+                Message vocal
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
+                {[...Array(12)].map((_, i) => (
+                  <View key={i} style={{
+                    width: 2, borderRadius: 1,
+                    height: Math.random() * 14 + 4,
+                    backgroundColor: isMe ? 'rgba(0,0,0,0.3)' : colors.primary,
+                    opacity: playing ? 1 : 0.5,
+                  }} />
+                ))}
+              </View>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]}>
+            {msg.content}
+          </Text>
+        )}
       </View>
       <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
         {formatTime(msg.created_at)}
@@ -194,6 +267,12 @@ export default function ConversationScreen() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
 
+  const [recording, setRecording] = useState<Audio.Recording | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const [sendingMedia, setSendingMedia] = useState(false)
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const listRef = useRef<FlatList<Message>>(null)
 
   // ── Fetch conversation ─────────────────────────────────────────────────────
@@ -221,7 +300,7 @@ export default function ConversationScreen() {
     if (!conversationId) return
     const { data, error: err } = await supabase
       .from('messages')
-      .select('id, content, sender_id, created_at, read_at, deleted_at')
+      .select('id, content, sender_id, created_at, read_at, deleted_at, message_type, media_url')
       .eq('conversation_id', conversationId)
       .is('deleted_at', null)
       .order('created_at', { ascending: true })
@@ -314,6 +393,150 @@ export default function ConversationScreen() {
       setSending(false)
     }
   }
+
+  // ── Media upload ───────────────────────────────────────────────────────────
+
+  const uploadMedia = useCallback(async (
+    localUri: string,
+    type: 'image' | 'audio'
+  ): Promise<string | null> => {
+    try {
+      const ext = type === 'audio' ? 'm4a' : 'jpg'
+      const path = `${currentUserId}/${Date.now()}.${ext}`
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: 'base64',
+      })
+      const contentType = type === 'audio' ? 'audio/m4a' : 'image/jpeg'
+      const { error } = await supabase.storage
+        .from('message-media')
+        .upload(path, decode(base64), { contentType })
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage
+        .from('message-media')
+        .getPublicUrl(path)
+      return publicUrl
+    } catch (err) {
+      console.error('[uploadMedia] error:', err)
+      return null
+    }
+  }, [currentUserId])
+
+  const sendMedia = useCallback(async (
+    mediaUri: string,
+    type: 'image' | 'audio'
+  ) => {
+    if (!conversationId || !currentUserId) return
+    setSendingMedia(true)
+    const mediaUrl = await uploadMedia(mediaUri, type)
+    if (!mediaUrl) {
+      Alert.alert('Erreur', "Impossible d'envoyer le média.")
+      setSendingMedia(false)
+      return
+    }
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        sender_id: currentUserId,
+        content: type === 'audio' ? '🎤 Message vocal' : '📷 Photo',
+        message_type: type,
+        media_url: mediaUrl,
+      })
+      .select('id, content, sender_id, created_at, read_at, message_type, media_url')
+      .maybeSingle()
+    if (!error && data) {
+      setMessages(prev => [...prev, data as Message])
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100)
+    }
+    setSendingMedia(false)
+  }, [conversationId, currentUserId, uploadMedia])
+
+  // ── Voice recording ────────────────────────────────────────────────────────
+
+  const startRecording = useCallback(async () => {
+    try {
+      const { granted } = await Audio.requestPermissionsAsync()
+      if (!granted) {
+        Alert.alert('Permission refusée', 'Active le micro dans les réglages.')
+        return
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      })
+      const { recording: rec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      )
+      setRecording(rec)
+      setIsRecording(true)
+      setRecordingDuration(0)
+      durationInterval.current = setInterval(() => {
+        setRecordingDuration(d => d + 1)
+      }, 1000)
+    } catch (err) {
+      Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
+    }
+  }, [])
+
+  const stopRecording = useCallback(async () => {
+    if (!recording) return
+    try {
+      if (durationInterval.current) clearInterval(durationInterval.current)
+      await recording.stopAndUnloadAsync()
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false })
+      const uri = recording.getURI()
+      setRecording(null)
+      setIsRecording(false)
+      setRecordingDuration(0)
+      if (uri) await sendMedia(uri, 'audio')
+    } catch (err) {
+      Alert.alert('Erreur', "Impossible d'envoyer le message vocal.")
+    }
+  }, [recording, sendMedia])
+
+  const cancelRecording = useCallback(async () => {
+    if (!recording) return
+    if (durationInterval.current) clearInterval(durationInterval.current)
+    await recording.stopAndUnloadAsync()
+    setRecording(null)
+    setIsRecording(false)
+    setRecordingDuration(0)
+  }, [recording])
+
+  // ── Photo handlers ─────────────────────────────────────────────────────────
+
+  const handlePickImage = useCallback(async () => {
+    const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!granted) {
+      Alert.alert('Permission refusée', 'Active la galerie dans les réglages.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [4, 3],
+    })
+    if (!result.canceled && result.assets[0]) {
+      await sendMedia(result.assets[0].uri, 'image')
+    }
+  }, [sendMedia])
+
+  const handleTakePhoto = useCallback(async () => {
+    const { granted } = await ImagePicker.requestCameraPermissionsAsync()
+    if (!granted) {
+      Alert.alert('Permission refusée', 'Active la caméra dans les réglages.')
+      return
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+      allowsEditing: true,
+      aspect: [4, 3],
+    })
+    if (!result.canceled && result.assets[0]) {
+      await sendMedia(result.assets[0].uri, 'image')
+    }
+  }, [sendMedia])
 
   // ── Delete message ─────────────────────────────────────────────────────────
 
@@ -421,26 +644,79 @@ export default function ConversationScreen() {
 
         {/* Input bar */}
         <View style={styles.inputBar}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="Message…"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={1}
-            // auto-grows up to 4 lines via maxHeight
-            returnKeyType="default"
-            blurOnSubmit={false}
-          />
-          <TouchableOpacity
-            style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={!canSend}
-            activeOpacity={0.7}
-          >
-            <Send size={20} color={canSend ? colors.bg : colors.textSecondary} />
-          </TouchableOpacity>
+          {isRecording ? (
+            <View style={styles.recordingBar}>
+              <TouchableOpacity onPress={cancelRecording} hitSlop={8}>
+                <Ionicons name="close-circle" size={28} color={colors.error} />
+              </TouchableOpacity>
+              <View style={styles.recordingIndicator}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingTime}>
+                  {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
+                  {String(recordingDuration % 60).padStart(2, '0')}
+                </Text>
+                <Text style={styles.recordingHint}>Glisse pour annuler</Text>
+              </View>
+              <TouchableOpacity onPress={stopRecording} hitSlop={8}>
+                <Ionicons name="stop-circle" size={36} color={colors.error} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={handlePickImage}
+                disabled={sendingMedia}
+                hitSlop={8}
+                style={{ paddingHorizontal: 4 }}
+              >
+                <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleTakePhoto}
+                disabled={sendingMedia}
+                hitSlop={8}
+                style={{ paddingHorizontal: 4 }}
+              >
+                <Ionicons name="camera-outline" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={text}
+                onChangeText={setText}
+                placeholder="Message…"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={1}
+                returnKeyType="default"
+                blurOnSubmit={false}
+              />
+
+              {text.trim().length > 0 ? (
+                <TouchableOpacity
+                  style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
+                  onPress={handleSend}
+                  disabled={!canSend}
+                  activeOpacity={0.7}
+                >
+                  <Send size={20} color={canSend ? colors.bg : colors.textSecondary} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={startRecording}
+                  disabled={sendingMedia}
+                  hitSlop={8}
+                  style={{ paddingHorizontal: 4 }}
+                >
+                  {sendingMedia ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="mic-outline" size={26} color={colors.textSecondary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -610,5 +886,36 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: colors.surfaceHigh,
+  },
+  recordingBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  recordingIndicator: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.error,
+  },
+  recordingTime: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 16,
+    color: colors.text,
+  },
+  recordingHint: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 })
