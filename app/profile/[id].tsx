@@ -90,6 +90,54 @@ const useBlock = (currentUserId: string, targetUserId: string) => {
   return { isBlocked, toggleBlock, loading }
 }
 
+// ─── StarRating ───────────────────────────────────────────────────────────────
+
+function StarRating({ avg, count }: { avg: number; count: number }) {
+  if (count === 0) return null
+  const stars = Math.round(avg)
+  return (
+    <TouchableOpacity
+      style={starStyles.row}
+      activeOpacity={0.8}
+    >
+      <View style={starStyles.stars}>
+        {[1,2,3,4,5].map(i => (
+          <Ionicons
+            key={i}
+            name={i <= stars ? 'star' : 'star-outline'}
+            size={16}
+            color="#FFC107"
+          />
+        ))}
+      </View>
+      <Text style={starStyles.avg}>{avg.toFixed(1)}</Text>
+      <Text style={starStyles.count}>({count} avis)</Text>
+    </TouchableOpacity>
+  )
+}
+
+const starStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  stars: { flexDirection: 'row', gap: 2 },
+  avg: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginLeft: 4,
+  },
+  count: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+})
+
 // ─── Grid cell ────────────────────────────────────────────────────────────────
 
 function DropGridCell({ drop }: { drop: Drop }) {
@@ -396,17 +444,11 @@ export default function PublicProfileScreen() {
           <Text style={styles.displayName}>{displayName}</Text>
           <Text style={styles.username}>@{profile.username}</Text>
 
-          {profile.rating_count > 0 && (
-            <View style={styles.ratingBadge}>
-              <Ionicons name="star" size={13} color="#FFD700" />
-              <Text style={styles.ratingBadgeText}>
-                {Number(profile.rating_avg).toFixed(1)}
-              </Text>
-              <Text style={styles.ratingBadgeCount}>({profile.rating_count})</Text>
-            </View>
-          )}
-
           {profile.bio ? <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text> : null}
+
+          {profile.role === 'seller' && (
+            <StarRating avg={profile.rating_avg ?? 0} count={profile.rating_count ?? 0} />
+          )}
 
           <View style={styles.statsRow}>
             <View style={styles.stat}>
@@ -649,28 +691,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingHorizontal: 8,
   },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-    backgroundColor: 'rgba(255,215,0,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.30)',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  ratingBadgeText: {
-    color: '#FFD700',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ratingBadgeCount: {
-    color: colors.textSecondary,
-    fontSize: 12,
-  },
-
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'center',

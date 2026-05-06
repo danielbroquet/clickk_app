@@ -699,6 +699,54 @@ const followersStyles = StyleSheet.create({
   username: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
 })
 
+// ── StarRating ───────────────────────────────────────────────────────────────
+
+function StarRating({ avg, count }: { avg: number; count: number }) {
+  if (count === 0) return null
+  const stars = Math.round(avg)
+  return (
+    <TouchableOpacity
+      style={starStyles.row}
+      activeOpacity={0.8}
+    >
+      <View style={starStyles.stars}>
+        {[1,2,3,4,5].map(i => (
+          <Ionicons
+            key={i}
+            name={i <= stars ? 'star' : 'star-outline'}
+            size={16}
+            color="#FFC107"
+          />
+        ))}
+      </View>
+      <Text style={starStyles.avg}>{avg.toFixed(1)}</Text>
+      <Text style={starStyles.count}>({count} avis)</Text>
+    </TouchableOpacity>
+  )
+}
+
+const starStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  stars: { flexDirection: 'row', gap: 2 },
+  avg: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginLeft: 4,
+  },
+  count: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+})
+
 // ── Screen ───────────────────────────────────────────────────────────────────
 
 type TabKey = 'drops' | 'favoris'
@@ -726,6 +774,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [followersVisible, setFollowersVisible] = useState(false)
   const [likedStories, setLikedStories] = useState<LikedStory[]>([])
+  const [ratingData, setRatingData] = useState<{ avg: number; count: number }>({ avg: 0, count: 0 })
 
   const currentUserId = session?.user?.id ?? ''
 
@@ -776,6 +825,18 @@ export default function ProfileScreen() {
 
   useEffect(() => { loadProfileData() }, [loadProfileData])
 
+  useEffect(() => {
+    if (!profile?.id || profile.role !== 'seller') return
+    supabase
+      .from('profiles')
+      .select('rating_avg, rating_count')
+      .eq('id', profile.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setRatingData({ avg: data.rating_avg ?? 0, count: data.rating_count ?? 0 })
+      })
+  }, [profile?.id, profile?.role])
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     await Promise.all([refreshProfile(), loadProfileData()])
@@ -816,7 +877,6 @@ export default function ProfileScreen() {
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.topHeader}>
-          <Text style={styles.topHeaderUsername} numberOfLines={1}>@{username}</Text>
           {editMode ? (
             <TouchableOpacity
               style={styles.settingsBtn}
@@ -857,6 +917,10 @@ export default function ProfileScreen() {
                 {profile.bio}
               </Text>
             </TouchableOpacity>
+          )}
+
+          {profile?.role === 'seller' && (
+            <StarRating avg={ratingData.avg} count={ratingData.count} />
           )}
 
           <View style={styles.statsRow}>
@@ -1072,11 +1136,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     position: 'relative',
-  },
-  topHeaderUsername: {
-    fontFamily: fontFamily.semiBold,
-    fontSize: 16,
-    color: colors.text,
   },
   settingsBtn: {
     position: 'absolute',
