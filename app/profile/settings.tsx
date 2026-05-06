@@ -79,9 +79,33 @@ export default function SettingsScreen() {
           text: t('common.confirm'),
           style: 'destructive',
           onPress: async () => {
-            await supabase.rpc('delete_user')
-            await supabase.auth.signOut()
-            router.replace('/(auth)/login')
+            try {
+              const { data: { session } } = await supabase.auth.getSession()
+              if (!session) {
+                await supabase.auth.signOut()
+                router.replace('/(auth)/login')
+                return
+              }
+              const res = await fetch(
+                `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-user`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              )
+              const json = await res.json()
+              if (!res.ok) {
+                Alert.alert('Erreur', json.error ?? 'Impossible de supprimer le compte.')
+                return
+              }
+              await supabase.auth.signOut()
+              router.replace('/(auth)/login')
+            } catch (err: any) {
+              Alert.alert('Erreur', err.message ?? 'Une erreur est survenue.')
+            }
           },
         },
       ],
