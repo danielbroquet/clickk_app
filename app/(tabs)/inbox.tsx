@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Image,
   ActivityIndicator,
   ListRenderItem,
+  Animated,
+  PanResponder,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -326,39 +328,79 @@ const ICON_CONFIG: Record<NotifType, { name: React.ComponentProps<typeof Ionicon
 
 const UNREAD_BG = 'rgba(0,210,184,0.08)'
 
-function NotifItem({ item }: { item: Notification }) {
-  const cfg = ICON_CONFIG[item.type] ?? ICON_CONFIG.sale
-  const storyId = (item as any).story_id as string | null | undefined
+function NotifItem({ notif, onPress }: { notif: Notification; onPress: () => void }) {
+  const cfg = ICON_CONFIG[notif.type] ?? ICON_CONFIG.sale
 
-  const inner = (
-    <View style={[notifStyles.item, !item.is_read && notifStyles.itemUnread]}>
-      <View style={[notifStyles.iconCircle, { backgroundColor: cfg.bg }]}>
-        <Ionicons name={cfg.name} size={22} color={cfg.color} />
+  return (
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={onPress}
+    >
+      <View style={[notifStyles.item, !notif.is_read && notifStyles.itemUnread]}>
+        <View style={[notifStyles.iconCircle, { backgroundColor: cfg.bg }]}>
+          <Ionicons name={cfg.name} size={22} color={cfg.color} />
+        </View>
+        <View style={notifStyles.textBlock}>
+          <Text style={notifStyles.itemTitle}>{notif.title}</Text>
+          {!!notif.message && (
+            <Text style={notifStyles.itemMsg} numberOfLines={2}>{notif.message}</Text>
+          )}
+          <Text style={notifStyles.itemTime}>{formatRelativeTime(notif.created_at)}</Text>
+        </View>
+        {!notif.is_read && <View style={notifStyles.dot} />}
       </View>
-      <View style={notifStyles.textBlock}>
-        <Text style={notifStyles.itemTitle}>{item.title}</Text>
-        {!!item.message && (
-          <Text style={notifStyles.itemMsg} numberOfLines={2}>{item.message}</Text>
-        )}
-        <Text style={notifStyles.itemTime}>{formatRelativeTime(item.created_at)}</Text>
+    </TouchableOpacity>
+  )
+}
+
+function SwipeableNotifRow({ notif, onDelete, onPress }: {
+  notif: Notification
+  onDelete: () => void
+  onPress: () => void
+}) {
+  const translateX = useRef(new Animated.Value(0)).current
+  const DELETE_THRESHOLD = -80
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_, g) => {
+        if (g.dx < 0) translateX.setValue(Math.max(g.dx, -120))
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < DELETE_THRESHOLD) {
+          Animated.timing(translateX, {
+            toValue: -500,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(onDelete)
+        } else {
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start()
+        }
+      },
+    })
+  ).current
+
+  return (
+    <View style={{ overflow: 'hidden' }}>
+      <View style={notifStyles.swipeDeleteBg}>
+        <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
       </View>
-      {!item.is_read && <View style={notifStyles.dot} />}
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        {...panResponder.panHandlers}
+      >
+        <NotifItem notif={notif} onPress={onPress} />
+      </Animated.View>
     </View>
   )
-
-  if (storyId) {
-    return (
-      <TouchableOpacity activeOpacity={0.75} onPress={() => router.push(`/story/${storyId}`)}>
-        {inner}
-      </TouchableOpacity>
-    )
-  }
-
-  return inner
 }
 
 const notifKeyExtractor = (item: Notification) => item.id
-const notifRenderItem: ListRenderItem<Notification> = ({ item }) => <NotifItem item={item} />
 
 function NotificationsTab({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<Notification[]>([])
@@ -401,6 +443,24 @@ function NotificationsTab({ userId }: { userId: string }) {
     }, [userId, markAllRead])
   )
 
+  const handleDelete = async (id: string) => {
+    await supabase.from('notifications').delete().eq('id', id)
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  const handleClearAll = async () => {
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', userId)
+    setNotifications([])
+  }
+
+  const handleNotifPress = (notif: Notification) => {
+    const storyId = (notif as any).story_id as string | null | undefined
+    if (storyId) router.push(`/story/${storyId}`)
+  }
+
   if (loading) {
     return (
       <View style={notifStyles.centered}>
@@ -410,19 +470,36 @@ function NotificationsTab({ userId }: { userId: string }) {
   }
 
   return (
-    <FlatList
-      data={notifications}
-      keyExtractor={notifKeyExtractor}
-      renderItem={notifRenderItem}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={notifications.length === 0 ? notifStyles.emptyFlex : undefined}
-      ListEmptyComponent={
-        <View style={notifStyles.empty}>
-          <Ionicons name="notifications-outline" size={52} color={colors.border} />
-          <Text style={notifStyles.emptyText}>Aucune notification</Text>
-        </View>
-      }
-    />
+    <View style={{ flex: 1 }}>
+      {notifications.length > 0 && (
+        <TouchableOpacity
+          style={notifStyles.clearAllBtn}
+          onPress={handleClearAll}
+          activeOpacity={0.7}
+        >
+          <Text style={notifStyles.clearAllText}>Tout supprimer</Text>
+        </TouchableOpacity>
+      )}
+      <FlatList
+        data={notifications}
+        keyExtractor={notifKeyExtractor}
+        renderItem={({ item }) => (
+          <SwipeableNotifRow
+            notif={item}
+            onDelete={() => handleDelete(item.id)}
+            onPress={() => handleNotifPress(item)}
+          />
+        )}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={notifications.length === 0 ? notifStyles.emptyFlex : undefined}
+        ListEmptyComponent={
+          <View style={notifStyles.empty}>
+            <Ionicons name="notifications-outline" size={52} color={colors.border} />
+            <Text style={notifStyles.emptyText}>Aucune notification</Text>
+          </View>
+        }
+      />
+    </View>
   )
 }
 
@@ -445,6 +522,26 @@ const notifStyles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 80 },
   emptyFlex: { flex: 1 },
   emptyText: { fontFamily: fontFamily.medium, fontSize: 15, color: colors.textSecondary, marginTop: spacing.md },
+  clearAllBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  clearAllText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.error,
+  },
+  swipeDeleteBg: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: colors.error,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 })
 
 // ─── Unread notification count hook ──────────────────────────────────────────
