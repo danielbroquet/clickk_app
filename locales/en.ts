@@ -197,5 +197,13 @@ export default {
     cta: 'Verify my identity →',
     already_seller_title: "You're already a seller!",
     already_seller_sub: 'Your seller account is active.',
+    benefit_kyc_title: 'Identity verification',
+    benefit_kyc_desc: 'Stripe verifies your identity securely — European banking standard',
+    benefit_time_title: 'Less than 5 minutes',
+    benefit_time_desc: 'ID card or passport is enough — guided step-by-step process',
+    benefit_data_title: 'Protected data',
+    benefit_data_desc: 'Your information is encrypted and managed by Stripe, never stored by Clickk',
+    benefit_once_title: 'One-time verification',
+    benefit_once_desc: 'Just once, then you can publish as many drops as you want',
   },
 }

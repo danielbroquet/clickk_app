@@ -15,17 +15,19 @@ import { supabase } from '../lib/supabase'
 import { callEdgeFunction } from '../lib/edgeFunction'
 import { colors, fontFamily, spacing } from '../lib/theme'
 import { useAuth } from '../lib/auth'
+import { useTranslation } from '../lib/i18n'
 
 type Status = 'idle' | 'loading' | 'redirecting' | 'complete' | 'error'
 
-const BENEFITS = [
-  { icon: 'shield-checkmark' as const, title: 'Vérification d\'identité', desc: 'Stripe vérifie ton identité de façon sécurisée — standard bancaire européen' },
-  { icon: 'time' as const, title: 'Moins de 5 minutes', desc: 'Carte d\'identité ou passeport suffisent — processus guidé étape par étape' },
-  { icon: 'lock-closed' as const, title: 'Données protégées', desc: 'Tes informations sont chiffrées et gérées par Stripe, jamais stockées par Clickk' },
-  { icon: 'checkmark-circle' as const, title: 'Vérification unique', desc: 'Une seule fois, puis tu peux publier autant de drops que tu veux' },
+const BENEFIT_ICONS = [
+  'shield-checkmark' as const,
+  'time' as const,
+  'lock-closed' as const,
+  'checkmark-circle' as const,
 ]
 
 export default function BecomeSellerScreen() {
+  const { t } = useTranslation()
   const params = useLocalSearchParams()
   const { refreshProfile } = useAuth()
   const [status, setStatus] = useState<Status>('idle')
@@ -157,6 +159,13 @@ export default function BecomeSellerScreen() {
     }
   }
 
+  const BENEFITS = [
+    { icon: BENEFIT_ICONS[0], title: t('become_seller.benefit_kyc_title'),  desc: t('become_seller.benefit_kyc_desc')  },
+    { icon: BENEFIT_ICONS[1], title: t('become_seller.benefit_time_title'), desc: t('become_seller.benefit_time_desc') },
+    { icon: BENEFIT_ICONS[2], title: t('become_seller.benefit_data_title'), desc: t('become_seller.benefit_data_desc') },
+    { icon: BENEFIT_ICONS[3], title: t('become_seller.benefit_once_title'), desc: t('become_seller.benefit_once_desc') },
+  ]
+
   if (status === 'complete') {
     return (
       <SafeAreaView style={styles.safe}>
@@ -164,16 +173,13 @@ export default function BecomeSellerScreen() {
           <View style={styles.successCircle}>
             <Ionicons name="checkmark-circle" size={56} color={colors.success} />
           </View>
-          <Text style={styles.successTitle}>Tu es vendeur !</Text>
-          <Text style={styles.successSubtitle}>
-            Ton compte vendeur est actif.{'\n'}
-            Tu peux maintenant créer des stories et publier des articles.
-          </Text>
+          <Text style={styles.successTitle}>{t('become_seller.already_seller_title')}</Text>
+          <Text style={styles.successSubtitle}>{t('become_seller.already_seller_sub')}</Text>
           <TouchableOpacity
             style={styles.startBtn}
             onPress={() => router.replace('/(tabs)')}
           >
-            <Text style={styles.startBtnText}>Commencer à vendre →</Text>
+            <Text style={styles.startBtnText}>{t('become_seller.cta')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -189,10 +195,8 @@ export default function BecomeSellerScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Vérifie ton identité</Text>
-        <Text style={styles.subtitle}>
-          Pour vendre sur Clickk, notre partenaire de paiement Stripe doit vérifier ton identité. C'est rapide, sécurisé, et ne prend que quelques minutes.
-        </Text>
+        <Text style={styles.title}>{t('become_seller.title')}</Text>
+        <Text style={styles.subtitle}>{t('become_seller.subtitle')}</Text>
 
         {BENEFITS.map((item, i) => (
           <View key={i} style={styles.benefitCard}>
@@ -223,7 +227,7 @@ export default function BecomeSellerScreen() {
           ) : status === 'redirecting' ? (
             <Text style={styles.mainBtnText}>Ouverture Stripe...</Text>
           ) : (
-            <Text style={styles.mainBtnText}>Vérifier mon identité →</Text>
+            <Text style={styles.mainBtnText}>{t('become_seller.cta')}</Text>
           )}
         </TouchableOpacity>
 
