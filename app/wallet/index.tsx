@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
 import { useAuth } from '../../lib/auth'
 import { callEdgeFunction } from '../../lib/edgeFunction'
+import { useTranslation } from '../../lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ function EmptyTransactions() {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function WalletScreen() {
+  const { t } = useTranslation()
   const { session, profile } = useAuth()
   const isSeller = profile?.role === 'seller'
 
@@ -160,7 +162,7 @@ export default function WalletScreen() {
               <Ionicons name="chevron-back" size={24} color={colors.text} />
             </TouchableOpacity>
           ),
-          title: 'Mon Wallet',
+          title: t('wallet.title'),
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: fontFamily.bold },
@@ -177,7 +179,7 @@ export default function WalletScreen() {
           {/* Balance card */}
           <LinearGradient colors={['#1A1A1A', '#252525']} style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>
-              {isSeller ? 'Solde disponible' : 'Wallet'}
+              {isSeller ? t('wallet.available') : t('wallet.title')}
             </Text>
 
             {loading ? (
@@ -222,7 +224,7 @@ export default function WalletScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="arrow-up-outline" size={16} color="#0F0F0F" />
-                <Text style={styles.payoutBtnText}>Virer vers mon compte bancaire</Text>
+                <Text style={styles.payoutBtnText}>{t('wallet.withdraw')}</Text>
               </TouchableOpacity>
             )}
 

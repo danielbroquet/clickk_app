@@ -14,12 +14,14 @@ import { Ionicons } from '@expo/vector-icons'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
 import { useAuth } from '../../lib/auth'
 import { callEdgeFunction } from '../../lib/edgeFunction'
+import { useTranslation } from '../../lib/i18n'
 
 interface WalletData {
   available_chf: number
 }
 
 export default function PayoutScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
 
   const [available, setAvailable] = useState<number | null>(null)
@@ -77,7 +79,7 @@ export default function PayoutScreen() {
     <>
       <Stack.Screen
         options={{
-          title: 'Retrait',
+          title: t('wallet.withdraw'),
           headerStyle: { backgroundColor: colors.bg },
           headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: fontFamily.bold },
@@ -94,7 +96,7 @@ export default function PayoutScreen() {
               <View style={styles.successIconWrap}>
                 <Ionicons name="checkmark-circle" size={56} color={colors.primary} />
               </View>
-              <Text style={styles.successTitle}>Virement initié</Text>
+              <Text style={styles.successTitle}>{t('wallet.withdraw_success')}</Text>
               <Text style={styles.successSub}>
                 Arrivée sous 2-3 jours ouvrés sur votre compte bancaire.
               </Text>
@@ -111,14 +113,12 @@ export default function PayoutScreen() {
               {/* Info banner */}
               <View style={styles.infoBanner}>
                 <Ionicons name="information-circle-outline" size={18} color={colors.primary} style={styles.infoIcon} />
-                <Text style={styles.infoText}>
-                  Les virements arrivent sous 2-3 jours ouvrés sur le compte bancaire lié à votre compte Stripe.
-                </Text>
+                <Text style={styles.infoText}>{t('wallet.withdraw_info')}</Text>
               </View>
 
               {/* Balance display */}
               <View style={styles.balanceCard}>
-                <Text style={styles.balanceLabel}>Solde disponible</Text>
+                <Text style={styles.balanceLabel}>{t('wallet.available')}</Text>
                 {loadingBalance ? (
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
                 ) : balanceError ? (
@@ -135,7 +135,7 @@ export default function PayoutScreen() {
 
               {/* Amount input */}
               <View style={styles.inputSection}>
-                <Text style={styles.inputLabel}>Montant à virer (CHF)</Text>
+                <Text style={styles.inputLabel}>{t('wallet.withdraw_amount')}</Text>
                 <View style={[styles.inputWrap, validationError ? styles.inputWrapError : null]}>
                   <Text style={styles.currencyPrefix}>CHF</Text>
                   <TextInput
@@ -186,7 +186,7 @@ export default function PayoutScreen() {
                 ) : (
                   <>
                     <Ionicons name="arrow-up-outline" size={18} color="#0F0F0F" />
-                    <Text style={styles.confirmBtnText}>Virer vers mon compte</Text>
+                    <Text style={styles.confirmBtnText}>{t('wallet.withdraw')}</Text>
                   </>
                 )}
               </TouchableOpacity>
