@@ -62,7 +62,6 @@ interface Message {
   sender_id: string
   created_at: string
   read_at: string | null
-  deleted_at: string | null
   message_type: 'text' | 'image' | 'audio'
   media_url: string | null
 }
@@ -300,9 +299,8 @@ export default function ConversationScreen() {
     if (!conversationId) return
     const { data, error: err } = await supabase
       .from('messages')
-      .select('id, content, sender_id, created_at, read_at, deleted_at, message_type, media_url')
+      .select('id, content, sender_id, created_at, read_at, message_type, media_url')
       .eq('conversation_id', conversationId)
-      .is('deleted_at', null)
       .order('created_at', { ascending: true })
 
     if (err) { setError(err.message); return }
