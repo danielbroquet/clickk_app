@@ -388,10 +388,14 @@ function SwipeableNotifRow({ notif, onDelete, onPress }: {
   ).current
 
   return (
-    <View style={{ overflow: 'hidden' }}>
-      <View style={notifStyles.swipeDeleteBg}>
+    <View style={{ overflow: 'hidden', backgroundColor: colors.bg }}>
+      <TouchableOpacity
+        style={notifStyles.swipeDeleteBg}
+        onPress={onDelete}
+        activeOpacity={0.8}
+      >
         <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
-      </View>
+      </TouchableOpacity>
       <Animated.View
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
@@ -514,6 +518,7 @@ const notifStyles = StyleSheet.create({
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.surface,
+    backgroundColor: colors.bg,
   },
   itemUnread: { backgroundColor: UNREAD_BG },
   iconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
