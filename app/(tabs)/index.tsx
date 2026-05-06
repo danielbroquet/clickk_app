@@ -101,7 +101,23 @@ interface Comment {
   content: string
   created_at: string
   user_id: string
-  profiles: { username: string | null; avatar_url?: string | null } | null
+  parent_comment_id: string | null
+  likes_count: number
+  dislikes_count: number
+  replies_count: number
+  profiles: { username: string | null; avatar_url: string | null }
+  userLike?: 1 | -1 | null
+}
+
+function formatRelativeDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'maintenant'
+  if (mins < 60) return `${mins} min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} h`
+  const days = Math.floor(hrs / 24)
+  return `${days} j`
 }
 
 function formatTimeAgo(dateStr: string): string {
@@ -166,6 +182,9 @@ function CommentsSheet({
   const [sending, setSending] = useState(false)
   const [count, setCount] = useState(initialCount)
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null)
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set())
+  const [repliesMap, setRepliesMap] = useState<Record<string, Comment[]>>({})
+  const [loadingReplies, setLoadingReplies] = useState<Set<string>>(new Set())
   const listRef = useRef<FlatList<Comment>>(null)
   const inputRef = useRef<TextInput>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -175,12 +194,12 @@ function CommentsSheet({
   const fetchComments = useCallback(async () => {
     const { data, error } = await supabase
       .from('comments')
-      .select('id, content, created_at, user_id')
+      .select('id, content, created_at, user_id, parent_comment_id, likes_count, dislikes_count, replies_count')
       .eq('story_id', storyId)
+      .is('parent_comment_id', null)
       .order('created_at', { ascending: false })
       .limit(100)
     if (error) {
-      console.log('[comments] fetch error:', error)
       setLoading(false)
       setRefreshing(false)
       return
@@ -197,36 +216,127 @@ function CommentsSheet({
       .from('profiles')
       .select('id, username, avatar_url')
       .in('id', userIds)
-    const profileMap = new Map(
-      (profiles ?? []).map((p: any) => [p.id, p])
-    )
+    const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
     const withProfiles = rows.map((r: any) => ({
       id: r.id,
       content: r.content,
       created_at: r.created_at,
       user_id: r.user_id,
+      parent_comment_id: r.parent_comment_id,
+      likes_count: r.likes_count ?? 0,
+      dislikes_count: r.dislikes_count ?? 0,
+      replies_count: r.replies_count ?? 0,
       profiles: profileMap.get(r.user_id) ?? { username: null, avatar_url: null },
     }))
-    setComments(withProfiles as Comment[])
+    const commentIds = withProfiles.map((c: any) => c.id)
+    const { data: myLikes } = await supabase
+      .from('comment_likes')
+      .select('comment_id, value')
+      .in('comment_id', commentIds)
+      .eq('user_id', currentUserId)
+    const likeMap = new Map((myLikes ?? []).map((l: any) => [l.comment_id, l.value]))
+    const final = withProfiles.map((c: any) => ({ ...c, userLike: likeMap.get(c.id) ?? null }))
+    setComments(final as Comment[])
     setLoading(false)
     setRefreshing(false)
-  }, [storyId])
+  }, [storyId, currentUserId])
+
+  const fetchReplies = useCallback(async (parentId: string) => {
+    setLoadingReplies(prev => new Set(prev).add(parentId))
+    const { data } = await supabase
+      .from('comments')
+      .select('id, content, created_at, user_id, parent_comment_id, likes_count, dislikes_count, replies_count')
+      .eq('parent_comment_id', parentId)
+      .order('created_at', { ascending: true })
+      .limit(50)
+    const rows = data ?? []
+    const userIds = [...new Set(rows.map((r: any) => r.user_id))]
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', userIds)
+    const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]))
+    const { data: myLikes } = await supabase
+      .from('comment_likes')
+      .select('comment_id, value')
+      .in('comment_id', rows.map((r: any) => r.id))
+      .eq('user_id', currentUserId)
+    const likeMap = new Map((myLikes ?? []).map((l: any) => [l.comment_id, l.value]))
+    const withProfiles = rows.map((r: any) => ({
+      ...r,
+      likes_count: r.likes_count ?? 0,
+      dislikes_count: r.dislikes_count ?? 0,
+      replies_count: r.replies_count ?? 0,
+      profiles: profileMap.get(r.user_id) ?? { username: null, avatar_url: null },
+      userLike: likeMap.get(r.id) ?? null,
+    }))
+    setRepliesMap(prev => ({ ...prev, [parentId]: withProfiles }))
+    setExpandedReplies(prev => new Set(prev).add(parentId))
+    setLoadingReplies(prev => { const s = new Set(prev); s.delete(parentId); return s })
+  }, [currentUserId])
+
+  const handleVote = useCallback(async (commentId: string, value: 1 | -1, isReply?: boolean) => {
+    const update = (prev: Comment[]) => prev.map(c => {
+      if (c.id !== commentId) return c
+      const wasLiked = c.userLike === value
+      const newUserLike = wasLiked ? null : value
+      const likeDelta = value === 1 ? (wasLiked ? -1 : 1) : 0
+      const dislikeDelta = value === -1 ? (wasLiked ? -1 : 1) : 0
+      const removePrevLike = c.userLike === 1 && value === -1 ? -1 : 0
+      const removePrevDislike = c.userLike === -1 && value === 1 ? -1 : 0
+      return {
+        ...c,
+        userLike: newUserLike,
+        likes_count: c.likes_count + likeDelta + removePrevLike,
+        dislikes_count: c.dislikes_count + dislikeDelta + removePrevDislike,
+      }
+    })
+    setComments(update)
+    if (isReply) {
+      setRepliesMap(prev => {
+        const updated = { ...prev }
+        for (const key in updated) {
+          updated[key] = updated[key].map(c => {
+            if (c.id !== commentId) return c
+            const wasLiked = c.userLike === value
+            return { ...c, userLike: wasLiked ? null : value }
+          })
+        }
+        return updated
+      })
+    }
+    const existing = await supabase
+      .from('comment_likes')
+      .select('id, value')
+      .eq('comment_id', commentId)
+      .eq('user_id', currentUserId)
+      .maybeSingle()
+    if (existing.data) {
+      if (existing.data.value === value) {
+        await supabase.from('comment_likes').delete().eq('id', existing.data.id)
+      } else {
+        await supabase.from('comment_likes').delete().eq('id', existing.data.id)
+        await supabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentUserId, value })
+      }
+    } else {
+      await supabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentUserId, value })
+    }
+  }, [currentUserId])
 
   useEffect(() => {
     if (!visible) return
     setLoading(true)
     fetchComments()
 
-    // Realtime
     channelRef.current = supabase
       .channel(`comments:${storyId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'comments', filter: `story_id=eq.${storyId}` },
         async (payload) => {
-          const row = payload.new as { id: string; content: string; created_at: string; user_id: string }
-          // Don't duplicate own optimistic insert
+          const row = payload.new as any
           if (row.user_id === currentUserId) return
+          if (row.parent_comment_id !== null) return
           const { data: prof } = await supabase
             .from('profiles')
             .select('username, avatar_url')
@@ -237,7 +347,12 @@ function CommentsSheet({
             content: row.content,
             created_at: row.created_at,
             user_id: row.user_id,
+            parent_comment_id: null,
+            likes_count: 0,
+            dislikes_count: 0,
+            replies_count: 0,
             profiles: prof ?? { username: null, avatar_url: null },
+            userLike: null,
           }
           setComments(prev => [newComment, ...prev])
           setCount(n => n + 1)
@@ -252,21 +367,10 @@ function CommentsSheet({
     }
   }, [visible, storyId, fetchComments, currentUserId, onCommentAdded])
 
-  const handleReply = (c: Comment) => {
-    const username = c.profiles?.username ?? 'user'
-    setReplyTo({ id: c.id, username })
-    setInput(`@${username} `)
-    setTimeout(() => inputRef.current?.focus(), 50)
-  }
-
-  const cancelReply = () => {
-    setReplyTo(null)
-    setInput('')
-  }
-
   const handleSend = async () => {
     const text = input.trim()
     if (!text || !currentUserId || sending) return
+    const pendingReplyTo = replyTo
     setSending(true)
     setInput('')
     setReplyTo(null)
@@ -275,20 +379,20 @@ function CommentsSheet({
     }
 
     const { data: { session: liveSession } } = await supabase.auth.getSession()
-    if (!liveSession) {
-      console.log('[supabase] no session, refreshing...')
-      await supabase.auth.refreshSession()
+    if (!liveSession) await supabase.auth.refreshSession()
+
+    const insertPayload: any = {
+      story_id: storyId,
+      user_id: currentUserId,
+      content: text,
     }
-    console.log('[auth] session uid:', liveSession?.user?.id)
+    if (pendingReplyTo) insertPayload.parent_comment_id = pendingReplyTo.id
 
     const { data, error } = await supabase
       .from('comments')
-      .insert({ story_id: storyId, user_id: currentUserId, content: text })
-      .select('id, content, created_at, user_id')
+      .insert(insertPayload)
+      .select('id, content, created_at, user_id, parent_comment_id, likes_count, dislikes_count, replies_count')
       .maybeSingle()
-
-    if (error) console.log('[comments] insert error:', error)
-    console.log('[comments] insert result:', { data, error })
 
     setSending(false)
 
@@ -297,20 +401,32 @@ function CommentsSheet({
       return
     }
 
-    const newComment: Comment = {
-      id: data.id,
-      content: data.content,
-      created_at: data.created_at,
-      user_id: data.user_id,
-      profiles: {
-        username: currentUserProfile.username,
-        avatar_url: currentUserProfile.avatar_url,
-      },
+    if (pendingReplyTo) {
+      setComments(prev => prev.map(c =>
+        c.id === pendingReplyTo.id ? { ...c, replies_count: c.replies_count + 1 } : c
+      ))
+      fetchReplies(pendingReplyTo.id)
+    } else {
+      const newComment: Comment = {
+        id: data.id,
+        content: data.content,
+        created_at: data.created_at,
+        user_id: data.user_id,
+        parent_comment_id: null,
+        likes_count: 0,
+        dislikes_count: 0,
+        replies_count: 0,
+        profiles: {
+          username: currentUserProfile.username,
+          avatar_url: currentUserProfile.avatar_url,
+        },
+        userLike: null,
+      }
+      setComments(prev => [newComment, ...prev])
+      setCount(n => n + 1)
+      onCommentAdded(newComment)
+      listRef.current?.scrollToOffset({ offset: 0, animated: true })
     }
-    setComments(prev => [newComment, ...prev])
-    setCount(n => n + 1)
-    onCommentAdded(newComment)
-    listRef.current?.scrollToOffset({ offset: 0, animated: true })
   }
 
   const handleDelete = (c: Comment) => {
@@ -331,57 +447,129 @@ function CommentsSheet({
 
   const onRefresh = () => { setRefreshing(true); fetchComments() }
 
-  const renderItem: ListRenderItem<Comment> = ({ item }) => {
-    const isOwn = item.user_id === currentUserId
-    const username = item.profiles?.username ?? 'user'
-    const initial = username.charAt(0).toUpperCase()
-    const avatar = item.profiles?.avatar_url
-    const goToProfile = () => {
-      if (item.user_id && item.user_id !== currentUserId) {
-        onClose()
-        router.push(`/profile/${item.user_id}`)
-      }
-    }
-
+  function CommentRow({ comment, isReply, onReply, onVote }: {
+    comment: Comment
+    isReply: boolean
+    onReply: () => void
+    onVote: (value: 1 | -1) => void
+  }) {
     return (
-      <View style={commentStyles.row}>
-        <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
-          {avatar ? (
-            <Image source={{ uri: avatar }} style={commentStyles.avatar} />
+      <View style={{
+        flexDirection: 'row',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginLeft: isReply ? 48 : 0,
+      }}>
+        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#2A2A2A', marginRight: 10, overflow: 'hidden' }}>
+          {comment.profiles.avatar_url ? (
+            <Image source={{ uri: comment.profiles.avatar_url }} style={{ width: 36, height: 36 }} />
           ) : (
-            <View style={commentStyles.avatarFallback}>
-              <Text style={commentStyles.avatarInitial}>{initial}</Text>
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#00D2B8', fontWeight: '700', fontSize: 14 }}>
+                {(comment.profiles.username ?? '?').charAt(0).toUpperCase()}
+              </Text>
             </View>
           )}
-        </TouchableOpacity>
-        <View style={commentStyles.body}>
-          <View style={commentStyles.headerRow}>
-            <TouchableOpacity onPress={goToProfile} activeOpacity={0.8} disabled={item.user_id === currentUserId}>
-              <Text style={commentStyles.username}>@{username}</Text>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
+            {comment.profiles.username ?? 'Utilisateur'}
+          </Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 14, lineHeight: 20 }}>
+            {comment.content}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 6 }}>
+            <Text style={{ color: '#666', fontSize: 11 }}>
+              {formatRelativeDate(comment.created_at)}
+            </Text>
+            <TouchableOpacity onPress={onReply}>
+              <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600' }}>
+                Répondre
+              </Text>
             </TouchableOpacity>
-            <Text style={commentStyles.timeAgo}>{formatTimeAgo(item.created_at)}</Text>
+            {comment.user_id === currentUserId && (
+              <TouchableOpacity onPress={() => handleDelete(comment)}>
+                <Ionicons name="trash-outline" size={13} color="#555" />
+              </TouchableOpacity>
+            )}
           </View>
-          <Text style={commentStyles.content}>{item.content}</Text>
-          <TouchableOpacity
-            onPress={() => handleReply(item)}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            style={commentStyles.replyBtn}
-          >
-            <Text style={commentStyles.replyBtnText}>Répondre</Text>
+        </View>
+
+        <View style={{ alignItems: 'center', gap: 8, marginLeft: 12 }}>
+          <TouchableOpacity onPress={() => onVote(1)} style={{ alignItems: 'center' }}>
+            <Ionicons
+              name={comment.userLike === 1 ? 'heart' : 'heart-outline'}
+              size={20}
+              color={comment.userLike === 1 ? '#FF4757' : '#A0A0A0'}
+            />
+            <Text style={{ color: '#A0A0A0', fontSize: 11, marginTop: 2 }}>
+              {comment.likes_count > 0 ? comment.likes_count : ''}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onVote(-1)} style={{ alignItems: 'center' }}>
+            <Ionicons
+              name={comment.userLike === -1 ? 'thumbs-down' : 'thumbs-down-outline'}
+              size={18}
+              color={comment.userLike === -1 ? '#00D2B8' : '#A0A0A0'}
+            />
           </TouchableOpacity>
         </View>
-        {isOwn && (
-          <TouchableOpacity
-            onPress={() => handleDelete(item)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={commentStyles.deleteBtn}
-          >
-            <Ionicons name="trash-outline" size={16} color="#888" />
-          </TouchableOpacity>
-        )}
       </View>
     )
   }
+
+  const renderItem = ({ item }: { item: Comment }) => (
+    <View>
+      <CommentRow
+        comment={item}
+        isReply={false}
+        onReply={() => {
+          setReplyTo({ id: item.id, username: item.profiles.username ?? 'utilisateur' })
+          inputRef.current?.focus()
+        }}
+        onVote={(value) => handleVote(item.id, value, false)}
+      />
+
+      {item.replies_count > 0 && (
+        <TouchableOpacity
+          style={{ marginLeft: 64, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+          onPress={() => {
+            if (expandedReplies.has(item.id)) {
+              setExpandedReplies(prev => { const s = new Set(prev); s.delete(item.id); return s })
+            } else {
+              fetchReplies(item.id)
+            }
+          }}
+        >
+          <View style={{ height: 1, width: 24, backgroundColor: '#444' }} />
+          {loadingReplies.has(item.id) ? (
+            <ActivityIndicator size="small" color="#00D2B8" />
+          ) : (
+            <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600' }}>
+              {expandedReplies.has(item.id)
+                ? 'Masquer les réponses'
+                : `Afficher ${item.replies_count} réponse${item.replies_count > 1 ? 's' : ''}`}
+              {' '}{expandedReplies.has(item.id) ? '▲' : '▼'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {expandedReplies.has(item.id) && (repliesMap[item.id] ?? []).map(reply => (
+        <CommentRow
+          key={reply.id}
+          comment={reply}
+          isReply={true}
+          onReply={() => {
+            setReplyTo({ id: item.id, username: item.profiles.username ?? 'utilisateur' })
+            inputRef.current?.focus()
+          }}
+          onVote={(value) => handleVote(reply.id, value, true)}
+        />
+      ))}
+    </View>
+  )
 
   return (
     <Modal
@@ -433,7 +621,6 @@ function CommentsSheet({
                 data={comments}
                 keyExtractor={(c) => c.id}
                 renderItem={renderItem}
-                ItemSeparatorComponent={() => <View style={commentStyles.sep} />}
                 contentContainerStyle={{ paddingVertical: 8 }}
                 style={{ flex: 1 }}
                 refreshControl={
@@ -444,12 +631,19 @@ function CommentsSheet({
 
             {/* Reply banner */}
             {replyTo && (
-              <View style={commentStyles.replyBanner}>
-                <Text style={commentStyles.replyBannerText}>
-                  Réponse à <Text style={commentStyles.replyBannerUsername}>@{replyTo.username}</Text>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 6,
+                backgroundColor: '#1A1A1A',
+                justifyContent: 'space-between',
+              }}>
+                <Text style={{ color: '#A0A0A0', fontSize: 12 }}>
+                  Réponse à <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>@{replyTo.username}</Text>
                 </Text>
-                <TouchableOpacity onPress={cancelReply} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="close-circle" size={18} color="#888" />
+                <TouchableOpacity onPress={() => setReplyTo(null)}>
+                  <Ionicons name="close" size={16} color="#A0A0A0" />
                 </TouchableOpacity>
               </View>
             )}
