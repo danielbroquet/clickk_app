@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { router, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { useTranslation } from '../../lib/i18n'
+import { colors, fontFamily } from '../../lib/theme'
 
 type Address = {
   id: string
@@ -216,6 +217,35 @@ function AddressForm({
   const [phone, setPhone] = useState(initial?.phone ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const searchSwissAddress = useCallback(async (query: string) => {
+    if (query.length < 4) {
+      setStreetSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    try {
+      const res = await fetch(
+        `https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&origins=address&limit=6&sr=4326`,
+        { headers: { 'Accept': 'application/json' } }
+      )
+      const json = await res.json()
+      const results = (json.results ?? []).map((r: any) => ({
+        label: r.attrs?.label?.replace(/<[^>]*>/g, '') ?? '',
+        street: r.attrs?.strname ?? '',
+        number: r.attrs?.num ?? '',
+        postal_code: r.attrs?.zip ?? '',
+        city: r.attrs?.city ?? '',
+      })).filter((r: any) => r.street && r.postal_code && r.city)
+      setStreetSuggestions(results)
+      setShowSuggestions(results.length > 0)
+    } catch {
+      setStreetSuggestions([])
+    }
+  }, [])
 
   const validate = () => {
     if (!fullName.trim()) return 'Nom requis'
@@ -311,10 +341,43 @@ function AddressForm({
           <TextInput
             style={styles.input}
             value={line1}
-            onChangeText={setLine1}
+            onChangeText={(val) => {
+              setLine1(val)
+              if (searchTimeout.current) clearTimeout(searchTimeout.current)
+              searchTimeout.current = setTimeout(() => searchSwissAddress(val), 400)
+            }}
             placeholderTextColor={C.muted}
             placeholder="Rue du Lac 12"
           />
+          {showSuggestions && streetSuggestions.length > 0 && (
+            <View style={styles.suggestionBox}>
+              {streetSuggestions.map((s, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.suggestionItem,
+                    i < streetSuggestions.length - 1 && styles.suggestionBorder]}
+                  onPress={() => {
+                    setLine1(`${s.street} ${s.number}`.trim())
+                    setPostalCode(s.postal_code)
+                    setCity(s.city)
+                    setShowSuggestions(false)
+                    setStreetSuggestions([])
+                  }}
+                >
+                  <Ionicons name="location-outline" size={14}
+                    color={colors.textSecondary} style={{ marginRight: 8, marginTop: 1 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.suggestionStreet}>
+                      {s.street} {s.number}
+                    </Text>
+                    <Text style={styles.suggestionCity}>
+                      {s.postal_code} {s.city}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.fieldLabel}>Complément (optionnel)</Text>
           <TextInput
@@ -358,6 +421,12 @@ function AddressForm({
             placeholderTextColor={C.muted}
             placeholder="+41 79 000 00 00"
           />
+
+          <Text style={styles.fieldLabel}>Pays</Text>
+          <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <Text style={{ color: colors.text, fontSize: 15 }}>🇨🇭 Suisse</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Seul pays disponible</Text>
+          </View>
 
           {error && <Text style={styles.error}>{error}</Text>}
         </ScrollView>
@@ -487,4 +556,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaText: { color: '#000', fontSize: 16, fontWeight: '700' },
+  suggestionBox: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    marginTop: 4,
+    marginBottom: 4,
+    overflow: 'hidden',
+    zIndex: 999,
+    elevation: 5,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  suggestionBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  suggestionStreet: {
+    fontSize: 14,
+    color: colors.text,
+    fontFamily: fontFamily.medium,
+  },
+  suggestionCity: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
 })
