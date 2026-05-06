@@ -26,6 +26,19 @@ import { useTranslation } from '../../lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type TrackingEvent = {
+  timestamp: string
+  description: string
+  location?: string
+}
+
+type TrackingStatus = {
+  status: 'in_transit' | 'delivered' | 'exception' | 'unknown'
+  label: string
+  lastEvent?: TrackingEvent
+  estimatedDelivery?: string
+}
+
 type DisplayStatus = 'paid' | 'sold' | 'shipped' | 'delivered' | 'refunded' | 'disputed'
 
 interface SellerInfo {
@@ -93,6 +106,54 @@ const DISPUTE_REASONS: { key: string; label: string }[] = [
   { key: 'other',           label: 'Autre problème' },
 ]
 
+async function fetchSwissPostTracking(trackingNumber: string): Promise<TrackingStatus> {
+  try {
+    const res = await fetch(
+      `https://www.post.ch/api/trackingv2?formattedParcelCodes=${encodeURIComponent(trackingNumber)}&lang=fr`,
+      { headers: { 'Accept': 'application/json' } }
+    )
+    if (!res.ok) return { status: 'unknown', label: 'Statut indisponible' }
+    const json = await res.json()
+
+    const shipment = json?.[0]
+    if (!shipment) return { status: 'unknown', label: 'Statut indisponible' }
+
+    const events = shipment.events ?? []
+    const lastEvent = events[0]
+
+    const statusCode = (shipment.status ?? '').toLowerCase()
+    let status: TrackingStatus['status'] = 'unknown'
+    let label = 'En transit'
+
+    if (statusCode.includes('delivr') || statusCode.includes('remis')) {
+      status = 'delivered'
+      label = 'Livré'
+    } else if (statusCode.includes('transit') || statusCode.includes('cours')) {
+      status = 'in_transit'
+      label = 'En transit'
+    } else if (statusCode.includes('exception') || statusCode.includes('echec')) {
+      status = 'exception'
+      label = 'Problème de livraison'
+    } else if (lastEvent) {
+      status = 'in_transit'
+      label = lastEvent.description ?? 'En transit'
+    }
+
+    return {
+      status,
+      label,
+      lastEvent: lastEvent ? {
+        timestamp: lastEvent.timestamp,
+        description: lastEvent.description ?? '',
+        location: lastEvent.location,
+      } : undefined,
+      estimatedDelivery: shipment.estimatedDeliveryDate,
+    }
+  } catch {
+    return { status: 'unknown', label: 'Statut indisponible' }
+  }
+}
+
 function StatusBadge({ status }: { status: DisplayStatus }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.paid
   return (
@@ -120,6 +181,24 @@ function OrderCard({
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
   const titleInitial  = item.title.charAt(0).toUpperCase()
+  const [tracking, setTracking] = useState<TrackingStatus | null>(null)
+  const [trackingLoading, setTrackingLoading] = useState(false)
+  const [trackingExpanded, setTrackingExpanded] = useState(false)
+
+  const handleTrackingPress = useCallback(async () => {
+    if (!item.tracking_number) return
+    if (trackingExpanded) {
+      setTrackingExpanded(false)
+      return
+    }
+    setTrackingExpanded(true)
+    if (!tracking) {
+      setTrackingLoading(true)
+      const result = await fetchSwissPostTracking(item.tracking_number)
+      setTracking(result)
+      setTrackingLoading(false)
+    }
+  }, [item.tracking_number, tracking, trackingExpanded])
 
   const handleConfirmDelivery = async () => {
     setAwaitingConfirm(false)
@@ -225,16 +304,79 @@ function OrderCard({
             </View>
           ) : null}
 
-          {item.tracking_number ? (
-            <TouchableOpacity
-              style={styles.trackBtn}
-              onPress={handleTrackParcel}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="navigate-outline" size={14} color={colors.primary} />
-              <Text style={styles.trackBtnText}>{t('orders.track_parcel')}</Text>
-            </TouchableOpacity>
-          ) : null}
+          {item.tracking_number && (
+            <View>
+              <TouchableOpacity
+                style={styles.trackBtn}
+                onPress={handleTrackingPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="navigate-outline" size={14} color={colors.primary} />
+                <Text style={styles.trackBtnText}>
+                  {trackingExpanded ? 'Masquer le suivi' : 'Suivre le colis'}
+                </Text>
+                {trackingLoading && (
+                  <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />
+                )}
+                <Ionicons
+                  name={trackingExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={colors.textSecondary}
+                  style={{ marginLeft: 'auto' }}
+                />
+              </TouchableOpacity>
+
+              {trackingExpanded && !trackingLoading && tracking && (
+                <View style={styles.trackingPanel}>
+                  <View style={styles.trackingStatusRow}>
+                    <View style={[
+                      styles.trackingDot,
+                      { backgroundColor:
+                          tracking.status === 'delivered' ? '#10B981' :
+                          tracking.status === 'in_transit' ? '#3B82F6' :
+                          tracking.status === 'exception' ? '#EF4444' : '#A0A0A0'
+                      }
+                    ]} />
+                    <Text style={styles.trackingStatusLabel}>{tracking.label}</Text>
+                  </View>
+
+                  {tracking.lastEvent && (
+                    <View style={styles.trackingEventRow}>
+                      <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                      <View style={{ flex: 1, marginLeft: 6 }}>
+                        <Text style={styles.trackingEventDesc}>
+                          {tracking.lastEvent.description}
+                        </Text>
+                        {tracking.lastEvent.location && (
+                          <Text style={styles.trackingEventMeta}>
+                            📍 {tracking.lastEvent.location}
+                          </Text>
+                        )}
+                        <Text style={styles.trackingEventMeta}>
+                          {new Date(tracking.lastEvent.timestamp).toLocaleString('fr-CH')}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {tracking.estimatedDelivery && (
+                    <View style={styles.trackingDeliveryRow}>
+                      <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
+                      <Text style={styles.trackingEventMeta}>
+                        {' '}Livraison estimée : {new Date(tracking.estimatedDelivery).toLocaleDateString('fr-CH')}
+                      </Text>
+                    </View>
+                  )}
+
+                  {!tracking.lastEvent && tracking.status === 'unknown' && (
+                    <Text style={styles.trackingEventMeta}>
+                      Aucune information disponible pour ce numéro de suivi.
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
 
           {awaitingConfirm ? (
             <View style={styles.confirmBlock}>
@@ -1276,5 +1418,52 @@ const styles = StyleSheet.create({
     color: '#0F0F0F',
     fontFamily: fontFamily.bold,
     fontSize: 15,
+  },
+
+  trackingPanel: {
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  trackingStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trackingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  trackingStatusLabel: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.text,
+  },
+  trackingEventRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  trackingEventDesc: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12,
+    color: colors.text,
+  },
+  trackingEventMeta: {
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  trackingDeliveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 4,
   },
 })
