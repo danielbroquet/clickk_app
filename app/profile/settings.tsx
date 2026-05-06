@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase'
 import { colors, fontFamily } from '../../lib/theme'
 import { useLocale } from '../../lib/LocaleContext'
 import { LOCALE_LABELS, LOCALE_FLAGS, SUPPORTED_LOCALES, Locale } from '../../lib/i18n'
+import { useTranslation } from '../../lib/i18n'
 
 type RowProps = {
   icon: string
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
   const appVersion = Constants.expoConfig?.version ?? '—'
   const { locale, setLocale } = useLocale()
   const [languageModalVisible, setLanguageModalVisible] = useState(false)
+  const { t } = useTranslation()
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -69,12 +71,12 @@ export default function SettingsScreen() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Supprimer mon compte',
-      'Êtes-vous sûr ? Cette action est irréversible.',
+      t('settings.delete_account'),
+      t('common.confirm'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('common.confirm'),
           style: 'destructive',
           onPress: async () => {
             await supabase.rpc('delete_user')
@@ -93,23 +95,23 @@ export default function SettingsScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Paramètres</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {/* COMPTE */}
-        <SectionHeader title="COMPTE" />
+        <SectionHeader title={t('settings.account')} />
         <View style={styles.section}>
           <SettingsRow
             icon="person-outline"
-            label="Modifier mon profil"
+            label={t('settings.edit_profile')}
             onPress={() => router.push('/profile/edit')}
           />
           <Divider />
           <SettingsRow
             icon="language-outline"
-            label="Langue"
+            label={t('settings.language')}
             value={`${LOCALE_FLAGS[locale]} ${LOCALE_LABELS[locale]}`}
             onPress={() => setLanguageModalVisible(true)}
           />
@@ -144,7 +146,7 @@ export default function SettingsScreen() {
           <Divider />
           <SettingsRow
             icon="information-circle-outline"
-            label="Version"
+            label={t('settings.version')}
             value={appVersion}
             onPress={() => {}}
             showChevron={false}
@@ -156,14 +158,14 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SettingsRow
             icon="log-out-outline"
-            label="Se déconnecter"
+            label={t('settings.sign_out')}
             onPress={handleSignOut}
             destructive
           />
           <Divider />
           <SettingsRow
             icon="trash-outline"
-            label="Supprimer mon compte"
+            label={t('settings.delete_account')}
             onPress={handleDeleteAccount}
             destructive
           />
@@ -180,7 +182,7 @@ export default function SettingsScreen() {
         <Pressable style={styles.modalBackdrop} onPress={() => setLanguageModalVisible(false)} />
         <View style={styles.modalSheet}>
           <View style={styles.modalHandle} />
-          <Text style={styles.modalTitle}>Langue</Text>
+          <Text style={styles.modalTitle}>{t('settings.language')}</Text>
           {SUPPORTED_LOCALES.map((l: Locale, idx) => {
             const active = l === locale
             return (
