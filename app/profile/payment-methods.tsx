@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { ChevronLeft, CreditCard, Trash2, Plus } from 'lucide-react-native'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 import { usePaymentMethods, type PaymentMethod } from '../../lib/payment'
 const useStripe: () => {
   initPaymentSheet: (params: any) => Promise<{ error?: { message: string } }>
@@ -62,6 +63,7 @@ function CardRow({
 }
 
 export default function PaymentMethodsScreen() {
+  const { t } = useTranslation()
   const {
     paymentMethods,
     loading,
@@ -158,7 +160,7 @@ export default function PaymentMethodsScreen() {
         >
           <ChevronLeft size={24} color={colors.text} strokeWidth={2} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Moyens de paiement</Text>
+        <Text style={styles.headerTitle}>{t('payment_methods.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -180,7 +182,7 @@ export default function PaymentMethodsScreen() {
             <View style={styles.emptyIconWrap}>
               <CreditCard size={40} color={colors.textSecondary} strokeWidth={1.4} />
             </View>
-            <Text style={styles.emptyTitle}>Aucun moyen de paiement enregistré</Text>
+            <Text style={styles.emptyTitle}>{t('payment_methods.no_method')}</Text>
             <Text style={styles.emptySubtitle}>
               Ajoutez une carte pour payer en un clic lors de vos prochains achats.
             </Text>
@@ -213,7 +215,7 @@ export default function PaymentMethodsScreen() {
           ) : (
             <>
               <Plus size={18} color="#000" strokeWidth={2.5} />
-              <Text style={styles.addBtnText}>Ajouter un moyen de paiement</Text>
+              <Text style={styles.addBtnText}>{t('payment_methods.add')}</Text>
             </>
           )}
         </TouchableOpacity>

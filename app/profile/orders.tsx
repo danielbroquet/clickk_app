@@ -22,6 +22,7 @@ import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,6 +115,7 @@ function OrderCard({
   onOpenDispute: (storyId: string, title: string) => void
   onOpenReview: (storyId: string, sellerId: string, sellerUsername: string, title: string) => void
 }) {
+  const { t } = useTranslation()
   const [confirming, setConfirming] = useState(false)
   const [awaitingConfirm, setAwaitingConfirm] = useState(false)
   const sellerInitial = (item.seller?.username ?? 'V').charAt(0).toUpperCase()
@@ -207,7 +209,7 @@ function OrderCard({
       {(item.displayStatus === 'sold' || item.displayStatus === 'paid') && (
         <View style={styles.helperRow}>
           <Ionicons name="time-outline" size={13} color="#FFA755" />
-          <Text style={styles.helperText}>Le vendeur prépare votre colis</Text>
+          <Text style={styles.helperText}>{t('orders.preparing')}</Text>
         </View>
       )}
 
@@ -230,7 +232,7 @@ function OrderCard({
               activeOpacity={0.8}
             >
               <Ionicons name="navigate-outline" size={14} color={colors.primary} />
-              <Text style={styles.trackBtnText}>Suivre le colis</Text>
+              <Text style={styles.trackBtnText}>{t('orders.track_parcel')}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -274,7 +276,7 @@ function OrderCard({
               activeOpacity={0.8}
             >
               <Ionicons name="checkmark-circle-outline" size={16} color="#0F0F0F" />
-              <Text style={styles.receivedBtnText}>J'ai bien reçu</Text>
+              <Text style={styles.receivedBtnText}>{t('orders.received')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -610,6 +612,7 @@ function ReviewModal({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function OrdersScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const [orders, setOrders]         = useState<OrderItem[]>([])
   const [loading, setLoading]       = useState(true)
@@ -728,7 +731,7 @@ export default function OrdersScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes commandes</Text>
+        <Text style={styles.headerTitle}>{t('orders.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -752,8 +755,8 @@ export default function OrdersScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
-              <Text style={styles.emptyText}>Aucune commande</Text>
-              <Text style={styles.emptySubtext}>Vos achats apparaîtront ici.</Text>
+              <Text style={styles.emptyText}>{t('orders.empty')}</Text>
+              <Text style={styles.emptySubtext}>{t('orders.empty_sub')}</Text>
             </View>
           }
           renderItem={({ item }) => (

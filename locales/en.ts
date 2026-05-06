@@ -183,6 +183,16 @@ export default {
     message_buyer: 'Message buyer',
     relaunched: 'Drop relaunched!',
   },
+  addresses: {
+    title: 'My addresses',
+    add: 'Add address',
+    no_address: 'No address',
+  },
+  payment_methods: {
+    title: 'Payment methods',
+    add: 'Add card',
+    no_method: 'No payment method',
+  },
   inbox: {
     title: 'Inbox',
     tab_messages: 'Messages',

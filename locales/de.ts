@@ -183,6 +183,16 @@ export default {
     message_buyer: 'Käufer anschreiben',
     relaunched: 'Drop neu gestartet!',
   },
+  addresses: {
+    title: 'Meine Adressen',
+    add: 'Adresse hinzufügen',
+    no_address: 'Keine Adresse',
+  },
+  payment_methods: {
+    title: 'Zahlungsmethoden',
+    add: 'Karte hinzufügen',
+    no_method: 'Keine Zahlungsmethode',
+  },
   inbox: {
     title: 'Posteingang',
     tab_messages: 'Nachrichten',

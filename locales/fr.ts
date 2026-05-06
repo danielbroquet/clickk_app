@@ -183,6 +183,16 @@ export default {
     message_buyer: 'Message acheteur',
     relaunched: 'Drop relancé !',
   },
+  addresses: {
+    title: 'Mes adresses',
+    add: 'Ajouter une adresse',
+    no_address: 'Aucune adresse',
+  },
+  payment_methods: {
+    title: 'Moyens de paiement',
+    add: 'Ajouter une carte',
+    no_method: 'Aucun moyen de paiement',
+  },
   inbox: {
     title: 'Boîte de réception',
     tab_messages: 'Messages',

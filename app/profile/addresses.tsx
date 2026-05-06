@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
+import { useTranslation } from '../../lib/i18n'
 
 type Address = {
   id: string
@@ -39,6 +40,7 @@ const C = {
 }
 
 export default function AddressesScreen() {
+  const { t } = useTranslation()
   const [addresses, setAddresses] = useState<Address[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Address | null>(null)
@@ -123,7 +125,7 @@ export default function AddressesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={C.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes adresses</Text>
+        <Text style={styles.headerTitle}>{t('addresses.title')}</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -131,7 +133,7 @@ export default function AddressesScreen() {
         {addresses.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name="location-outline" size={52} color={C.muted} />
-            <Text style={styles.emptyTitle}>Aucune adresse enregistrée</Text>
+            <Text style={styles.emptyTitle}>{t('addresses.no_address')}</Text>
             <Text style={styles.emptyText}>
               Ton adresse sera automatiquement enregistrée après ton premier achat.
             </Text>
@@ -190,7 +192,7 @@ export default function AddressesScreen() {
           onPress={() => setCreating(true)}
         >
           <Ionicons name="add" size={18} color={C.primary} />
-          <Text style={styles.addBtnText}>Ajouter une adresse</Text>
+          <Text style={styles.addBtnText}>{t('addresses.add')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
