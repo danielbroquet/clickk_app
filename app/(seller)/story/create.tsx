@@ -21,16 +21,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSpring,
-  withSequence,
-  withRepeat,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated'
+import Animated from 'react-native-reanimated'
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
@@ -142,33 +133,6 @@ function ProgressBar({ step }: { step: number }) {
 }
 
 // ─── Success check animation ──────────────────────────────────────────────────
-
-function SuccessCheck({ onDone }: { onDone: () => void }) {
-  const scale = useSharedValue(0)
-  const opacity = useSharedValue(0)
-
-  useEffect(() => {
-    scale.value = withSpring(1, { damping: 12, stiffness: 180 })
-    opacity.value = withTiming(1, { duration: 250 })
-    const t = setTimeout(() => runOnJS(onDone)(), 1600)
-    return () => clearTimeout(t)
-  }, [scale, opacity, onDone])
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }))
-
-  return (
-    <View style={s.successWrap}>
-      <Animated.View style={[s.successCircle, animStyle]}>
-        <Ionicons name="checkmark" size={52} color="#0F0F0F" />
-      </Animated.View>
-      <Text style={s.successTitle}>Drop publié !</Text>
-      <Text style={s.successSub}>Votre enchère est maintenant en ligne.</Text>
-    </View>
-  )
-}
 
 // ─── Category picker ──────────────────────────────────────────────────────────
 
@@ -610,38 +574,24 @@ export default function CreateDropScreen() {
 
       setUploadPercent(100)
       setUploadPhase('Publié !')
-      setLoading(false)
       setSuccess(true)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      try {
+        router.replace('/(tabs)')
+      } catch {
+        try {
+          router.push('/(tabs)')
+        } catch {
+          // silently fail — user can navigate manually
+        }
+      }
     } catch (err: any) {
       Alert.alert('Erreur', err.message ?? 'Une erreur est survenue')
-      setLoading(false)
       setUploadPercent(0)
       setUploadPhase('')
+    } finally {
+      setLoading(false)
     }
-  }
-
-  // ── success screen ─────────────────────────────────────────────────────────
-
-  const handleSuccessNav = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    try {
-      router.replace('/(tabs)')
-    } catch {
-      try {
-        router.push('/(tabs)')
-      } catch {
-        setSuccess(false)
-        setLoading(false)
-      }
-    }
-  }, [router])
-
-  if (success) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <SuccessCheck onDone={handleSuccessNav} />
-      </View>
-    )
   }
 
   // ── can advance? ───────────────────────────────────────────────────────────
@@ -697,6 +647,12 @@ export default function CreateDropScreen() {
             />
           </ScrollView>
         </KeyboardAvoidingView>
+        {success && (
+          <View style={s.successOverlay}>
+            <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
+            <Text style={s.successOverlayText}>Drop publié !</Text>
+          </View>
+        )}
       </SafeAreaView>
     )
   }
@@ -799,6 +755,12 @@ export default function CreateDropScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+      {success && (
+        <View style={s.successOverlay}>
+          <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
+          <Text style={s.successOverlayText}>Drop publié !</Text>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -1777,17 +1739,7 @@ const s = StyleSheet.create({
   },
 
   // Success
-  successWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.bg, gap: 16 },
-  successCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successTitle: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
-  successSub: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
+
 
   // Relaunch review
   relaunchHeadline: {
@@ -1841,5 +1793,23 @@ const s = StyleSheet.create({
     fontFamily: fontFamily.medium,
     fontSize: 14,
     color: colors.textSecondary,
+  },
+
+  successOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    zIndex: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  successOverlayText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
+    color: '#FFFFFF',
   },
 })
