@@ -221,6 +221,8 @@ function AddressForm({
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [searchingAddress, setSearchingAddress] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const line1Ref = useRef<View>(null)
+  const [line1Y, setLine1Y] = useState(0)
 
   const searchSwissAddress = useCallback(async (query: string) => {
     if (query.length < 4) {
@@ -347,7 +349,11 @@ function AddressForm({
           />
 
           <Text style={styles.fieldLabel}>{t('addresses.field_address')}</Text>
-          <View style={styles.line1Wrap}>
+          <View
+            ref={line1Ref}
+            style={styles.line1Wrap}
+            onLayout={(e) => setLine1Y(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 60)}
+          >
             <TextInput
               style={[styles.input, { flex: 1 }]}
               value={line1}
@@ -371,35 +377,6 @@ function AddressForm({
                 color={C.primary}
                 style={styles.line1Spinner}
               />
-            )}
-            {showSuggestions && streetSuggestions.length > 0 && (
-              <View style={styles.suggestionBox}>
-                {streetSuggestions.map((s, i) => (
-                  <TouchableOpacity
-                    key={i}
-                    style={[styles.suggestionItem,
-                      i < streetSuggestions.length - 1 && styles.suggestionBorder]}
-                    onPress={() => {
-                      setLine1((s.street + ' ' + s.number).trim())
-                      setPostalCode(s.postal_code)
-                      setCity(s.city)
-                      setShowSuggestions(false)
-                      if (searchTimeout.current) clearTimeout(searchTimeout.current)
-                    }}
-                  >
-                    <Ionicons name="location-outline" size={14}
-                      color={colors.textSecondary} style={{ marginRight: 8, marginTop: 1 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.suggestionStreet}>
-                        {s.street} {s.number}
-                      </Text>
-                      <Text style={styles.suggestionCity}>
-                        {s.postal_code} {s.city}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
             )}
           </View>
 
@@ -469,6 +446,60 @@ function AddressForm({
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {showSuggestions && streetSuggestions.length > 0 && (
+        <View style={{
+          position: 'absolute',
+          top: line1Y,
+          left: 16,
+          right: 16,
+          zIndex: 9999,
+          elevation: 10,
+          backgroundColor: colors.surface,
+          borderRadius: 8,
+          borderWidth: 1,
+          borderColor: colors.border,
+          maxHeight: 220,
+          overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
+        }}>
+          <ScrollView keyboardShouldPersistTaps="handled">
+            {streetSuggestions.map((s, i) => (
+              <TouchableOpacity
+                key={i}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  padding: 12,
+                  borderBottomWidth: i < streetSuggestions.length - 1 ? 1 : 0,
+                  borderBottomColor: colors.border,
+                }}
+                onPress={() => {
+                  setLine1((s.street + ' ' + s.number).trim())
+                  setPostalCode(s.postal_code)
+                  setCity(s.city)
+                  setShowSuggestions(false)
+                  if (searchTimeout.current) clearTimeout(searchTimeout.current)
+                }}
+              >
+                <Ionicons name="location-outline" size={14}
+                  color={colors.textSecondary} style={{ marginRight: 8 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontSize: 14, fontFamily: fontFamily.medium }}>
+                    {s.street} {s.number}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    {s.postal_code} {s.city}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
