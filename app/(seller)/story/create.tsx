@@ -216,6 +216,7 @@ export default function CreateDropScreen() {
   const router = useRouter()
   const { profile } = useAuth()
   const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
+  const isRelaunch = !!relaunchId
 
   useEffect(() => {
     if (profile && profile.role !== 'seller') {
@@ -266,7 +267,6 @@ export default function CreateDropScreen() {
       setDurationHours(data.duration_hours ?? 72)
       if (data.video_url) setVideoUri(data.video_url)
       if (data.thumbnail_url) setThumbnailUri(data.thumbnail_url)
-      setStep(1)
     })()
     return () => { mounted = false }
   }, [relaunchId])
@@ -481,8 +481,6 @@ export default function CreateDropScreen() {
       let thumbnailPublicUrl: string | null = null
 
       if (isRelaunchReuse) {
-        // Reuse existing assets from the previous drop
-        setUploadPhase('Réutilisation des médias…')
         setUploadPercent(75)
         publicUrl = videoUri!
         thumbnailPublicUrl = thumbnailUri ?? null
@@ -568,6 +566,15 @@ export default function CreateDropScreen() {
       const { error: insertError } = await supabase.from('stories').insert(insertPayload)
       if (insertError) throw insertError
 
+      if (relaunchId) {
+        await supabase
+          .from('stories')
+          .delete()
+          .eq('id', relaunchId)
+          .eq('seller_id', user.id)
+          .eq('status', 'expired')
+      }
+
       setUploadPercent(100)
       setUploadPhase('Publié !')
       setLoading(false)
@@ -614,6 +621,53 @@ export default function CreateDropScreen() {
 
   // ─── render ────────────────────────────────────────────────────────────────
 
+  if (isRelaunch) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top']}>
+        <View style={s.header}>
+          <TouchableOpacity onPress={handleCancel} style={s.headerBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={22} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <View style={s.headerCenter}>
+            <Text style={s.headerTitle}>Relancer ce drop</Text>
+          </View>
+          <View style={s.headerBtn} />
+        </View>
+
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <StepRelaunch
+              videoUri={videoUri}
+              thumbnailUri={thumbnailUri}
+              onReplaceVideo={launchGallery}
+              onCameraVideo={launchCamera}
+              title={title} onTitle={setTitle}
+              description={description} onDescription={setDescription}
+              category={category} onCategory={setCategory}
+              startPrice={startPrice} onStart={setStartPrice}
+              floorPrice={floorPrice} onFloor={setFloorPrice}
+              preset={preset} onPreset={setPreset}
+              floorGtStart={floorGtStart}
+              loading={loading}
+              uploadPhase={uploadPhase}
+              uploadPercent={uploadPercent}
+              onPublish={handlePublish}
+              onCancel={handleCancel}
+            />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       {/* Header */}
@@ -648,7 +702,6 @@ export default function CreateDropScreen() {
               onCamera={launchCamera}
               onGallery={launchGallery}
               onClear={() => { setVideoUri(null); setThumbnailUri(null); setVideoDurationSeconds(30) }}
-              isRelaunch={!!relaunchId}
             />
           )}
           {step === 2 && (
@@ -727,29 +780,16 @@ function Step1({
   onCamera,
   onGallery,
   onClear,
-  isRelaunch,
 }: {
   videoUri: string | null
   thumbnailUri: string | null
   onCamera: () => void
   onGallery: () => void
   onClear: () => void
-  isRelaunch?: boolean
 }) {
   if (videoUri) {
     return (
       <View>
-        {isRelaunch && (
-          <View style={s.relaunchBanner}>
-            <Ionicons name="cube-outline" size={14} color="#00D2B8" style={{ marginTop: 1 }} />
-            <Text style={s.relaunchBannerText}>
-              Relance — vidéo précédente chargée. Tu peux en choisir une nouvelle ou continuer.
-            </Text>
-            <TouchableOpacity onPress={onGallery} style={s.relaunchBannerAction}>
-              <Text style={s.relaunchBannerActionText}>Changer</Text>
-            </TouchableOpacity>
-          </View>
-        )}
         <View style={s.videoWrap}>
           <AvVideo
             source={{ uri: videoUri }}
@@ -1086,6 +1126,208 @@ function Step4({
       <Text style={s.publishDisclaimer}>
         En publiant, votre enchère sera immédiatement visible par tous les utilisateurs.
       </Text>
+    </View>
+  )
+}
+
+// ─── Step Relaunch: one-shot review ───────────────────────────────────────────
+
+function StepRelaunch({
+  videoUri,
+  thumbnailUri,
+  onReplaceVideo,
+  onCameraVideo,
+  title, onTitle,
+  description, onDescription,
+  category, onCategory,
+  startPrice, onStart,
+  floorPrice, onFloor,
+  preset, onPreset,
+  floorGtStart,
+  loading,
+  uploadPhase,
+  uploadPercent,
+  onPublish,
+  onCancel,
+}: {
+  videoUri: string | null
+  thumbnailUri: string | null
+  onReplaceVideo: () => void
+  onCameraVideo: () => void
+  title: string; onTitle: (s: string) => void
+  description: string; onDescription: (s: string) => void
+  category: string; onCategory: (s: string) => void
+  startPrice: string; onStart: (s: string) => void
+  floorPrice: string; onFloor: (s: string) => void
+  preset: SpeedPreset; onPreset: (p: SpeedPreset) => void
+  floorGtStart: boolean
+  loading: boolean
+  uploadPhase: string
+  uploadPercent: number
+  onPublish: () => void
+  onCancel: () => void
+}) {
+  const showVideoActions = () => {
+    Alert.alert(
+      'Vidéo',
+      undefined,
+      [
+        { text: 'Garder la vidéo', style: 'cancel' },
+        { text: 'Filmer une nouvelle vidéo', onPress: onCameraVideo },
+        { text: 'Choisir depuis la galerie', onPress: onReplaceVideo },
+      ]
+    )
+  }
+
+  const canPublish =
+    !loading &&
+    title.trim().length > 0 &&
+    startPrice !== '' &&
+    floorPrice !== '' &&
+    !floorGtStart &&
+    !!videoUri
+
+  return (
+    <View style={s.formWrap}>
+      <Text style={s.relaunchHeadline}>Relancer ce drop</Text>
+      <Text style={s.relaunchSub}>
+        Tous les champs sont déjà remplis. Modifie ce qui doit l'être.
+      </Text>
+
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={showVideoActions}
+        style={s.relaunchVideoWrap}
+      >
+        {thumbnailUri ? (
+          <Image source={{ uri: thumbnailUri }} style={s.relaunchVideoImg} />
+        ) : (
+          <View style={[s.relaunchVideoImg, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Ionicons name="videocam-outline" size={32} color={colors.border} />
+          </View>
+        )}
+        <View style={s.relaunchVideoOverlay}>
+          <Ionicons name="create-outline" size={14} color="#FFFFFF" />
+          <Text style={s.relaunchVideoOverlayText}>Modifier la vidéo</Text>
+        </View>
+      </TouchableOpacity>
+
+      <Text style={s.fieldLabel}>Titre *</Text>
+      <TextInput
+        style={s.titleInput}
+        placeholder="Titre"
+        placeholderTextColor={colors.textSecondary}
+        value={title}
+        onChangeText={(t) => onTitle(t.slice(0, 80))}
+        returnKeyType="next"
+      />
+      <Text style={s.counter}>{title.length}/80</Text>
+
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
+      <TextInput
+        style={s.descInput}
+        placeholder="Description"
+        placeholderTextColor={colors.textSecondary}
+        value={description}
+        onChangeText={(t) => onDescription(t.slice(0, 300))}
+        multiline
+        numberOfLines={4}
+        textAlignVertical="top"
+      />
+      <Text style={s.counter}>{description.length}/300</Text>
+
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Catégorie</Text>
+      <CategoryPicker value={category} onChange={onCategory} />
+
+      <View style={[s.priceRow, { marginTop: spacing.lg }]}>
+        <View style={s.priceCol}>
+          <Text style={s.priceColLabel}>Prix de départ</Text>
+          <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
+            <Text style={s.chfTag}>CHF</Text>
+            <TextInput
+              style={s.priceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              value={startPrice}
+              onChangeText={onStart}
+            />
+          </View>
+        </View>
+        <View style={s.priceArrow}>
+          <Ionicons name="arrow-forward" size={18} color={colors.textSecondary} />
+        </View>
+        <View style={s.priceCol}>
+          <Text style={s.priceColLabel}>Prix plancher</Text>
+          <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
+            <Text style={s.chfTag}>CHF</Text>
+            <TextInput
+              style={s.priceInput}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+              value={floorPrice}
+              onChangeText={onFloor}
+            />
+          </View>
+        </View>
+      </View>
+      {floorGtStart && (
+        <Text style={s.priceError}>Le prix plancher doit être inférieur au prix de départ</Text>
+      )}
+
+      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>Vitesse de vente</Text>
+      <View style={s.presetRow}>
+        {PRESETS.map((p) => {
+          const active = preset === p.key
+          const accent = PRESET_ACCENT[p.key]
+          return (
+            <TouchableOpacity
+              key={p.key}
+              style={[s.presetCard, active && { borderColor: accent, backgroundColor: `${accent}18` }]}
+              onPress={() => onPreset(p.key)}
+              activeOpacity={0.8}
+            >
+              <Text style={s.presetEmoji}>{p.emoji}</Text>
+              <Text style={[s.presetLabel, active && { color: accent }]}>{p.label}</Text>
+              <Text style={s.presetTagline}>{p.tagline}</Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+
+      <TouchableOpacity
+        style={[s.publishBtn, { marginTop: spacing.xl, width: '100%' }, loading && s.publishBtnLoading, !canPublish && { opacity: 0.5 }]}
+        onPress={onPublish}
+        disabled={!canPublish}
+        activeOpacity={0.85}
+      >
+        {loading ? (
+          <View style={s.publishLoadingWrap}>
+            <View style={s.publishProgressRow}>
+              <Text style={s.publishBtnText}>{uploadPhase || 'Publication...'}</Text>
+              <Text style={s.publishPercentText}>{uploadPercent}%</Text>
+            </View>
+            <View style={s.publishProgressTrack}>
+              <View style={[s.publishProgressFill, { width: `${uploadPercent}%` }]} />
+            </View>
+          </View>
+        ) : (
+          <>
+            <Ionicons name="rocket" size={20} color="#0F0F0F" style={{ marginRight: 8 }} />
+            <Text style={s.publishBtnText}>Publier le drop</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={s.relaunchCancelBtn}
+        onPress={onCancel}
+        disabled={loading}
+        activeOpacity={0.8}
+      >
+        <Text style={s.relaunchCancelText}>Annuler</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -1513,4 +1755,58 @@ const s = StyleSheet.create({
   },
   successTitle: { fontFamily: fontFamily.bold, fontSize: 26, color: colors.text },
   successSub: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
+
+  // Relaunch review
+  relaunchHeadline: {
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
+  relaunchSub: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: spacing.md,
+  },
+  relaunchVideoWrap: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceHigh,
+    marginBottom: spacing.md,
+  },
+  relaunchVideoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  relaunchVideoOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  relaunchVideoOverlayText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 11,
+    color: '#FFFFFF',
+  },
+  relaunchCancelBtn: {
+    marginTop: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  relaunchCancelText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
 })
