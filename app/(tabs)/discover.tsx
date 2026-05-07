@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { toCdnUrl } from '../../lib/cdn'
-import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
+import { colors, fontFamily, spacing } from '../../lib/theme'
 import type { Story, Profile } from '../../types'
 import { useTranslation } from '../../lib/i18n'
 
@@ -38,9 +38,21 @@ const CATEGORIES = [
   { value: 'autre',       label: '🎁 Autre' },
 ]
 
+type SortOption = 'recent' | 'expiring' | 'deal' | 'price_asc'
+
 type StoryWithSeller = Omit<Story, 'seller'> & { seller?: Pick<Profile, 'id' | 'username' | 'avatar_url'> }
 
-function StoryCard({ item }: { item: StoryWithSeller }) {
+function formatTimeLeft(expiresAt: string): string {
+  const ms = new Date(expiresAt).getTime() - Date.now()
+  if (ms <= 0) return 'Expiré'
+  const totalMins = Math.floor(ms / 60000)
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  if (h > 0) return `${h}h ${m}min`
+  return `${m}min`
+}
+
+function StoryCard({ item, showExpiry }: { item: StoryWithSeller; showExpiry: boolean }) {
   const thumb = toCdnUrl(item.thumbnail_url ?? item.video_url)
   return (
     <TouchableOpacity
@@ -48,13 +60,20 @@ function StoryCard({ item }: { item: StoryWithSeller }) {
       activeOpacity={0.85}
       onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: item.id } })}
     >
-      {thumb ? (
-        <Image source={{ uri: thumb }} style={styles.cardImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-          <Ionicons name="image-outline" size={28} color={colors.border} />
-        </View>
-      )}
+      <View style={styles.cardImageWrap}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+            <Ionicons name="image-outline" size={28} color={colors.border} />
+          </View>
+        )}
+        {showExpiry && item.expires_at && (
+          <View style={styles.expiryBadge}>
+            <Text style={styles.expiryText}>⏱ {formatTimeLeft(item.expires_at)}</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.cardPrice}>CHF {Number(item.current_price_chf).toFixed(2)}</Text>
@@ -82,6 +101,7 @@ export default function DiscoverScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [maxPrice, setMaxPrice] = useState<string>('')
   const [showPriceInput, setShowPriceInput] = useState(false)
+  const [sortOption, setSortOption] = useState<SortOption>('recent')
 
   const [stories, setStories] = useState<StoryWithSeller[]>([])
   const [loading, setLoading] = useState(true)
@@ -91,25 +111,65 @@ export default function DiscoverScreen() {
   const pageRef = useRef(0)
   const activeQueryRef = useRef('')
 
-  const fetchStories = useCallback(async (page: number, search: string, replace: boolean, category: string | null, price: string) => {
+  const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+    { value: 'recent',    label: t('discover.sort_recent') },
+    { value: 'expiring',  label: t('discover.sort_expiring') },
+    { value: 'deal',      label: t('discover.sort_deal') },
+    { value: 'price_asc', label: t('discover.sort_price_asc') },
+  ]
+
+  const fetchStories = useCallback(async (
+    page: number,
+    search: string,
+    replace: boolean,
+    category: string | null,
+    price: string,
+    sort: SortOption,
+  ) => {
     const from = page * PAGE_SIZE
     const to = from + PAGE_SIZE - 1
+
     let q = supabase
       .from('stories')
       .select('*')
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
       .range(from, to)
+
     if (search.trim()) q = q.ilike('title', `%${search.trim()}%`)
     if (category) q = q.eq('category', category)
     const maxP = parseFloat(price)
     if (!isNaN(maxP) && maxP > 0) q = q.lte('current_price_chf', maxP)
 
+    if (sort === 'recent') {
+      q = q.order('created_at', { ascending: false })
+    } else if (sort === 'expiring') {
+      const threeHoursLater = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString()
+      q = q.lt('expires_at', threeHoursLater).order('expires_at', { ascending: true })
+    } else if (sort === 'price_asc') {
+      q = q.order('current_price_chf', { ascending: true })
+    } else {
+      // 'deal' — fetch recent, sort client-side by discount %
+      q = q.order('created_at', { ascending: false })
+    }
+
     const { data, error } = await q
     if (error) return
 
-    const rows = (data ?? []) as Story[]
+    let rows = (data ?? []) as Story[]
+
+    if (sort === 'deal') {
+      rows = [...rows].sort((a, b) => {
+        const discountA = a.start_price_chf > 0
+          ? (a.start_price_chf - a.current_price_chf) / a.start_price_chf
+          : 0
+        const discountB = b.start_price_chf > 0
+          ? (b.start_price_chf - b.current_price_chf) / b.start_price_chf
+          : 0
+        return discountB - discountA
+      })
+    }
+
     let rowsWithSellers: StoryWithSeller[] = rows
     if (rows.length > 0) {
       const sellerIds = [...new Set(rows.map(r => r.seller_id))]
@@ -132,28 +192,28 @@ export default function DiscoverScreen() {
     setLoading(true)
     setHasMore(true)
 
-    fetchStories(0, query, true, selectedCategory, maxPrice).then(() => {
+    fetchStories(0, query, true, selectedCategory, maxPrice, sortOption).then(() => {
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [query, fetchStories, selectedCategory, maxPrice])
+  }, [query, fetchStories, selectedCategory, maxPrice, sortOption])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
     pageRef.current = 0
     setHasMore(true)
-    await fetchStories(0, query, true, selectedCategory, maxPrice)
+    await fetchStories(0, query, true, selectedCategory, maxPrice, sortOption)
     setRefreshing(false)
-  }, [query, fetchStories, selectedCategory, maxPrice])
+  }, [query, fetchStories, selectedCategory, maxPrice, sortOption])
 
   const handleEndReached = useCallback(async () => {
     if (loadingMore || !hasMore || loading) return
     setLoadingMore(true)
     const nextPage = pageRef.current + 1
     pageRef.current = nextPage
-    await fetchStories(nextPage, activeQueryRef.current, false, selectedCategory, maxPrice)
+    await fetchStories(nextPage, activeQueryRef.current, false, selectedCategory, maxPrice, sortOption)
     setLoadingMore(false)
-  }, [loadingMore, hasMore, loading, fetchStories, selectedCategory, maxPrice])
+  }, [loadingMore, hasMore, loading, fetchStories, selectedCategory, maxPrice, sortOption])
 
   const pricePillLabel = maxPrice ? `≤ CHF ${maxPrice}` : 'Prix max'
   const priceActive = maxPrice.length > 0
@@ -179,6 +239,30 @@ export default function DiscoverScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Sort pills */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.sortRow}
+        style={styles.sortScroll}
+      >
+        {SORT_OPTIONS.map(opt => {
+          const active = sortOption === opt.value
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[styles.sortPill, active ? styles.sortPillActive : styles.sortPillInactive]}
+              onPress={() => setSortOption(opt.value)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.sortPillText, active ? styles.sortPillTextActive : styles.sortPillTextInactive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
+      </ScrollView>
 
       <View style={styles.filtersWrapper}>
         <ScrollView
@@ -267,7 +351,7 @@ export default function DiscoverScreen() {
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : null}
-          renderItem={({ item }) => <StoryCard item={item} />}
+          renderItem={({ item }) => <StoryCard item={item} showExpiry={sortOption === 'expiring'} />}
         />
       )}
     </SafeAreaView>
@@ -302,6 +386,36 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   clearBtn: { paddingHorizontal: 10 },
+
+  sortScroll: { marginBottom: 8 },
+  sortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    gap: 8,
+  },
+  sortPill: {
+    height: 34,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sortPillActive: {
+    backgroundColor: colors.primary,
+  },
+  sortPillInactive: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sortPillText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+  },
+  sortPillTextActive: { color: '#0F0F0F' },
+  sortPillTextInactive: { color: colors.textSecondary },
+
   filtersWrapper: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
@@ -378,8 +492,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  cardImageWrap: { position: 'relative' },
   cardImage: { width: '100%', aspectRatio: 1, backgroundColor: colors.surfaceHigh },
   cardImagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  expiryBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(255,69,0,0.85)',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  expiryText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontFamily: fontFamily.semiBold,
+  },
   cardBody: { padding: spacing.sm },
   cardTitle: { fontFamily: fontFamily.medium, fontSize: 13, color: colors.text },
   cardPrice: { fontFamily: fontFamily.bold, fontSize: 14, color: colors.primary, marginTop: 2 },

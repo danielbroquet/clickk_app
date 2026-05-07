@@ -101,6 +101,10 @@ export default {
     tab_stories: 'Drops',
     empty_stories: 'Aucun drop actif pour le moment.',
     no_results: 'Aucun résultat',
+    sort_recent: '🆕 Récents',
+    sort_expiring: '⏱ Expire bientôt',
+    sort_deal: '🔥 Meilleure affaire',
+    sort_price_asc: '💰 Prix croissant',
   },
   orders: {
     title: 'Mes commandes',
