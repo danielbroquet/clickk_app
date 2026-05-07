@@ -486,7 +486,7 @@ export default function CreateDropScreen() {
     setShowFramePicker(true)
 
     const sizeMB = await getFileSizeMB(asset.uri)
-    if (sizeMB > 20) {
+    if (sizeMB > 30) {
       Alert.alert(
         'Vidéo assez lourde',
         `Cette vidéo fait ${sizeMB.toFixed(0)} MB. Pour de meilleures performances, filme directement depuis l'app ou choisis une vidéo plus courte.`,
@@ -506,11 +506,11 @@ export default function CreateDropScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      quality: 0.7,
+      quality: 1.0,
       videoMaxDuration: 30,
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.HighQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -518,11 +518,11 @@ export default function CreateDropScreen() {
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      quality: 0.7,
+      quality: 1.0,
       videoMaxDuration: 30,
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.HighQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -663,8 +663,8 @@ export default function CreateDropScreen() {
         setUploadPhase('Lecture de la vidéo…')
         setUploadPercent(15)
         const preflight = await FileSystem.getInfoAsync(localUri, { size: true }) as FileSystem.FileInfo & { size?: number }
-        if (preflight.exists && typeof preflight.size === 'number' && preflight.size / (1024 * 1024) > 50) {
-          throw new Error('Vidéo trop lourde (> 50 MB)')
+        if (preflight.exists && typeof preflight.size === 'number' && preflight.size / (1024 * 1024) > 100) {
+          throw new Error('Vidéo trop lourde (> 100 MB)')
         }
         const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
 

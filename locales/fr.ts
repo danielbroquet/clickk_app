@@ -19,7 +19,7 @@ export default {
       step_settings: 'Paramètres',
       pick_video: 'Choisir depuis la galerie',
       record_video: 'Filmer',
-      video_tip: 'Max 30 sec · Choisis ta meilleure frame',
+      video_tip: 'Max 30 sec · Qualité HD · Choisis ta meilleure frame',
       listing_title: 'Titre de l\'article',
       listing_title_placeholder: 'Ex: Nike Air Max 90 Taille 42',
       description: 'Description',
