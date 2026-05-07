@@ -834,6 +834,29 @@ function Step2({
         <Image source={{ uri: thumbnailUri }} style={s.detailThumb} />
       )}
 
+      {thumbnailUri && (
+        <>
+          <TouchableOpacity
+            style={[s.generateBtn, generating && { opacity: 0.7 }]}
+            onPress={onGenerate}
+            disabled={generating}
+            activeOpacity={0.85}
+          >
+            {generating ? (
+              <>
+                <ActivityIndicator size="small" color="#0F0F0F" />
+                <Text style={s.generateBtnText}>Génération en cours...</Text>
+              </>
+            ) : (
+              <Text style={s.generateBtnText}>✨ Générer avec l'IA</Text>
+            )}
+          </TouchableOpacity>
+          <Text style={s.generateBtnSub}>
+            Titre, description et catégorie remplis automatiquement
+          </Text>
+        </>
+      )}
+
       <Text style={s.fieldLabel}>Titre *</Text>
       <TextInput
         style={s.titleInput}
@@ -845,21 +868,6 @@ function Step2({
         autoFocus
       />
       <Text style={s.counter}>{title.length}/80</Text>
-
-      {thumbnailUri && (
-        <TouchableOpacity
-          style={[s.generateBtn, generating && { opacity: 0.6 }]}
-          onPress={onGenerate}
-          disabled={generating}
-          activeOpacity={0.8}
-        >
-          {generating ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={s.generateBtnText}>✨ Générer avec l'IA</Text>
-          )}
-        </TouchableOpacity>
-      )}
 
       <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
       <TextInput
@@ -1286,18 +1294,23 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    backgroundColor: 'rgba(0,210,184,0.12)',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 10,
-    marginTop: 10,
+    gap: 8,
+    height: 48,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   generateBtnText: {
-    fontFamily: fontFamily.semiBold,
-    fontSize: 14,
-    color: colors.primary,
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
+    color: '#0F0F0F',
+  },
+  generateBtnSub: {
+    fontFamily: fontFamily.regular,
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 16,
   },
 
   // Category
