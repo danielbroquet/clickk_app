@@ -534,8 +534,8 @@ function DisputeModal({
       if (insErr) throw insErr
 
       onSubmitted(storyId)
-    } catch (e: any) {
-      setError(e.message ?? t('common.error'))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t('common.error'))
     } finally {
       setSubmitting(false)
     }
@@ -673,8 +673,8 @@ function ReviewModal({
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }
       onSubmitted(storyId, rating)
-    } catch (e: any) {
-      setError(e.message ?? t('common.error'))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t('common.error'))
     } finally {
       setSubmitting(false)
     }
@@ -781,7 +781,23 @@ export default function OrdersScreen() {
       console.error('[fetchOrders] stories query failed:', storiesRes.error)
     }
 
-    const storyIds = (storiesRes.data ?? []).map((s: any) => s.id)
+    interface StoryRow {
+      id: string
+      seller_id: string
+      created_at: string
+      final_price_chf: number | null
+      status: string
+      title: string | null
+      video_url: string | null
+      thumbnail_url: string | null
+      shipped_at: string | null
+      delivered_at: string | null
+      tracking_number: string | null
+      seller: SellerInfo | null
+    }
+
+    const rows = (storiesRes.data ?? []) as unknown as StoryRow[]
+    const storyIds = rows.map((s) => s.id)
     const reviewsRes = storyIds.length > 0
       ? await supabase
           .from('reviews')
@@ -790,16 +806,16 @@ export default function OrdersScreen() {
           .in('story_id', storyIds)
       : { data: [] as { story_id: string; rating: number }[] }
     const myRatings = new Map<string, number>()
-    ;(reviewsRes.data ?? []).forEach((r: any) => myRatings.set(r.story_id, r.rating))
+    ;(reviewsRes.data ?? []).forEach((r: { story_id: string; rating: number }) => myRatings.set(r.story_id, r.rating))
 
-    const storyOrders: OrderItem[] = (storiesRes.data ?? []).map((s: any) => ({
+    const storyOrders: OrderItem[] = rows.map((s) => ({
       id:             `story-${s.id}`,
       story_id:       s.id,
       seller_id:      s.seller_id,
       title:          s.title ?? 'Drop',
       thumbnail:      s.thumbnail_url ?? null,
       hasVideo:       !s.thumbnail_url && !!s.video_url,
-      seller:         s.seller as SellerInfo | null,
+      seller:         s.seller,
       price:          s.final_price_chf ?? 0,
       displayStatus:  (s.status as DisplayStatus) ?? 'sold',
       shipped_at:     s.shipped_at ?? null,
@@ -870,6 +886,17 @@ export default function OrdersScreen() {
     )
   }, [])
 
+  const renderOrderItem = useCallback(({ item }: { item: OrderItem }) => (
+    <OrderCard
+      item={item}
+      onDelivered={handleDelivered}
+      onOpenDispute={handleOpenDispute}
+      onOpenReview={handleOpenReview}
+    />
+  ), [handleDelivered, handleOpenDispute, handleOpenReview])
+
+  const OrderSeparator = useCallback(() => <View style={styles.separator} />, [])
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -908,15 +935,8 @@ export default function OrdersScreen() {
               <Text style={styles.emptySubtext}>{t('orders.empty_sub')}</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <OrderCard
-              item={item}
-              onDelivered={handleDelivered}
-              onOpenDispute={handleOpenDispute}
-              onOpenReview={handleOpenReview}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={renderOrderItem}
+          ItemSeparatorComponent={OrderSeparator}
         />
       )}
 

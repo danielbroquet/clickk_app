@@ -343,7 +343,7 @@ function FramePickerModal({
 // ─── R2 upload helper ─────────────────────────────────────────────────────────
 
 async function uploadToR2(opts: {
-  session: any
+  session: { access_token: string }
   bucket: 'story-videos' | 'story-thumbnails' | 'listing-images'
   filename: string
   base64: string
@@ -575,8 +575,8 @@ export default function CreateDropScreen() {
       if (data.title) setTitle(data.title)
       if (data.description) setDescription(data.description)
       if (data.category) setCategory(data.category)
-    } catch (err: any) {
-      Alert.alert(t('story.create.ai_error_title'), err.message ?? t('story.create.ai_error_message'))
+    } catch (err: unknown) {
+      Alert.alert(t('story.create.ai_error_title'), err instanceof Error ? err.message : t('story.create.ai_error_message'))
     } finally {
       setGenerating(false)
     }
@@ -762,8 +762,8 @@ export default function CreateDropScreen() {
           // silently fail — user can navigate manually
         }
       }
-    } catch (err: any) {
-      Alert.alert(t('common.error'), err.message ?? t('common.error'))
+    } catch (err: unknown) {
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.error'))
       setUploadPercent(0)
       setUploadPhase('')
     } finally {

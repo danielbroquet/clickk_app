@@ -1061,10 +1061,7 @@ function DropItem({
       <View style={styles.actionsCol}>
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => {
-            console.log('[heart] isWatchlisted:', isWatchlisted, 'userId:', currentUserId, 'storyId:', story.id)
-            toggleWatchlist()
-          }}
+          onPress={toggleWatchlist}
           activeOpacity={0.7}
         >
           <Ionicons
@@ -1657,14 +1654,14 @@ export default function FeedScreen() {
     return () => { channel.unsubscribe() }
   }, [currentUserId])
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ index: number | null }> }) => {
     if (viewableItems.length > 0) {
       setActiveIndex(viewableItems[0].index ?? 0)
     }
   }).current
 
   const handleSwipeDown = useCallback(() => {
-    console.log('[feed] swipe down -> main menu (TBD)')
+    // intentionally empty — reserved for future menu gesture
   }, [])
 
   const activeStories = activeTab === 'foryou' ? forYouStories : followingStories

@@ -36,7 +36,7 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
 
     const countPromise = supabase
       .from('watchlist')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('story_id', storyId)
 
     Promise.all([checkPromise, countPromise]).then(([checkRes, countRes]) => {
@@ -55,17 +55,11 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
   }, [storyId, userId])
 
   const toggleWatchlist = useCallback(async () => {
-    if (!userId) {
-      console.log('[watchlist] toggleWatchlist aborted — no userId')
-      return
-    }
+    if (!userId) return
 
     const wasWatchlisted = isWatchlisted
     const prevCount = watchlistCount
 
-    console.log('[watchlist] toggle start', { storyId, wasWatchlisted, userId })
-
-    // Optimistic update
     toggling.current = true
     setIsWatchlisted(!wasWatchlisted)
     setWatchlistCount(wasWatchlisted ? prevCount - 1 : prevCount + 1)
@@ -73,10 +67,8 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
     try {
       const { data: { session: liveSession } } = await supabase.auth.getSession()
       if (!liveSession) {
-        console.log('[supabase] no session, refreshing...')
         await supabase.auth.refreshSession()
       }
-      console.log('[auth] session uid:', liveSession?.user?.id)
 
       if (wasWatchlisted) {
         const { error } = await supabase
@@ -84,23 +76,14 @@ export function useWatchlist(storyId: string): UseWatchlistResult {
           .delete()
           .eq('user_id', userId)
           .eq('story_id', storyId)
-        if (error) {
-          console.log('[watchlist] delete error', error)
-          throw error
-        }
-        console.log('[watchlist] deleted OK')
+        if (error) throw error
       } else {
         const { error } = await supabase
           .from('watchlist')
           .upsert({ user_id: userId, story_id: storyId }, { onConflict: 'user_id,story_id', ignoreDuplicates: true })
-        if (error) {
-          console.log('[watchlist] insert error', error)
-          throw error
-        }
-        console.log('[watchlist] inserted OK')
+        if (error) throw error
       }
     } catch (err) {
-      console.log('[watchlist] rolling back optimistic update', err)
       setIsWatchlisted(wasWatchlisted)
       setWatchlistCount(prevCount)
     } finally {

@@ -172,19 +172,17 @@ export default function WatchlistScreen() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.log('[watchlist] fetch error', error)
+      console.error('[watchlist] fetch error', error)
       setLoading(false)
       setRefreshing(false)
       return
     }
 
-    // Supabase returns the joined table under the FK constraint name ("stories")
-    // Normalize it to the expected "story" field
-    const normalized = (data ?? []).map((r: any) => ({
-      id: r.id,
-      story_id: r.story_id,
-      story: r.stories ?? r.story ?? null,
-    })).filter((r: any) => r.story !== null)
+    const normalized = (data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      story_id: r.story_id as string,
+      story: (r.stories ?? r.story ?? null) as WatchlistStory | null,
+    })).filter((r): r is WatchlistRow => r.story !== null)
 
     setRows(normalized as WatchlistRow[])
     setLoading(false)

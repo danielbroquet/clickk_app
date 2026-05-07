@@ -78,7 +78,6 @@ export function usePushNotifications(userId: string | null): PushNotificationSta
         if (cancelled) return
 
         setExpoPushToken(token)
-        console.log('[PushNotifications] Expo push token:', token)
 
         // Persist token to profile if user is logged in
         if (userId && token) {

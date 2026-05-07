@@ -124,8 +124,6 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
 
-      console.log('[useGroupedStories] fetch result', { length: data?.length, error })
-
       if (!mounted) return
 
       if (error) {
@@ -183,6 +181,5 @@ export function useGroupedStories(): { sellerGroups: SellerGroup[]; viewedIds: S
     }
   }, [])
 
-  console.log('[useGroupedStories]', sellerGroups.length)
   return { sellerGroups, viewedIds, loading }
 }

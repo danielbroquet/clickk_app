@@ -31,10 +31,10 @@ type Address = {
 }
 
 const C = {
-  bg: '#0F0F0F',
-  primary: '#00D2B8',
-  surface: '#1A1A1A',
-  text: '#FFFFFF',
+  bg: colors.bg,
+  primary: colors.primary,
+  surface: colors.surface,
+  text: colors.text,
   muted: '#717976',
   danger: '#FF4757',
   border: '#2A2A2A',

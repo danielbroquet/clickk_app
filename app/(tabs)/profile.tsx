@@ -586,7 +586,7 @@ function FollowersModal({
       .select('profiles:follower_id(id, username, display_name, avatar_url)')
       .eq('following_id', userId)
       .then(({ data }) => {
-        const list = (data ?? []).map((r: any) => r.profiles).filter(Boolean)
+        const list = (data ?? []).map((r: Record<string, unknown>) => r.profiles).filter(Boolean)
         setFollowers(list as FollowerProfile[])
         setLoading(false)
       })
@@ -803,11 +803,11 @@ export default function ProfileScreen() {
       .order('created_at', { ascending: false })
       .limit(60)
     if (error) {
-      console.log('[profile] watchlist fetch error', error)
+      console.error('[profile] watchlist fetch error', error)
       return
     }
     const normalized = (data ?? [])
-      .map((row: any) => row.stories)
+      .map((row: Record<string, unknown>) => row.stories)
       .filter(Boolean) as LikedStory[]
     setLikedStories(normalized)
   }, [currentUserId])
@@ -818,16 +818,18 @@ export default function ProfileScreen() {
     await Promise.all([
       supabase
         .from('stories')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('seller_id', currentUserId)
-        .then(({ count }) => setDropsCount(count ?? 0)),
+        .then(({ count }) => setDropsCount(count ?? 0))
+        .catch(() => {}),
 
       supabase
         .from('stories')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('seller_id', currentUserId)
         .eq('status', 'sold')
-        .then(({ count }) => setVentesCount(count ?? 0)),
+        .then(({ count }) => setVentesCount(count ?? 0))
+        .catch(() => {}),
 
       supabase
         .from('stories')
@@ -836,9 +838,10 @@ export default function ProfileScreen() {
         .neq('status', 'expired')
         .order('created_at', { ascending: false })
         .limit(60)
-        .then(({ data }) => setOwnDrops((data ?? []) as DropCell[])),
+        .then(({ data }) => setOwnDrops((data ?? []) as DropCell[]))
+        .catch(() => {}),
 
-      fetchWatchlist(),
+      fetchWatchlist().catch(() => {}),
     ])
 
     if (profile?.role === 'seller') {
