@@ -3,15 +3,17 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 
 export default function StoryRedirect() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, fromProfile } = useLocalSearchParams<{ id: string; fromProfile?: string }>()
 
   useEffect(() => {
     if (!id) {
       router.replace('/(tabs)')
       return
     }
-    router.replace({ pathname: '/(tabs)', params: { initialStoryId: id } })
-  }, [id])
+    const params: Record<string, string> = { initialStoryId: id }
+    if (fromProfile) params.fromProfile = fromProfile
+    router.push({ pathname: '/(tabs)', params })
+  }, [id, fromProfile])
 
   return (
     <View style={styles.container}>

@@ -698,6 +698,7 @@ function DropItem({
   tabFocused,
   onSwipeDown,
   currentUserId,
+  fromProfile,
 }: {
   story: FeedStory
   active: boolean
@@ -706,6 +707,7 @@ function DropItem({
   tabFocused: boolean
   onSwipeDown: () => void
   currentUserId: string
+  fromProfile?: string
 }) {
   const { profile: authProfile } = useAuth()
   const currentUserProfile = {
@@ -1029,6 +1031,16 @@ function DropItem({
           usePoster={!!story.thumbnail_url && !active}
           posterStyle={StyleSheet.absoluteFillObject}
         />
+      )}
+
+      {fromProfile && router.canGoBack() && (
+        <TouchableOpacity
+          style={[styles.backFromProfileBtn, { top: sheetInsets.top + 12 }]}
+          onPress={() => router.back()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
       )}
 
       {paused && (
@@ -1425,7 +1437,7 @@ export default function FeedScreen() {
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
   const insets = useSafeAreaInsets()
-  const params = useLocalSearchParams<{ initialStoryId?: string }>()
+  const params = useLocalSearchParams<{ initialStoryId?: string; fromProfile?: string }>()
   const [activeTab, setActiveTab] = useState<FeedTab>('foryou')
 
   // Per-tab state
@@ -1677,9 +1689,10 @@ export default function FeedScreen() {
         tabFocused={tabFocused}
         onSwipeDown={handleSwipeDown}
         currentUserId={currentUserId}
+        fromProfile={item.id === params.initialStoryId ? params.fromProfile : undefined}
       />
     ),
-    [activeIndex, tabFocused, currentUserId, handleSwipeDown]
+    [activeIndex, tabFocused, currentUserId, handleSwipeDown, params.initialStoryId, params.fromProfile]
   )
 
   const getItemLayout = useCallback(
@@ -1845,6 +1858,15 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     backgroundColor: '#000',
     overflow: 'hidden',
+  },
+
+  backFromProfileBtn: {
+    position: 'absolute',
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 20,
+    padding: 6,
+    zIndex: 50,
   },
 
   pauseOverlay: {

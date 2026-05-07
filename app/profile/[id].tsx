@@ -141,7 +141,7 @@ const starStyles = StyleSheet.create({
 
 // ─── Grid cell ────────────────────────────────────────────────────────────────
 
-function DropGridCell({ drop }: { drop: Drop }) {
+function DropGridCell({ drop, profileId }: { drop: Drop; profileId: string }) {
   const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const status = drop.status
 
@@ -149,7 +149,7 @@ function DropGridCell({ drop }: { drop: Drop }) {
     <TouchableOpacity
       style={gridStyles.cell}
       activeOpacity={0.85}
-      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })}
+      onPress={() => router.push({ pathname: '/story/[id]', params: { id: drop.id, fromProfile: profileId } })}
     >
       {thumb ? (
         <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />
@@ -509,7 +509,7 @@ export default function PublicProfileScreen() {
         ) : (
           <View style={gridStyles.grid}>
             {drops.map(drop => (
-              <DropGridCell key={drop.id} drop={drop} />
+              <DropGridCell key={drop.id} drop={drop} profileId={id ?? ''} />
             ))}
           </View>
         )}
