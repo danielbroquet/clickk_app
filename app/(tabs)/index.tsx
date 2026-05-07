@@ -693,6 +693,7 @@ function DropItem({
   story,
   active,
   isPreload,
+  shouldUnload,
   tabFocused,
   onSwipeDown,
   currentUserId,
@@ -700,6 +701,7 @@ function DropItem({
   story: FeedStory
   active: boolean
   isPreload: boolean
+  shouldUnload?: boolean
   tabFocused: boolean
   onSwipeDown: () => void
   currentUserId: string
@@ -810,10 +812,19 @@ function DropItem({
   }, [active, tabFocused, paused, buyVisible])
 
   useEffect(() => {
-    if (!active && !isPreload) {
+    if (shouldUnload || (!active && !isPreload)) {
+      videoRef.current?.pauseAsync().catch(() => {})
       videoRef.current?.unloadAsync().catch(() => {})
     }
-  }, [active, isPreload])
+  }, [active, isPreload, shouldUnload])
+
+  useEffect(() => {
+    const ref = videoRef
+    return () => {
+      ref.current?.pauseAsync().catch(() => {})
+      ref.current?.unloadAsync().catch(() => {})
+    }
+  }, [])
 
   // Fetch comments + count when drop becomes active
   useEffect(() => {
@@ -982,18 +993,30 @@ function DropItem({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      <Video
-        ref={videoRef}
-        source={{ uri: story.video_url }}
-        style={StyleSheet.absoluteFill}
-        resizeMode={ResizeMode.COVER}
-        isLooping
-        isMuted={active ? muted : true}
-        shouldPlay={active && tabFocused && !paused && !buyVisible}
-        posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
-        usePoster={!!story.thumbnail_url && !active}
-        posterStyle={StyleSheet.absoluteFill as any}
-      />
+      {shouldUnload ? (
+        story.thumbnail_url ? (
+          <Image
+            source={{ uri: story.thumbnail_url }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+        )
+      ) : (
+        <Video
+          ref={videoRef}
+          source={{ uri: story.video_url }}
+          style={StyleSheet.absoluteFill}
+          resizeMode={ResizeMode.COVER}
+          isLooping
+          isMuted={active ? muted : true}
+          shouldPlay={active && tabFocused && !paused && !buyVisible}
+          posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
+          usePoster={!!story.thumbnail_url && !active}
+          posterStyle={StyleSheet.absoluteFillObject}
+        />
+      )}
 
       {paused && (
         <View style={styles.pauseOverlay} pointerEvents="none">
@@ -1637,6 +1660,7 @@ export default function FeedScreen() {
         story={item}
         active={index === activeIndex}
         isPreload={index === activeIndex + 1}
+        shouldUnload={Math.abs(index - activeIndex) > 2}
         tabFocused={tabFocused}
         onSwipeDown={handleSwipeDown}
         currentUserId={currentUserId}
