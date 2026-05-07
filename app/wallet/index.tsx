@@ -48,12 +48,12 @@ function formatDate(unix: number): string {
   return d.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
-const PAYOUT_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  paid:        { label: 'Versé',       color: '#10B981' },
-  pending:     { label: 'En attente',  color: '#F59E0B' },
-  in_transit:  { label: 'En transit',  color: '#3B82F6' },
-  canceled:    { label: 'Annulé',      color: '#EF4444' },
-  failed:      { label: 'Échoué',      color: '#EF4444' },
+const PAYOUT_STATUS_COLORS: Record<string, string> = {
+  paid:        '#10B981',
+  pending:     '#F59E0B',
+  in_transit:  '#3B82F6',
+  canceled:    '#EF4444',
+  failed:      '#EF4444',
 }
 
 // ─── Components ───────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function SectionTitle({ title }: { title: string }) {
   return <Text style={styles.sectionTitle}>{title}</Text>
 }
 
-function TransactionRow({ transfer }: { transfer: Transfer }) {
+function TransactionRow({ transfer, t }: { transfer: Transfer; t: (key: string, options?: any) => string }) {
   return (
     <View style={styles.txRow}>
       <View style={styles.txIconWrap}>
@@ -70,7 +70,7 @@ function TransactionRow({ transfer }: { transfer: Transfer }) {
       </View>
       <View style={styles.txInfo}>
         <Text style={styles.txLabel} numberOfLines={1}>
-          {transfer.description ? `Vente #${transfer.description.slice(-6)}` : 'Vente'}
+          {transfer.description ? `${t('profile.sales')} #${transfer.description.slice(-6)}` : t('profile.sales')}
         </Text>
         <Text style={styles.txDate}>{formatDate(transfer.date)}</Text>
       </View>
@@ -79,33 +79,33 @@ function TransactionRow({ transfer }: { transfer: Transfer }) {
   )
 }
 
-function PayoutRow({ payout }: { payout: Payout }) {
-  const cfg = PAYOUT_STATUS_LABELS[payout.status] ?? PAYOUT_STATUS_LABELS.pending
+function PayoutRow({ payout, t }: { payout: Payout; t: (key: string, options?: any) => string }) {
+  const color = PAYOUT_STATUS_COLORS[payout.status] ?? PAYOUT_STATUS_COLORS.pending
   return (
     <View style={styles.txRow}>
       <View style={styles.txIconWrap}>
-        <Ionicons name="arrow-up-circle" size={22} color={cfg.color} />
+        <Ionicons name="arrow-up-circle" size={22} color={color} />
       </View>
       <View style={styles.txInfo}>
-        <Text style={styles.txLabel}>Virement bancaire</Text>
+        <Text style={styles.txLabel}>{t('wallet.transfer_bank')}</Text>
         <Text style={styles.txDate}>{formatDate(payout.arrival_date)}</Text>
       </View>
       <View style={styles.txRight}>
         <Text style={[styles.txAmount, { color: colors.text }]}>
           -CHF {payout.amount_chf.toFixed(2)}
         </Text>
-        <View style={[styles.statusDot, { backgroundColor: cfg.color }]} />
+        <View style={[styles.statusDot, { backgroundColor: color }]} />
       </View>
     </View>
   )
 }
 
-function EmptyTransactions() {
+function EmptyTransactions({ t }: { t: (key: string, options?: any) => string }) {
   return (
     <View style={styles.emptyTx}>
       <Ionicons name="receipt-outline" size={40} color={colors.border} />
-      <Text style={styles.emptyTxText}>Aucune transaction</Text>
-      <Text style={styles.emptyTxSub}>Vos gains apparaîtront ici une fois vos premières ventes livrées.</Text>
+      <Text style={styles.emptyTxText}>{t('wallet.no_transactions')}</Text>
+      <Text style={styles.emptyTxSub}>{t('wallet.no_transactions_hint')}</Text>
     </View>
   )
 }
@@ -187,7 +187,7 @@ export default function WalletScreen() {
             ) : error ? (
               <View style={styles.errorBlock}>
                 <Ionicons name="alert-circle-outline" size={20} color={colors.error} />
-                <Text style={styles.errorText}>{error === 'forbidden' ? 'Accès vendeur requis' : error}</Text>
+                <Text style={styles.errorText}>{error === 'forbidden' ? t('wallet.seller_access_required') : error}</Text>
               </View>
             ) : (
               <>
@@ -200,7 +200,7 @@ export default function WalletScreen() {
                       <View style={styles.balanceDetail}>
                         <View style={[styles.detailDot, { backgroundColor: '#F59E0B' }]} />
                         <Text style={styles.balanceDetailText}>
-                          En transit : CHF {(data?.stripe_pending_chf ?? 0).toFixed(2)}
+                          {t('wallet.in_transit', { amount: (data?.stripe_pending_chf ?? 0).toFixed(2) })}
                         </Text>
                       </View>
                     )}
@@ -208,7 +208,7 @@ export default function WalletScreen() {
                       <View style={styles.balanceDetail}>
                         <View style={[styles.detailDot, { backgroundColor: '#3B82F6' }]} />
                         <Text style={styles.balanceDetailText}>
-                          En attente de livraison : CHF {(data?.escrow_pending_chf ?? 0).toFixed(2)}
+                          {t('wallet.awaiting_delivery', { amount: (data?.escrow_pending_chf ?? 0).toFixed(2) })}
                         </Text>
                       </View>
                     )}
@@ -235,7 +235,7 @@ export default function WalletScreen() {
                 activeOpacity={0.85}
               >
                 <Ionicons name="card-outline" size={16} color="#0F0F0F" />
-                <Text style={styles.payoutBtnText}>Gérer mes moyens de paiement</Text>
+                <Text style={styles.payoutBtnText}>{t('wallet.manage_payment')}</Text>
               </TouchableOpacity>
             )}
           </LinearGradient>
@@ -250,7 +250,7 @@ export default function WalletScreen() {
               <View style={styles.quickIconWrap}>
                 <Ionicons name="card-outline" size={22} color={colors.primary} />
               </View>
-              <Text style={styles.quickLabel}>Mes cartes</Text>
+              <Text style={styles.quickLabel}>{t('wallet.my_cards')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -261,7 +261,7 @@ export default function WalletScreen() {
               <View style={styles.quickIconWrap}>
                 <Ionicons name="bag-outline" size={22} color={colors.primary} />
               </View>
-              <Text style={styles.quickLabel}>Commandes</Text>
+              <Text style={styles.quickLabel}>{t('wallet.my_orders')}</Text>
             </TouchableOpacity>
 
             {isSeller && (
@@ -273,7 +273,7 @@ export default function WalletScreen() {
                 <View style={styles.quickIconWrap}>
                   <Ionicons name="receipt-outline" size={22} color={colors.primary} />
                 </View>
-                <Text style={styles.quickLabel}>Mes ventes</Text>
+                <Text style={styles.quickLabel}>{t('wallet.my_sales')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -285,25 +285,25 @@ export default function WalletScreen() {
           >
             <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
             <Text style={styles.complianceText}>
-              Paiements sécurisés · Conformité LPD Suisse
+              {t('wallet.security_badge')}
             </Text>
           </LinearGradient>
 
           {/* Transactions */}
           {isSeller && (
             <View style={styles.section}>
-              <SectionTitle title="Transactions récentes" />
+              <SectionTitle title={t('wallet.recent_transactions')} />
               {loading ? (
                 <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 24 }} />
               ) : allTransactions.length === 0 ? (
-                <EmptyTransactions />
+                <EmptyTransactions t={t} />
               ) : (
                 <View style={styles.txList}>
                   {allTransactions.map(entry =>
                     entry.type === 'transfer' ? (
-                      <TransactionRow key={entry.item.id} transfer={entry.item as Transfer} />
+                      <TransactionRow key={entry.item.id} transfer={entry.item as Transfer} t={t} />
                     ) : (
-                      <PayoutRow key={entry.item.id} payout={entry.item as Payout} />
+                      <PayoutRow key={entry.item.id} payout={entry.item as Payout} t={t} />
                     )
                   )}
                 </View>

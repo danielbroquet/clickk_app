@@ -58,7 +58,7 @@ function AddCell() {
     <TouchableOpacity
       style={[gridStyles.cell, gridStyles.addCell]}
       activeOpacity={0.85}
-      onPress={() => router.push('/story/create')}
+      onPress={() => router.push('/(seller)/story/create')}
     >
       <Ionicons name="add" size={44} color="#0F0F0F" />
       <Text style={gridStyles.addCellLabel}>{t('profile.new_story')}</Text>
@@ -1099,7 +1099,7 @@ export default function ProfileScreen() {
               <Text style={styles.emptyTitle}>{t('profile.no_publications')}</Text>
               <TouchableOpacity
                 style={styles.emptyCta}
-                onPress={() => router.push('/story/create')}
+                onPress={() => router.push('/(seller)/story/create')}
                 activeOpacity={0.85}
               >
                 <Text style={styles.emptyCtaText}>{t('story.create.title')}</Text>

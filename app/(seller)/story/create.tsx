@@ -387,6 +387,7 @@ export default function CreateDropScreen() {
   const { t } = useTranslation()
   const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
   const isRelaunch = !!relaunchId
+  const [relaunchLoading, setRelaunchLoading] = useState(!!relaunchId)
 
   useEffect(() => {
     if (profile && profile.role !== 'seller') {
@@ -427,18 +428,18 @@ export default function CreateDropScreen() {
         .select('title, description, category, condition, start_price_chf, floor_price_chf, price_drop_seconds, duration_hours, speed_preset, thumbnail_url, video_url')
         .eq('id', relaunchId)
         .maybeSingle()
-      if (!mounted || !data) return
+      if (!mounted || !data) { setRelaunchLoading(false); return }
       setTitle(data.title ?? '')
       setDescription(data.description ?? '')
-      setCategory(data.category ?? '')
+      setCategory(data.category ?? 'autre')
       setCondition((data as any).condition ?? '')
-      setStartPrice(data.start_price_chf?.toString() ?? '')
-      setFloorPrice(data.floor_price_chf?.toString() ?? '')
-      const sp = (data.speed_preset as SpeedPreset) ?? 'STANDARD'
-      setPreset(sp && DURATION[sp] ? sp : 'STANDARD')
+      setStartPrice(String(data.start_price_chf ?? ''))
+      setFloorPrice(String(data.floor_price_chf ?? ''))
+      if (data.speed_preset) setPreset(data.speed_preset as SpeedPreset)
       setDurationHours(data.duration_hours ?? 72)
-      if (data.video_url) setVideoUri(data.video_url)
-      if (data.thumbnail_url) setThumbnailUri(data.thumbnail_url)
+      setVideoUri(data.video_url ?? null)
+      setThumbnailUri(data.thumbnail_url ?? null)
+      setRelaunchLoading(false)
     })()
     return () => { mounted = false }
   }, [relaunchId])
@@ -784,6 +785,16 @@ export default function CreateDropScreen() {
   // ─── render ────────────────────────────────────────────────────────────────
 
   if (isRelaunch) {
+    if (relaunchLoading) {
+      return (
+        <SafeAreaView style={s.safe} edges={['top']}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </SafeAreaView>
+      )
+    }
+
     return (
       <SafeAreaView style={s.safe} edges={['top']}>
         <View style={s.header}>

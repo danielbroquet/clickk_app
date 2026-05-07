@@ -121,7 +121,7 @@ export default function TabLayout() {
               style={styles.option}
               onPress={() => {
                 setShowSellModal(false)
-                router.push('/story/create')
+                router.push('/(seller)/story/create')
               }}
             >
               <Ionicons name="videocam-outline" size={24} color={colors.primary} style={{ marginRight: spacing.md }} />
