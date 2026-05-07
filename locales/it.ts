@@ -9,6 +9,15 @@ export default {
     next: 'Avanti',
     publish: 'Pubblica',
     chf: 'CHF',
+    now: 'adesso',
+    day_short: 'g',
+    week_short: 'set',
+  },
+  tabs: {
+    feed: 'Drops',
+    discover: 'Scoprire',
+    inbox: 'Messaggi',
+    profile: 'Profilo',
   },
   story: {
     chf: 'CHF %{price}',
@@ -441,6 +450,7 @@ export default {
     camera_permission: 'Attiva la fotocamera nelle impostazioni.',
     gallery_permission: 'Attiva la galleria nelle impostazioni.',
     media_error: 'Impossibile inviare il media.',
+    slide_to_cancel: 'Scorri per annullare',
   },
   shipping: {
     title: 'Indirizzo di consegna',

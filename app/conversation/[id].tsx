@@ -658,7 +658,7 @@ export default function ConversationScreen() {
                   {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
                   {String(recordingDuration % 60).padStart(2, '0')}
                 </Text>
-                <Text style={styles.recordingHint}>Glisse pour annuler</Text>
+                <Text style={styles.recordingHint}>{t('conversation.slide_to_cancel')}</Text>
               </View>
               <TouchableOpacity onPress={stopRecording} hitSlop={8}>
                 <Ionicons name="stop-circle" size={36} color={colors.error} />

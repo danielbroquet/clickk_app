@@ -9,6 +9,15 @@ export default {
     next: 'Next',
     publish: 'Publish',
     chf: 'CHF',
+    now: 'now',
+    day_short: 'd',
+    week_short: 'w',
+  },
+  tabs: {
+    feed: 'Drops',
+    discover: 'Discover',
+    inbox: 'Messages',
+    profile: 'Profile',
   },
   story: {
     chf: 'CHF %{price}',
@@ -441,6 +450,7 @@ export default {
     camera_permission: 'Enable the camera in settings.',
     gallery_permission: 'Enable the gallery in settings.',
     media_error: 'Unable to send media.',
+    slide_to_cancel: 'Slide to cancel',
   },
   shipping: {
     title: 'Delivery address',

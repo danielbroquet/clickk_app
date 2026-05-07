@@ -9,6 +9,7 @@ import {
   Modal,
   StyleSheet,
   Pressable,
+  Platform,
 } from 'react-native'
 import { Tabs, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -47,7 +48,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Drops',
+            title: t('tabs.feed'),
             tabBarIcon: ({ focused, color }) => (
               <Ionicons name={focused ? 'home' : 'home-outline'} size={22} color={color} />
             ),
@@ -56,7 +57,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="discover"
           options={{
-            title: 'Découvrir',
+            title: t('tabs.discover'),
             tabBarIcon: ({ focused, color }) => (
               <Ionicons name={focused ? 'compass' : 'compass-outline'} size={22} color={color} />
             ),
@@ -74,7 +75,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="inbox"
           options={{
-            title: 'Messages',
+            title: t('tabs.inbox'),
             tabBarIcon: ({ focused, color }) => (
               <View>
                 <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={22} color={color} />
@@ -97,7 +98,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profil',
+            title: t('tabs.profile'),
             tabBarIcon: ({ focused, color }) => (
               <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
             ),
@@ -145,10 +146,10 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.bg,
+    borderTopWidth: 0.5,
     borderTopColor: colors.border,
-    borderTopWidth: 1,
-    height: 68,
-    paddingBottom: 8,
+    height: Platform.OS === 'ios' ? 84 : 64,
+    paddingBottom: Platform.OS === 'ios' ? 0 : 8,
   },
   tabLabel: {
     fontFamily: fontFamily.semiBold,

@@ -52,16 +52,16 @@ interface Conversation {
 
 // ─── Messages helpers ────────────────────────────────────────────────────────
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: (key: string) => string): string {
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'maintenant'
+  if (mins < 1) return t('common.now')
   if (mins < 60) return `${mins}m`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h`
   const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}j`
-  return `${Math.floor(days / 7)}sem`
+  if (days < 7) return `${days}${t('common.day_short')}`
+  return `${Math.floor(days / 7)}${t('common.week_short')}`
 }
 
 function lastMessage(messages: MessageRow[]): string {
@@ -99,7 +99,7 @@ function ConversationRow({
   const other = otherUser(conv, userId)
   const preview = lastMessage(conv.messages)
   const badge = unreadMsgCount(conv.messages, userId)
-  const time = relativeTime(conv.updated_at)
+  const time = relativeTime(conv.updated_at, t)
 
   return (
     <TouchableOpacity style={msgStyles.row} onPress={onPress} activeOpacity={0.7}>
