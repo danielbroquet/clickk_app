@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Video, ResizeMode } from 'expo-av'
 import {
   View,
@@ -692,12 +692,14 @@ function CommentsSheet({
 function DropItem({
   story,
   active,
+  isPreload,
   tabFocused,
   onSwipeDown,
   currentUserId,
 }: {
   story: FeedStory
   active: boolean
+  isPreload: boolean
   tabFocused: boolean
   onSwipeDown: () => void
   currentUserId: string
@@ -806,6 +808,12 @@ function DropItem({
       videoRef.current.pauseAsync().catch(() => {})
     }
   }, [active, tabFocused, paused, buyVisible])
+
+  useEffect(() => {
+    if (!active && !isPreload) {
+      videoRef.current?.unloadAsync().catch(() => {})
+    }
+  }, [active, isPreload])
 
   // Fetch comments + count when drop becomes active
   useEffect(() => {
@@ -980,10 +988,11 @@ function DropItem({
         style={StyleSheet.absoluteFill}
         resizeMode={ResizeMode.COVER}
         isLooping
-        isMuted={muted}
+        isMuted={active ? muted : true}
         shouldPlay={active && tabFocused && !paused && !buyVisible}
         posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
-        usePoster={!!story.thumbnail_url}
+        usePoster={!!story.thumbnail_url && !active}
+        posterStyle={StyleSheet.absoluteFill as any}
       />
 
       {paused && (
@@ -1403,7 +1412,7 @@ export default function FeedScreen() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [tabFocused, setTabFocused] = useState(true)
   const [toast, setToast] = useState<SaleToastPayload | null>(null)
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 })
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 })
   const flatListRef = useRef<FlatList<FeedStory>>(null)
 
   useFocusEffect(
@@ -1622,16 +1631,12 @@ export default function FeedScreen() {
   const activeStories = activeTab === 'foryou' ? forYouStories : followingStories
   const isLoading = activeTab === 'foryou' ? forYouLoading : followingLoading
 
-  const preloadStories = useMemo(
-    () => activeStories.slice(activeIndex + 1, activeIndex + 3),
-    [activeStories, activeIndex]
-  )
-
   const renderItem: ListRenderItem<FeedStory> = useCallback(
     ({ item, index }) => (
       <DropItem
         story={item}
         active={index === activeIndex}
+        isPreload={index === activeIndex + 1}
         tabFocused={tabFocused}
         onSwipeDown={handleSwipeDown}
         currentUserId={currentUserId}
@@ -1783,19 +1788,6 @@ export default function FeedScreen() {
       {tabHeader}
 
       {toast && <SaleToast key={toast.id} payload={toast} onDismiss={() => setToast(null)} />}
-
-      <View style={styles.preloadHidden} pointerEvents="none">
-        {preloadStories.map((s) => (
-          <Video
-            key={`pre-${s.id}`}
-            source={{ uri: s.video_url }}
-            style={styles.preloadVideo}
-            shouldPlay={false}
-            isMuted
-            resizeMode={ResizeMode.COVER}
-          />
-        ))}
-      </View>
     </View>
   )
 }
