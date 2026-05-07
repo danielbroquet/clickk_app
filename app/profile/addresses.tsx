@@ -219,14 +219,17 @@ function AddressForm({
   const [error, setError] = useState<string | null>(null)
   const [streetSuggestions, setStreetSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchingAddress, setSearchingAddress] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const searchSwissAddress = useCallback(async (query: string) => {
     if (query.length < 4) {
       setStreetSuggestions([])
       setShowSuggestions(false)
+      setSearchingAddress(false)
       return
     }
+    setSearchingAddress(true)
     try {
       const res = await fetch(
         `https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&origins=address&limit=6&sr=4326`,
@@ -244,6 +247,9 @@ function AddressForm({
       setShowSuggestions(results.length > 0)
     } catch {
       setStreetSuggestions([])
+      setShowSuggestions(false)
+    } finally {
+      setSearchingAddress(false)
     }
   }, [])
 
@@ -326,7 +332,7 @@ function AddressForm({
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Text style={styles.fieldLabel}>Nom et prénom</Text>
           <TextInput
             style={styles.input}
@@ -338,17 +344,32 @@ function AddressForm({
           />
 
           <Text style={styles.fieldLabel}>Adresse</Text>
-          <TextInput
-            style={styles.input}
-            value={line1}
-            onChangeText={(val) => {
-              setLine1(val)
-              if (searchTimeout.current) clearTimeout(searchTimeout.current)
-              searchTimeout.current = setTimeout(() => searchSwissAddress(val), 400)
-            }}
-            placeholderTextColor={C.muted}
-            placeholder="Rue du Lac 12"
-          />
+          <View style={styles.line1Wrap}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={line1}
+              onChangeText={(v) => {
+                setLine1(v)
+                setShowSuggestions(false)
+                if (searchTimeout.current) clearTimeout(searchTimeout.current)
+                searchTimeout.current = setTimeout(() => {
+                  searchSwissAddress(v)
+                }, 350)
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowSuggestions(false), 150)
+              }}
+              placeholderTextColor={C.muted}
+              placeholder="Rue du Lac 12"
+            />
+            {searchingAddress && (
+              <ActivityIndicator
+                size="small"
+                color={C.primary}
+                style={styles.line1Spinner}
+              />
+            )}
+          </View>
           {showSuggestions && streetSuggestions.length > 0 && (
             <View style={styles.suggestionBox}>
               {streetSuggestions.map((s, i) => (
@@ -543,6 +564,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   row: { flexDirection: 'row' },
+  line1Wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  line1Spinner: {
+    position: 'absolute',
+    right: 14,
+  },
   error: { color: C.danger, fontSize: 13, marginTop: 14, textAlign: 'center' },
   footer: {
     padding: 16,
