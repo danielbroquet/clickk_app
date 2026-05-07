@@ -145,48 +145,57 @@ function MessageBubble({ msg, isMe, t }: { msg: Message; isMe: boolean; t: (key:
 
   return (
     <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowOther]}>
-      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-        {msg.message_type === 'image' && msg.media_url ? (
+      {msg.message_type === 'image' && msg.media_url ? (
+        <View style={{ maxWidth: '75%' }}>
           <Image
             source={{ uri: msg.media_url }}
-            style={{ width: 200, height: 150, borderRadius: 8 }}
+            style={{ width: 220, height: 220 * (4 / 3), borderRadius: 12, backgroundColor: colors.surface }}
             resizeMode="cover"
           />
-        ) : msg.message_type === 'audio' && msg.media_url ? (
-          <TouchableOpacity
-            onPress={playAudio}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingHorizontal: 4 }}
-          >
-            <Ionicons
-              name={playing ? 'pause-circle' : 'play-circle'}
-              size={32}
-              color={isMe ? '#0F0F0F' : colors.primary}
-            />
-            <View>
-              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther, { fontSize: 13 }]}>
-                {t('conversation.voice_message')}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
-                {[...Array(12)].map((_, i) => (
-                  <View key={i} style={{
-                    width: 2, borderRadius: 1,
-                    height: Math.random() * 14 + 4,
-                    backgroundColor: isMe ? 'rgba(0,0,0,0.3)' : colors.primary,
-                    opacity: playing ? 1 : 0.5,
-                  }} />
-                ))}
-              </View>
-            </View>
-          </TouchableOpacity>
-        ) : (
-          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]}>
-            {msg.content}
+          <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
+            {formatTime(msg.created_at)}
           </Text>
-        )}
-      </View>
-      <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
-        {formatTime(msg.created_at)}
-      </Text>
+        </View>
+      ) : (
+        <>
+          <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
+            {msg.message_type === 'audio' && msg.media_url ? (
+              <TouchableOpacity
+                onPress={playAudio}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, paddingHorizontal: 4 }}
+              >
+                <Ionicons
+                  name={playing ? 'pause-circle' : 'play-circle'}
+                  size={32}
+                  color={isMe ? '#0F0F0F' : colors.primary}
+                />
+                <View>
+                  <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther, { fontSize: 13 }]}>
+                    {t('conversation.voice_message')}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 2, marginTop: 3 }}>
+                    {[...Array(12)].map((_, i) => (
+                      <View key={i} style={{
+                        width: 2, borderRadius: 1,
+                        height: Math.random() * 14 + 4,
+                        backgroundColor: isMe ? 'rgba(0,0,0,0.3)' : colors.primary,
+                        opacity: playing ? 1 : 0.5,
+                      }} />
+                    ))}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextOther]}>
+                {msg.content}
+              </Text>
+            )}
+          </View>
+          <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
+            {formatTime(msg.created_at)}
+          </Text>
+        </>
+      )}
     </View>
   )
 }
@@ -541,34 +550,19 @@ export default function ConversationScreen() {
     }
   }, [sendMedia])
 
-  // ── Mic PanResponder (press-and-hold to record) ────────────────────────────
+  // ── Recording bar PanResponder (slide-to-cancel) ──────────────────────────
 
-  const startRecordingRef = useRef(startRecording)
-  const stopRecordingRef = useRef(stopRecording)
   const cancelRecordingRef = useRef(cancelRecording)
-  useEffect(() => { startRecordingRef.current = startRecording }, [startRecording])
-  useEffect(() => { stopRecordingRef.current = stopRecording }, [stopRecording])
   useEffect(() => { cancelRecordingRef.current = cancelRecording }, [cancelRecording])
 
-  const micPanResponder = useRef(
+  const recordingPanResponder = useRef(
     PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        startRecordingRef.current()
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10,
+      onPanResponderMove: (_, g) => {
+        setCancelIntent(g.dx < -60)
       },
-      onPanResponderMove: (_, gestureState) => {
-        setCancelIntent(gestureState.dx < -80)
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -80) {
-          cancelRecordingRef.current()
-        } else {
-          stopRecordingRef.current()
-        }
-        setCancelIntent(false)
-      },
-      onPanResponderTerminate: () => {
-        cancelRecordingRef.current()
+      onPanResponderRelease: (_, g) => {
+        if (g.dx < -60) cancelRecordingRef.current()
         setCancelIntent(false)
       },
     })
@@ -682,7 +676,7 @@ export default function ConversationScreen() {
         {/* Input bar */}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
           {isRecording ? (
-            <View style={styles.recordingBar}>
+            <View style={styles.recordingBar} {...recordingPanResponder.panHandlers}>
               <View style={styles.recordingLeft}>
                 <View style={styles.recordingDot} />
                 <Text style={styles.recordingTime}>
@@ -700,10 +694,7 @@ export default function ConversationScreen() {
                   {cancelIntent ? 'Annulation...' : t('conversation.slide_to_cancel')}
                 </Text>
               </View>
-              <View
-                {...micPanResponder.panHandlers}
-                style={styles.micHoldBtn}
-              >
+              <View style={styles.micHoldBtn}>
                 <Ionicons name="mic" size={26} color={colors.primary} />
               </View>
             </View>
@@ -748,16 +739,31 @@ export default function ConversationScreen() {
                   <Send size={20} color={canSend ? colors.bg : colors.textSecondary} />
                 </TouchableOpacity>
               ) : (
-                <View
-                  {...micPanResponder.panHandlers}
+                <TouchableOpacity
+                  onLongPress={() => startRecording()}
+                  onPressOut={() => {
+                    if (isRecording) {
+                      if (cancelIntent) {
+                        cancelRecording()
+                      } else {
+                        stopRecording()
+                      }
+                    }
+                  }}
+                  delayLongPress={200}
+                  activeOpacity={0.7}
                   style={{ paddingHorizontal: 4 }}
                 >
                   {sendingMedia ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Ionicons name="mic-outline" size={26} color={colors.textSecondary} />
+                    <Ionicons
+                      name={isRecording ? 'mic' : 'mic-outline'}
+                      size={26}
+                      color={isRecording ? colors.primary : colors.textSecondary}
+                    />
                   )}
-                </View>
+                </TouchableOpacity>
               )}
             </>
           )}
