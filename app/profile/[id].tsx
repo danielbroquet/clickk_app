@@ -149,7 +149,7 @@ function DropGridCell({ drop, profileId }: { drop: Drop; profileId: string }) {
     <TouchableOpacity
       style={gridStyles.cell}
       activeOpacity={0.85}
-      onPress={() => router.push({ pathname: '/story/[id]', params: { id: drop.id, fromProfile: profileId } })}
+      onPress={() => router.push({ pathname: '/seller-feed/[sellerId]', params: { sellerId: profileId, initialStoryId: drop.id } })}
     >
       {thumb ? (
         <Image source={{ uri: thumb }} style={gridStyles.thumb} resizeMode="cover" />

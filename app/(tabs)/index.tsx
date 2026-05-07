@@ -45,7 +45,7 @@ import { getOrCreateConversation } from '../../lib/utils'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
-interface FeedStory {
+export interface FeedStory {
   id: string
   seller_id: string
   title: string
@@ -66,7 +66,7 @@ interface FeedStory {
 
 const PAGE_SIZE = 15
 
-const STORY_SELECT = `
+export const STORY_SELECT = `
   id, seller_id, title, description, category, start_price_chf, floor_price_chf, current_price_chf,
   video_url, thumbnail_url, status, buyer_id, created_at, expires_at, price_drop_seconds,
   seller:seller_id ( id, username, avatar_url )
@@ -156,7 +156,7 @@ function RecentViewersPill({ count }: { count: number }) {
 }
 
 
-function DropItem({
+export function DropItem({
   story,
   active,
   isPreload,
