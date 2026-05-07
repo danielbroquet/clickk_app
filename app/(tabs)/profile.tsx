@@ -79,6 +79,7 @@ function DropGridCell({
   onLongPress: () => void
   onDelete: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const status = drop.status
   const rotation = useSharedValue(0)
@@ -111,15 +112,15 @@ function DropGridCell({
 
   const handleDeletePress = () => {
     if (status === 'sold' || status === 'shipped') {
-      Alert.alert('Impossible — ce drop a déjà été vendu.')
+      Alert.alert(t('profile.delete_sold_error'))
       return
     }
     Alert.alert(
-      'Supprimer ce drop ?',
+      t('profile.delete_confirm_title'),
       undefined,
       [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('profile.delete_confirm_action'), style: 'destructive', onPress: () => onDelete(drop.id) },
       ],
     )
   }
@@ -150,18 +151,18 @@ function DropGridCell({
           {/* Status badge */}
           {variant === 'own' && status === 'sold' && (
             <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-              <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+              <Text style={gridStyles.statusSoldText}>{t('profile.status_sold')}</Text>
             </View>
           )}
           {variant === 'own' && status === 'expired' && (
             <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
-              <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+              <Text style={gridStyles.statusExpiredText}>{t('profile.status_expired')}</Text>
             </View>
           )}
           {variant === 'purchase' && (
             <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
               <Text style={gridStyles.statusSoldText}>
-                {status === 'delivered' ? 'Livré' : status === 'shipped' ? 'Expédié' : 'En cours'}
+                {status === 'delivered' ? t('profile.status_delivered') : status === 'shipped' ? t('profile.status_shipped') : t('profile.status_in_progress')}
               </Text>
             </View>
           )}
@@ -290,6 +291,7 @@ function EditProfileSheet({
   initialUsername: string
   initialAvatarUrl: string | null
 }) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const slideAnim = useRef(new Animated.Value(400)).current
   const [displayName, setDisplayName] = useState(initialDisplayName)
@@ -326,7 +328,7 @@ function EditProfileSheet({
     if (result.canceled || !result.assets[0]) return
     const asset = result.assets[0]
     if (!asset.base64) {
-      setError('Impossible de lire l\'image.')
+      setError(t('profile.image_read_error'))
       return
     }
     setAvatarUploading(true)
@@ -385,12 +387,12 @@ function EditProfileSheet({
           <View style={sheetStyles.handle} />
           <View style={sheetStyles.sheetHeader}>
             <TouchableOpacity onPress={onClose}>
-              <Text style={sheetStyles.cancelText}>Annuler</Text>
+              <Text style={sheetStyles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
-            <Text style={sheetStyles.sheetTitle}>Modifier le profil</Text>
+            <Text style={sheetStyles.sheetTitle}>{t('profile.edit')}</Text>
             <TouchableOpacity onPress={handleSave} disabled={saving || avatarUploading}>
               <Text style={[sheetStyles.saveText, (saving || avatarUploading) && sheetStyles.savingText]}>
-                {saving ? '...' : 'Enregistrer'}
+                {saving ? '...' : t('common.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -420,23 +422,23 @@ function EditProfileSheet({
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={sheetStyles.avatarHint}>Modifier la photo</Text>
+            <Text style={sheetStyles.avatarHint}>{t('profile.edit_photo')}</Text>
           </View>
 
           <View style={sheetStyles.fieldGroup}>
-            <Text style={sheetStyles.fieldLabel}>Nom affiché</Text>
+            <Text style={sheetStyles.fieldLabel}>{t('profile.display_name')}</Text>
             <TextInput
               style={sheetStyles.input}
               value={displayName}
               onChangeText={setDisplayName}
-              placeholder="Nom affiché"
+              placeholder={t('profile.display_name')}
               placeholderTextColor={colors.textSecondary}
               returnKeyType="next"
             />
           </View>
 
           <View style={sheetStyles.fieldGroup}>
-            <Text style={sheetStyles.fieldLabel}>Nom d'utilisateur</Text>
+            <Text style={sheetStyles.fieldLabel}>{t('profile.username')}</Text>
             <TextInput
               style={sheetStyles.input}
               value={username}
@@ -450,14 +452,14 @@ function EditProfileSheet({
 
           <View style={sheetStyles.fieldGroup}>
             <View style={sheetStyles.bioLabelRow}>
-              <Text style={sheetStyles.fieldLabel}>Bio</Text>
+              <Text style={sheetStyles.fieldLabel}>{t('profile.bio')}</Text>
               <Text style={sheetStyles.charCount}>{bio.length}/150</Text>
             </View>
             <TextInput
               style={[sheetStyles.input, sheetStyles.bioInput]}
               value={bio}
-              onChangeText={t => setBio(t.slice(0, 150))}
-              placeholder="Parlez-nous de vous…"
+              onChangeText={val => setBio(val.slice(0, 150))}
+              placeholder={t('profile.bio_placeholder')}
               placeholderTextColor={colors.textSecondary}
               multiline
               maxLength={150}
@@ -571,6 +573,7 @@ function FollowersModal({
   onClose: () => void
   userId: string
 }) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const [followers, setFollowers] = useState<FollowerProfile[]>([])
   const [loading, setLoading] = useState(false)
@@ -596,7 +599,7 @@ function FollowersModal({
           <View style={followersStyles.handle} />
           <View style={followersStyles.headerRow}>
             <View style={{ width: 32 }} />
-            <Text style={followersStyles.title}>Abonnés</Text>
+            <Text style={followersStyles.title}>{t('profile.followers')}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -610,12 +613,12 @@ function FollowersModal({
         ) : followers.length === 0 ? (
           <View style={followersStyles.center}>
             <Ionicons name="people-outline" size={44} color={colors.border} />
-            <Text style={followersStyles.emptyText}>Aucun abonné pour l'instant</Text>
+            <Text style={followersStyles.emptyText}>{t('profile.no_followers')}</Text>
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={followersStyles.list}>
             {followers.map(f => {
-              const name = f.display_name ?? f.username ?? 'Utilisateur'
+              const name = f.display_name ?? f.username ?? t('profile.default_user')
               const initial = name.charAt(0).toUpperCase()
               return (
                 <TouchableOpacity
@@ -704,6 +707,7 @@ const followersStyles = StyleSheet.create({
 // ── StarRating ───────────────────────────────────────────────────────────────
 
 function StarRating({ avg, count }: { avg: number; count: number }) {
+  const { t } = useTranslation()
   if (count === 0) return null
   const stars = Math.round(avg)
   return (
@@ -722,7 +726,7 @@ function StarRating({ avg, count }: { avg: number; count: number }) {
         ))}
       </View>
       <Text style={starStyles.avg}>{avg.toFixed(1)}</Text>
-      <Text style={starStyles.count}>({count} avis)</Text>
+      <Text style={starStyles.count}>({count} {t('profile.rating_reviews')})</Text>
     </TouchableOpacity>
   )
 }
@@ -887,7 +891,7 @@ export default function ProfileScreen() {
       .eq('seller_id', currentUserId)
   }
 
-  const displayName = profile?.display_name ?? profile?.username ?? 'Utilisateur'
+  const displayName = profile?.display_name ?? profile?.username ?? t('profile.default_user')
   const username = profile?.username ?? 'username'
   const initial = displayName.charAt(0).toUpperCase()
 
@@ -909,7 +913,7 @@ export default function ProfileScreen() {
               activeOpacity={0.7}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.terminerText}>Terminer</Text>
+              <Text style={styles.terminerText}>{t('profile.done')}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -1012,7 +1016,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="cube-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>Mes commandes</Text>
+            <Text style={styles.quickLabel}>{t('profile.my_orders')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1021,7 +1025,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="card-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>Paiement</Text>
+            <Text style={styles.quickLabel}>{t('profile.payment_methods')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1030,7 +1034,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="location-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>Adresses</Text>
+            <Text style={styles.quickLabel}>{t('profile.addresses_link')}</Text>
           </TouchableOpacity>
 
           {profile?.role === 'seller' && (
@@ -1073,7 +1077,7 @@ export default function ProfileScreen() {
               color={activeTab === 'favoris' ? colors.primary : colors.textSecondary}
             />
             <Text style={[styles.tabLabel, activeTab === 'favoris' && styles.tabLabelActive]}>
-              Favoris
+              {t('profile.favorites')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1110,7 +1114,7 @@ export default function ProfileScreen() {
         ) : likedStories.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="heart-outline" size={48} color={colors.textSecondary} />
-            <Text style={styles.emptyTitle}>Aucun favori pour l'instant</Text>
+            <Text style={styles.emptyTitle}>{t('profile.no_favorites')}</Text>
           </View>
         ) : (
           <View style={gridStyles.grid}>

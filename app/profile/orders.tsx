@@ -76,68 +76,72 @@ function formatDate(iso: string | null): string {
   return `${dd}/${mm}/${yyyy}`
 }
 
-function relativeTime(dateStr: string): string {
+function relativeTime(dateStr: string, t: (key: string, params?: Record<string, any>) => string): string {
   const diff  = Date.now() - new Date(dateStr).getTime()
   const mins  = Math.floor(diff / 60_000)
   const hours = Math.floor(diff / 3_600_000)
   const days  = Math.floor(diff / 86_400_000)
-  if (mins  < 1)  return "À l'instant"
-  if (mins  < 60) return `Il y a ${mins} min`
-  if (hours < 24) return `Il y a ${hours} h`
-  if (days  < 30) return `Il y a ${days} j`
+  if (mins  < 1)  return t('orders.time_just_now')
+  if (mins  < 60) return t('orders.time_minutes_ago', { count: mins })
+  if (hours < 24) return t('orders.time_hours_ago', { count: hours })
+  if (days  < 30) return t('orders.time_days_ago', { count: days })
   return new Date(dateStr).toLocaleDateString('fr-CH', { day: 'numeric', month: 'short' })
 }
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<DisplayStatus, { label: string; color: string; bg: string }> = {
-  sold:      { label: "En attente d'expédition", color: '#FFA755', bg: 'rgba(255,167,85,0.12)'   },
-  paid:      { label: "En attente d'expédition", color: '#FFA755', bg: 'rgba(255,167,85,0.12)'   },
-  shipped:   { label: 'Expédié',                 color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'   },
-  delivered: { label: 'Reçu',                    color: '#10B981', bg: 'rgba(16,185,129,0.12)'   },
-  refunded:  { label: 'Remboursé',               color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
-  disputed:  { label: 'Litige en cours',         color: '#FFA502', bg: 'rgba(255,165,2,0.12)'    },
+function getStatusConfig(t: (key: string) => string): Record<DisplayStatus, { label: string; color: string; bg: string }> {
+  return {
+    sold:      { label: t('orders.status_pending'),   color: '#FFA755', bg: 'rgba(255,167,85,0.12)'   },
+    paid:      { label: t('orders.status_pending'),   color: '#FFA755', bg: 'rgba(255,167,85,0.12)'   },
+    shipped:   { label: t('orders.status_shipped'),   color: '#3B82F6', bg: 'rgba(59,130,246,0.12)'   },
+    delivered: { label: t('orders.status_delivered'), color: '#10B981', bg: 'rgba(16,185,129,0.12)'   },
+    refunded:  { label: t('orders.status_refunded'), color: '#EF4444', bg: 'rgba(239,68,68,0.12)'    },
+    disputed:  { label: t('orders.dispute_pending'),  color: '#FFA502', bg: 'rgba(255,165,2,0.12)'    },
+  }
 }
 
-const DISPUTE_REASONS: { key: string; label: string }[] = [
-  { key: 'not_received',    label: "Je n'ai pas reçu le colis" },
-  { key: 'not_as_described', label: "L'article ne correspond pas à la description" },
-  { key: 'damaged',         label: "L'article est endommagé" },
-  { key: 'counterfeit',     label: 'Article contrefait' },
-  { key: 'other',           label: 'Autre problème' },
-]
+function getDisputeReasons(t: (key: string) => string): { key: string; label: string }[] {
+  return [
+    { key: 'not_received',    label: t('orders.dispute_reason_not_received') },
+    { key: 'not_as_described', label: t('orders.dispute_reason_wrong_item') },
+    { key: 'damaged',         label: t('orders.dispute_reason_damaged') },
+    { key: 'counterfeit',     label: t('orders.dispute_reason_other') },
+    { key: 'other',           label: t('orders.dispute_reason_other') },
+  ]
+}
 
-async function fetchSwissPostTracking(trackingNumber: string): Promise<TrackingStatus> {
+async function fetchSwissPostTracking(trackingNumber: string, t: (key: string) => string): Promise<TrackingStatus> {
   try {
     const res = await fetch(
       `https://www.post.ch/api/trackingv2?formattedParcelCodes=${encodeURIComponent(trackingNumber)}&lang=fr`,
       { headers: { 'Accept': 'application/json' } }
     )
-    if (!res.ok) return { status: 'unknown', label: 'Statut indisponible' }
+    if (!res.ok) return { status: 'unknown', label: t('orders.tracking_unavailable') }
     const json = await res.json()
 
     const shipment = json?.[0]
-    if (!shipment) return { status: 'unknown', label: 'Statut indisponible' }
+    if (!shipment) return { status: 'unknown', label: t('orders.tracking_unavailable') }
 
     const events = shipment.events ?? []
     const lastEvent = events[0]
 
     const statusCode = (shipment.status ?? '').toLowerCase()
     let status: TrackingStatus['status'] = 'unknown'
-    let label = 'En transit'
+    let label = t('orders.tracking_in_transit')
 
     if (statusCode.includes('delivr') || statusCode.includes('remis')) {
       status = 'delivered'
-      label = 'Livré'
+      label = t('orders.status_delivered')
     } else if (statusCode.includes('transit') || statusCode.includes('cours')) {
       status = 'in_transit'
-      label = 'En transit'
+      label = t('orders.tracking_in_transit')
     } else if (statusCode.includes('exception') || statusCode.includes('echec')) {
       status = 'exception'
-      label = 'Problème de livraison'
+      label = t('orders.tracking_delivery_issue')
     } else if (lastEvent) {
       status = 'in_transit'
-      label = lastEvent.description ?? 'En transit'
+      label = lastEvent.description ?? t('orders.tracking_in_transit')
     }
 
     return {
@@ -151,12 +155,14 @@ async function fetchSwissPostTracking(trackingNumber: string): Promise<TrackingS
       estimatedDelivery: shipment.estimatedDeliveryDate,
     }
   } catch {
-    return { status: 'unknown', label: 'Statut indisponible' }
+    return { status: 'unknown', label: t('orders.tracking_unavailable') }
   }
 }
 
 function StatusBadge({ status }: { status: DisplayStatus }) {
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.paid
+  const { t } = useTranslation()
+  const statusConfig = getStatusConfig(t)
+  const cfg = statusConfig[status] ?? statusConfig.paid
   return (
     <View style={[styles.badge, { backgroundColor: cfg.bg }]}>
       <Text style={[styles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
@@ -195,7 +201,7 @@ function OrderCard({
     setTrackingExpanded(true)
     if (!tracking) {
       setTrackingLoading(true)
-      const result = await fetchSwissPostTracking(item.tracking_number)
+      const result = await fetchSwissPostTracking(item.tracking_number, t)
       setTracking(result)
       setTrackingLoading(false)
     }
@@ -265,7 +271,7 @@ function OrderCard({
                 <Text style={styles.sellerAvatarText}>{sellerInitial}</Text>
               </View>
             )}
-            <Text style={styles.sellerName}>@{item.seller?.username ?? 'vendeur'}</Text>
+            <Text style={styles.sellerName}>@{item.seller?.username ?? t('orders.seller').toLowerCase()}</Text>
           </View>
 
           <View style={styles.bottomRow}>
@@ -278,10 +284,10 @@ function OrderCard({
                 <Text style={styles.statusDate}>{formatDate(item.delivered_at)}</Text>
               )}
             </View>
-            <Text style={styles.price}>CHF {item.price.toFixed(2)}</Text>
+            <Text style={styles.price}>{t('orders.price_label', { price: item.price.toFixed(2) })}</Text>
           </View>
 
-          <Text style={styles.date}>{relativeTime(item.created_at)}</Text>
+          <Text style={styles.date}>{relativeTime(item.created_at, t)}</Text>
         </View>
       </View>
 
@@ -300,7 +306,7 @@ function OrderCard({
             <View style={styles.trackingRow}>
               <Ionicons name="barcode-outline" size={13} color={colors.textSecondary} />
               <Text style={styles.trackingText} numberOfLines={1}>
-                Numéro de suivi: {item.tracking_number}
+                {t('orders.tracking_number')}: {item.tracking_number}
               </Text>
             </View>
           ) : null}
@@ -314,7 +320,7 @@ function OrderCard({
               >
                 <Ionicons name="navigate-outline" size={14} color={colors.primary} />
                 <Text style={styles.trackBtnText}>
-                  {trackingExpanded ? 'Masquer le suivi' : 'Suivre le colis'}
+                  {trackingExpanded ? t('orders.tracking_hide') : t('orders.tracking_follow')}
                 </Text>
                 {trackingLoading && (
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />
@@ -364,14 +370,14 @@ function OrderCard({
                     <View style={styles.trackingDeliveryRow}>
                       <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
                       <Text style={styles.trackingEventMeta}>
-                        {' '}Livraison estimée : {new Date(tracking.estimatedDelivery).toLocaleDateString('fr-CH')}
+                        {' '}{t('orders.tracking_estimated_delivery')}: {new Date(tracking.estimatedDelivery).toLocaleDateString('fr-CH')}
                       </Text>
                     </View>
                   )}
 
                   {!tracking.lastEvent && tracking.status === 'unknown' && (
                     <Text style={styles.trackingEventMeta}>
-                      Aucune information disponible pour ce numéro de suivi.
+                      {t('orders.tracking_no_info')}
                     </Text>
                   )}
                 </View>
@@ -384,9 +390,7 @@ function OrderCard({
               <View style={styles.confirmWarning}>
                 <Ionicons name="warning-outline" size={16} color="#FFA502" />
                 <Text style={styles.confirmWarningText}>
-                  En confirmant, l'argent est immédiatement envoyé au vendeur.
-                  Aucun retour ou remboursement ne sera possible ensuite.
-                  Si quelque chose ne va pas, annule et utilise "Signaler un problème".
+                  {t('orders.confirm_delivery_message')}
                 </Text>
               </View>
               <View style={styles.confirmRow}>
@@ -395,7 +399,7 @@ function OrderCard({
                   onPress={() => setAwaitingConfirm(false)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.confirmCancelText}>Annuler</Text>
+                  <Text style={styles.confirmCancelText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.confirmDestructiveBtn, confirming && styles.receivedBtnDisabled]}
@@ -406,7 +410,7 @@ function OrderCard({
                   {confirming ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.confirmDestructiveText}>Je confirme</Text>
+                    <Text style={styles.confirmDestructiveText}>{t('common.confirm')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -436,7 +440,7 @@ function OrderCard({
           activeOpacity={0.7}
         >
           <Ionicons name="alert-circle-outline" size={13} color={colors.textSecondary} />
-          <Text style={styles.disputeLinkText}>Signaler un problème</Text>
+          <Text style={styles.disputeLinkText}>{t('orders.open_dispute')}</Text>
         </TouchableOpacity>
       )}
 
@@ -444,7 +448,7 @@ function OrderCard({
         <View style={styles.disputeNotice}>
           <Ionicons name="shield-checkmark-outline" size={13} color="#FFA502" />
           <Text style={styles.disputeNoticeText}>
-            Notre équipe examine ton dossier. Réponse sous 48 h.
+            {t('orders.dispute_success')}
           </Text>
         </View>
       )}
@@ -454,7 +458,7 @@ function OrderCard({
           <View style={styles.reviewedRow}>
             <Ionicons name="star" size={13} color="#FFD700" />
             <Text style={styles.reviewedText}>
-              Tu as donné {item.myRating}/5 au vendeur
+              {t('orders.review_given', { rating: item.myRating })}
             </Text>
           </View>
         ) : (
@@ -464,14 +468,14 @@ function OrderCard({
               onOpenReview(
                 item.story_id,
                 item.seller_id,
-                item.seller?.username ?? 'vendeur',
+                item.seller?.username ?? t('orders.seller').toLowerCase(),
                 item.title,
               )
             }
             activeOpacity={0.85}
           >
             <Ionicons name="star-outline" size={15} color="#0F0F0F" />
-            <Text style={styles.reviewCtaText}>Noter le vendeur</Text>
+            <Text style={styles.reviewCtaText}>{t('orders.leave_review')}</Text>
           </TouchableOpacity>
         )
       )}
@@ -494,6 +498,7 @@ function DisputeModal({
   onClose: () => void
   onSubmitted: (storyId: string) => void
 }) {
+  const { t } = useTranslation()
   const [reason, setReason] = useState<string>('')
   const [description, setDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -510,14 +515,14 @@ function DisputeModal({
 
   const handleSubmit = async () => {
     if (!storyId || !reason) {
-      setError('Sélectionne un motif')
+      setError(t('orders.dispute_select_reason'))
       return
     }
     setSubmitting(true)
     setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non authentifié')
+      if (!user) throw new Error(t('common.error'))
 
       const { error: insErr } = await supabase.from('disputes').insert({
         story_id: storyId,
@@ -530,7 +535,7 @@ function DisputeModal({
 
       onSubmitted(storyId)
     } catch (e: any) {
-      setError(e.message ?? 'Erreur')
+      setError(e.message ?? t('common.error'))
     } finally {
       setSubmitting(false)
     }
@@ -550,7 +555,7 @@ function DisputeModal({
         >
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Signaler un problème</Text>
+            <Text style={styles.modalTitle}>{t('orders.dispute_title')}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -558,8 +563,8 @@ function DisputeModal({
           <Text style={styles.modalSubtitle} numberOfLines={2}>{title}</Text>
 
           <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
-            <Text style={styles.modalLabel}>Motif</Text>
-            {DISPUTE_REASONS.map((r) => {
+            <Text style={styles.modalLabel}>{t('orders.dispute_subtitle')}</Text>
+            {getDisputeReasons(t).map((r) => {
               const active = reason === r.key
               return (
                 <TouchableOpacity
@@ -576,7 +581,7 @@ function DisputeModal({
               )
             })}
 
-            <Text style={[styles.modalLabel, { marginTop: 16 }]}>Détails (optionnel)</Text>
+            <Text style={[styles.modalLabel, { marginTop: 16 }]}>{t('orders.dispute_details_label')}</Text>
             <TextInput
               style={styles.modalTextarea}
               value={description}
@@ -584,7 +589,7 @@ function DisputeModal({
               multiline
               numberOfLines={4}
               maxLength={500}
-              placeholder="Explique ce qui s'est passé..."
+              placeholder={t('orders.dispute_details_placeholder')}
               placeholderTextColor={colors.textSecondary}
             />
 
@@ -600,7 +605,7 @@ function DisputeModal({
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.modalSubmitText}>Envoyer le signalement</Text>
+              <Text style={styles.modalSubmitText}>{t('orders.dispute_submit')}</Text>
             )}
           </TouchableOpacity>
         </KeyboardAvoidingView>
@@ -628,6 +633,7 @@ function ReviewModal({
   onClose: () => void
   onSubmitted: (storyId: string, rating: number) => void
 }) {
+  const { t } = useTranslation()
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -645,14 +651,14 @@ function ReviewModal({
   const handleSubmit = async () => {
     if (!storyId || !sellerId) return
     if (rating < 1) {
-      setError('Choisis une note entre 1 et 5')
+      setError(t('orders.review_choose_rating'))
       return
     }
     setSubmitting(true)
     setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non authentifié')
+      if (!user) throw new Error(t('common.error'))
 
       const { error: insErr } = await supabase.from('reviews').insert({
         story_id: storyId,
@@ -668,7 +674,7 @@ function ReviewModal({
       }
       onSubmitted(storyId, rating)
     } catch (e: any) {
-      setError(e.message ?? 'Erreur')
+      setError(e.message ?? t('common.error'))
     } finally {
       setSubmitting(false)
     }
@@ -688,7 +694,7 @@ function ReviewModal({
         >
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Noter @{sellerUsername}</Text>
+            <Text style={styles.modalTitle}>{t('orders.review_title')} @{sellerUsername}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -716,11 +722,11 @@ function ReviewModal({
           </View>
           {rating > 0 && (
             <Text style={styles.ratingHint}>
-              {rating === 5 ? 'Parfait' : rating === 4 ? 'Très bien' : rating === 3 ? 'Correct' : rating === 2 ? 'Décevant' : 'Mauvais'}
+              {rating === 5 ? t('orders.rating_5') : rating === 4 ? t('orders.rating_4') : rating === 3 ? t('orders.rating_3') : rating === 2 ? t('orders.rating_2') : t('orders.rating_1')}
             </Text>
           )}
 
-          <Text style={[styles.modalLabel, { marginTop: 16 }]}>Commentaire (optionnel)</Text>
+          <Text style={[styles.modalLabel, { marginTop: 16 }]}>{t('orders.review_subtitle')}</Text>
           <TextInput
             style={styles.modalTextarea}
             value={comment}
@@ -728,7 +734,7 @@ function ReviewModal({
             multiline
             numberOfLines={4}
             maxLength={500}
-            placeholder="Partage ton expérience..."
+            placeholder={t('orders.review_placeholder')}
             placeholderTextColor={colors.textSecondary}
           />
 
@@ -743,7 +749,7 @@ function ReviewModal({
             {submitting ? (
               <ActivityIndicator color="#0F0F0F" />
             ) : (
-              <Text style={styles.reviewSubmitText}>Publier l'avis</Text>
+              <Text style={styles.reviewSubmitText}>{t('orders.review_submit')}</Text>
             )}
           </TouchableOpacity>
         </KeyboardAvoidingView>

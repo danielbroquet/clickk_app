@@ -79,10 +79,10 @@ export default function AddressesScreen() {
   }
 
   const remove = async (id: string) => {
-    Alert.alert('Supprimer', 'Retirer cette adresse ?', [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('addresses.delete'), t('addresses.delete_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: t('addresses.delete'),
         style: 'destructive',
         onPress: async () => {
           await supabase.from('shipping_addresses').delete().eq('id', id)
@@ -136,7 +136,7 @@ export default function AddressesScreen() {
             <Ionicons name="location-outline" size={52} color={C.muted} />
             <Text style={styles.emptyTitle}>{t('addresses.no_address')}</Text>
             <Text style={styles.emptyText}>
-              Ton adresse sera automatiquement enregistrée après ton premier achat.
+              {t('addresses.empty_hint')}
             </Text>
           </View>
         ) : (
@@ -146,7 +146,7 @@ export default function AddressesScreen() {
                 <Text style={styles.cardName}>{a.full_name}</Text>
                 {a.is_default && (
                   <View style={styles.defaultTag}>
-                    <Text style={styles.defaultTagText}>Par défaut</Text>
+                    <Text style={styles.defaultTagText}>{t('addresses.default_tag')}</Text>
                   </View>
                 )}
               </View>
@@ -164,7 +164,7 @@ export default function AddressesScreen() {
                     style={styles.actionBtn}
                     onPress={() => setDefault(a.id)}
                   >
-                    <Text style={styles.actionText}>Définir par défaut</Text>
+                    <Text style={styles.actionText}>{t('addresses.set_default')}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -172,7 +172,7 @@ export default function AddressesScreen() {
                   onPress={() => setEditing(a)}
                 >
                   <Ionicons name="create-outline" size={14} color={C.text} />
-                  <Text style={styles.actionText}>Modifier</Text>
+                  <Text style={styles.actionText}>{t('addresses.edit')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.actionBtn}
@@ -180,7 +180,7 @@ export default function AddressesScreen() {
                 >
                   <Ionicons name="trash-outline" size={14} color={C.danger} />
                   <Text style={[styles.actionText, { color: C.danger }]}>
-                    Supprimer
+                    {t('addresses.delete')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -253,11 +253,13 @@ function AddressForm({
     }
   }, [])
 
+  const { t } = useTranslation()
+
   const validate = () => {
-    if (!fullName.trim()) return 'Nom requis'
-    if (!line1.trim()) return 'Adresse requise'
-    if (!postalCode.trim()) return 'NPA requis'
-    if (!city.trim()) return 'Ville requise'
+    if (!fullName.trim()) return t('addresses.error_name')
+    if (!line1.trim()) return t('addresses.error_line1')
+    if (!postalCode.trim()) return t('addresses.error_postal')
+    if (!city.trim()) return t('addresses.error_city')
     return null
   }
 
@@ -272,7 +274,7 @@ function AddressForm({
     setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non authentifié')
+      if (!user) throw new Error(t('addresses.error_auth'))
 
       const payload = {
         full_name: fullName.trim(),
@@ -309,7 +311,7 @@ function AddressForm({
 
       onSaved()
     } catch (e: any) {
-      setError(e.message ?? 'Erreur')
+      setError(e.message ?? t('common.error'))
     } finally {
       setSaving(false)
     }
@@ -323,7 +325,7 @@ function AddressForm({
           <Ionicons name="close" size={24} color={C.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {initial ? 'Modifier' : 'Nouvelle adresse'}
+          {initial ? t('addresses.form_edit_title') : t('addresses.form_new_title')}
         </Text>
         <View style={{ width: 32 }} />
       </View>
@@ -333,7 +335,7 @@ function AddressForm({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.fieldLabel}>Nom et prénom</Text>
+          <Text style={styles.fieldLabel}>{t('addresses.field_name')}</Text>
           <TextInput
             style={styles.input}
             value={fullName}
@@ -343,7 +345,7 @@ function AddressForm({
             placeholder="Marc Dupont"
           />
 
-          <Text style={styles.fieldLabel}>Adresse</Text>
+          <Text style={styles.fieldLabel}>{t('addresses.field_address')}</Text>
           <View style={styles.line1Wrap}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -400,7 +402,7 @@ function AddressForm({
             </View>
           )}
 
-          <Text style={styles.fieldLabel}>Complément (optionnel)</Text>
+          <Text style={styles.fieldLabel}>{t('addresses.field_complement')}</Text>
           <TextInput
             style={styles.input}
             value={line2}
@@ -411,7 +413,7 @@ function AddressForm({
 
           <View style={styles.row}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>NPA</Text>
+              <Text style={styles.fieldLabel}>{t('addresses.field_postal')}</Text>
               <TextInput
                 style={styles.input}
                 value={postalCode}
@@ -422,7 +424,7 @@ function AddressForm({
               />
             </View>
             <View style={{ flex: 2, marginLeft: 10 }}>
-              <Text style={styles.fieldLabel}>Ville</Text>
+              <Text style={styles.fieldLabel}>{t('addresses.field_city')}</Text>
               <TextInput
                 style={styles.input}
                 value={city}
@@ -433,7 +435,7 @@ function AddressForm({
             </View>
           </View>
 
-          <Text style={styles.fieldLabel}>Téléphone (optionnel)</Text>
+          <Text style={styles.fieldLabel}>{t('addresses.field_phone')}</Text>
           <TextInput
             style={styles.input}
             value={phone}
@@ -443,10 +445,10 @@ function AddressForm({
             placeholder="+41 79 000 00 00"
           />
 
-          <Text style={styles.fieldLabel}>Pays</Text>
+          <Text style={styles.fieldLabel}>{t('addresses.field_country')}</Text>
           <View style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-            <Text style={{ color: colors.text, fontSize: 15 }}>🇨🇭 Suisse</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Seul pays disponible</Text>
+            <Text style={{ color: colors.text, fontSize: 15 }}>{t('addresses.country_ch')}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{t('addresses.country_only')}</Text>
           </View>
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -461,7 +463,7 @@ function AddressForm({
             {saving ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.ctaText}>Enregistrer</Text>
+              <Text style={styles.ctaText}>{t('addresses.save')}</Text>
             )}
           </TouchableOpacity>
         </View>

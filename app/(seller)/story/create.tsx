@@ -27,6 +27,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-nati
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/auth'
+import { useTranslation } from '../../../lib/i18n'
 import { colors, fontFamily, spacing, fontSize } from '../../../lib/theme'
 
 const { width: SW } = Dimensions.get('window')
@@ -41,26 +42,20 @@ const DURATION: Record<SpeedPreset, { label: string; hours: number; ms: number }
   RELAX:    { label: '7 jours', hours: 168, ms: 7 * 24 * 60 * 60 * 1000 },
 }
 
-const PRESETS: { key: SpeedPreset; emoji: string; label: string; tagline: string }[] = [
-  { key: 'FLASH',    emoji: '⚡', label: 'FLASH',    tagline: '1h · chute rapide'    },
-  { key: 'STANDARD', emoji: '🎯', label: 'STANDARD', tagline: '24h · équilibré'      },
-  { key: 'RELAX',    emoji: '🌙', label: 'RELAX',    tagline: '7 jours · lente'      },
-]
-
-const CATEGORIES: { label: string; value: string }[] = [
-  { value: 'sneakers',    label: '👟 Sneakers' },
-  { value: 'vetements',   label: '👕 Vêtements' },
-  { value: 'accessoires', label: '👜 Accessoires' },
-  { value: 'montres',     label: '⌚ Montres' },
-  { value: 'tech',        label: '📱 Tech' },
-  { value: 'gaming',      label: '🎮 Gaming' },
-  { value: 'maison',      label: '🏠 Maison & Déco' },
-  { value: 'livres',      label: '📚 Livres & Culture' },
-  { value: 'sport',       label: '⚽ Sport & Outdoor' },
-  { value: 'art',         label: '🎨 Art & Collection' },
-  { value: 'beaute',      label: '🧴 Beauté' },
-  { value: 'auto',        label: '🚗 Auto & Moto' },
-  { value: 'autre',       label: '🎁 Autre' },
+const CATEGORY_KEYS: { value: string; emoji: string; labelKey: string }[] = [
+  { value: 'sneakers',    emoji: '👟', labelKey: 'Sneakers' },
+  { value: 'vetements',   emoji: '👕', labelKey: 'Vêtements' },
+  { value: 'accessoires', emoji: '👜', labelKey: 'Accessoires' },
+  { value: 'montres',     emoji: '⌚', labelKey: 'Montres' },
+  { value: 'tech',        emoji: '📱', labelKey: 'Tech' },
+  { value: 'gaming',      emoji: '🎮', labelKey: 'Gaming' },
+  { value: 'maison',      emoji: '🏠', labelKey: 'Maison & Déco' },
+  { value: 'livres',      emoji: '📚', labelKey: 'Livres & Culture' },
+  { value: 'sport',       emoji: '⚽', labelKey: 'Sport & Outdoor' },
+  { value: 'art',         emoji: '🎨', labelKey: 'Art & Collection' },
+  { value: 'beaute',      emoji: '🧴', labelKey: 'Beauté' },
+  { value: 'auto',        emoji: '🚗', labelKey: 'Auto & Moto' },
+  { value: 'autre',       emoji: '🎁', labelKey: 'Autre' },
 ]
 
 const PRESET_ACCENT: Record<SpeedPreset, string> = {
@@ -144,12 +139,14 @@ function CategoryPicker({
   value: string
   onChange: (c: string) => void
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
+  const selected = CATEGORY_KEYS.find((c) => c.value === value)
   return (
     <>
       <TouchableOpacity style={s.catTrigger} onPress={() => setOpen(true)} activeOpacity={0.8}>
         <Text style={[s.catTriggerText, !value && { color: colors.textSecondary }]}>
-          {CATEGORIES.find((c) => c.value === value)?.label ?? 'Choisir une catégorie'}
+          {selected ? `${selected.emoji} ${selected.labelKey}` : t('story.create.category_placeholder')}
         </Text>
         <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -157,14 +154,14 @@ function CategoryPicker({
         <Pressable style={s.catBackdrop} onPress={() => setOpen(false)} />
         <View style={s.catSheet}>
           <View style={s.catHandle} />
-          <Text style={s.catSheetTitle}>Catégorie</Text>
-          {CATEGORIES.map((c) => (
+          <Text style={s.catSheetTitle}>{t('story.create.field_category')}</Text>
+          {CATEGORY_KEYS.map((c) => (
             <TouchableOpacity
               key={c.value}
               style={[s.catItem, value === c.value && s.catItemActive]}
               onPress={() => { onChange(c.value); setOpen(false) }}
             >
-              <Text style={[s.catItemText, value === c.value && s.catItemTextActive]}>{c.label}</Text>
+              <Text style={[s.catItemText, value === c.value && s.catItemTextActive]}>{c.emoji} {c.labelKey}</Text>
               {value === c.value && <Ionicons name="checkmark" size={18} color={colors.primary} />}
             </TouchableOpacity>
           ))}
@@ -189,6 +186,7 @@ function FramePickerModal({
   onConfirm: (thumbUri: string) => void
   onCancel: () => void
 }) {
+  const { t } = useTranslation()
   const [previewThumbnail, setPreviewThumbnail] = useState<string | null>(null)
   const [capturingFrame, setCapturingFrame] = useState(false)
   const [sliderValue, setSliderValue] = useState(0) // seconds
@@ -284,9 +282,9 @@ function FramePickerModal({
       onRequestClose={onCancel}
     >
       <View style={fp.root}>
-        <Text style={fp.title}>Choisir la couverture</Text>
+        <Text style={fp.title}>{t('story.create.frame_picker_title')}</Text>
         <Text style={fp.subtitle}>
-          Fais glisser pour trouver le meilleur moment de ta vidéo
+          {t('story.create.frame_picker_subtitle')}
         </Text>
 
         {/* Preview */}
@@ -331,11 +329,11 @@ function FramePickerModal({
           disabled={!previewThumbnail || capturingFrame}
           activeOpacity={0.85}
         >
-          <Text style={fp.confirmBtnText}>✅ Utiliser cette frame</Text>
+          <Text style={fp.confirmBtnText}>{t('story.create.frame_picker_confirm')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={fp.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
-          <Text style={fp.cancelBtnText}>↩ Choisir une autre vidéo</Text>
+          <Text style={fp.cancelBtnText}>{t('story.create.frame_picker_change')}</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -380,6 +378,7 @@ async function uploadToR2(opts: {
 export default function CreateDropScreen() {
   const router = useRouter()
   const { profile } = useAuth()
+  const { t } = useTranslation()
   const { relaunchId } = useLocalSearchParams<{ relaunchId?: string }>()
   const isRelaunch = !!relaunchId
 
@@ -472,7 +471,7 @@ export default function CreateDropScreen() {
     const assetDurationMs = asset.duration ?? null
 
     if (assetDurationMs != null && assetDurationMs > 30000) {
-      Alert.alert('Vidéo trop longue', 'Sélectionne un segment de 30s maximum')
+      Alert.alert(t('story.create.video_too_long_title'), t('story.create.video_too_long_message'))
       setVideoUri(null)
       setThumbnailUri(null)
       return
@@ -488,11 +487,11 @@ export default function CreateDropScreen() {
     const sizeMB = await getFileSizeMB(asset.uri)
     if (sizeMB > 30) {
       Alert.alert(
-        'Vidéo assez lourde',
-        `Cette vidéo fait ${sizeMB.toFixed(0)} MB. Pour de meilleures performances, filme directement depuis l'app ou choisis une vidéo plus courte.`,
+        t('story.create.video_heavy_title'),
+        t('story.create.video_heavy_message', { size: sizeMB.toFixed(0) }),
         [
-          { text: 'Choisir une autre vidéo', style: 'cancel', onPress: () => { setVideoUri(null); setThumbnailUri(null) } },
-          { text: 'Continuer quand même', onPress: () => {} },
+          { text: t('story.create.video_heavy_change'), style: 'cancel', onPress: () => { setVideoUri(null); setThumbnailUri(null) } },
+          { text: t('story.create.video_heavy_continue'), onPress: () => {} },
         ]
       )
     }
@@ -501,7 +500,7 @@ export default function CreateDropScreen() {
   const launchCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync()
     if (status !== 'granted') {
-      Alert.alert('Accès refusé', "Autorisez l'accès à la caméra dans les réglages.")
+      Alert.alert(t('story.create.camera_denied_title'), t('story.create.camera_denied_message'))
       return
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -533,7 +532,7 @@ export default function CreateDropScreen() {
     setGenerating(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Non authentifié')
+      if (!session) throw new Error('Not authenticated')
 
       let imageBase64: string | null = null
 
@@ -557,7 +556,7 @@ export default function CreateDropScreen() {
 
       const body = imageBase64
         ? JSON.stringify({ imageBase64, mimeType: 'image/jpeg' })
-        : JSON.stringify({ textOnly: true, hint: title || 'article à vendre' })
+        : JSON.stringify({ textOnly: true, hint: title || 'item for sale' })
 
       const res = await fetch(
         `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generate-drop-info`,
@@ -577,11 +576,11 @@ export default function CreateDropScreen() {
       if (data.description) setDescription(data.description)
       if (data.category) setCategory(data.category)
     } catch (err: any) {
-      Alert.alert('Erreur IA', err.message ?? "L'IA n'a pas pu analyser l'image")
+      Alert.alert(t('story.create.ai_error_title'), err.message ?? t('story.create.ai_error_message'))
     } finally {
       setGenerating(false)
     }
-  }, [thumbnailUri, videoUri, title])
+  }, [thumbnailUri, videoUri, title, t])
 
   // ── navigation ─────────────────────────────────────────────────────────────
 
@@ -590,11 +589,11 @@ export default function CreateDropScreen() {
 
   const handleCancel = () => {
     Alert.alert(
-      'Annuler ?',
-      'Vos modifications seront perdues.',
+      t('story.create.cancel_confirm_title'),
+      t('story.create.cancel_confirm_message'),
       [
-        { text: 'Continuer', style: 'cancel' },
-        { text: 'Annuler le drop', style: 'destructive', onPress: () => router.back() },
+        { text: t('story.create.cancel_confirm_continue'), style: 'cancel' },
+        { text: t('story.create.cancel_confirm_discard'), style: 'destructive', onPress: () => router.back() },
       ]
     )
   }
@@ -602,8 +601,18 @@ export default function CreateDropScreen() {
   // ── publish ────────────────────────────────────────────────────────────────
 
   const handlePublish = async () => {
+    const phases = {
+      preparing: t('story.create.upload_phase_preparing'),
+      copying: t('story.create.upload_phase_copying'),
+      reading: t('story.create.upload_phase_reading'),
+      sending: t('story.create.upload_phase_sending'),
+      thumbnail: t('story.create.upload_phase_thumbnail'),
+      finalizing: t('story.create.upload_phase_finalizing'),
+      published: t('story.create.upload_phase_published'),
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return Alert.alert('Erreur', 'Non authentifié')
+    if (!user) return Alert.alert(t('common.error'), t('common.error'))
 
     const { data: sellerProfile } = await supabase
       .from('seller_profiles')
@@ -623,11 +632,11 @@ export default function CreateDropScreen() {
 
     if (!isOnboarded) {
       Alert.alert(
-        'Compte vendeur incomplet',
-        "Tu dois d'abord terminer ton inscription vendeur (Stripe) pour pouvoir recevoir des paiements.",
+        t('story.create.seller_incomplete_title'),
+        t('story.create.seller_incomplete_message'),
         [
-          { text: 'Plus tard', style: 'cancel' },
-          { text: 'Configurer', onPress: () => router.push('/become-seller') },
+          { text: t('story.create.seller_incomplete_later'), style: 'cancel' },
+          { text: t('story.create.seller_incomplete_setup'), onPress: () => router.push('/become-seller') },
         ]
       )
       return
@@ -635,7 +644,7 @@ export default function CreateDropScreen() {
 
     setLoading(true)
     setUploadPercent(0)
-    setUploadPhase('Préparation…')
+    setUploadPhase(phases.preparing)
     try {
       const isLocalVideo =
         !!videoUri && (videoUri.startsWith('file://') || videoUri.startsWith('ph://'))
@@ -652,7 +661,7 @@ export default function CreateDropScreen() {
         // Step 1 — copy to cache if needed (5%)
         let localUri = videoUri!
         if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
-          setUploadPhase('Copie du fichier…')
+          setUploadPhase(phases.copying)
           setUploadPercent(5)
           const cacheUri = FileSystem.cacheDirectory + `upload_${Date.now()}.mp4`
           await FileSystem.copyAsync({ from: localUri, to: cacheUri })
@@ -660,19 +669,19 @@ export default function CreateDropScreen() {
         }
 
         // Step 2 — read video (15%)
-        setUploadPhase('Lecture de la vidéo…')
+        setUploadPhase(phases.reading)
         setUploadPercent(15)
         const preflight = await FileSystem.getInfoAsync(localUri, { size: true }) as FileSystem.FileInfo & { size?: number }
         if (preflight.exists && typeof preflight.size === 'number' && preflight.size / (1024 * 1024) > 100) {
-          throw new Error('Vidéo trop lourde (> 100 MB)')
+          throw new Error(t('story.create.upload_too_large'))
         }
         const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
 
         // Step 3 — upload video (60%)
-        setUploadPhase('Envoi de la vidéo…')
+        setUploadPhase(phases.sending)
         setUploadPercent(30)
         const { data: { session: uploadSession } } = await supabase.auth.getSession()
-        if (!uploadSession) throw new Error('Non authentifié')
+        if (!uploadSession) throw new Error('Not authenticated')
 
         publicUrl = await uploadToR2({
           session: uploadSession,
@@ -686,7 +695,7 @@ export default function CreateDropScreen() {
         // Step 4 — upload thumbnail (75%)
         if (thumbnailUri && (thumbnailUri.startsWith('file://') || thumbnailUri.startsWith('ph://'))) {
           try {
-            setUploadPhase('Envoi de la miniature…')
+            setUploadPhase(phases.thumbnail)
             setUploadPercent(65)
             const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
             thumbnailPublicUrl = await uploadToR2({
@@ -707,7 +716,7 @@ export default function CreateDropScreen() {
       }
 
       // Step 5 — insert record (100%)
-      setUploadPhase('Finalisation…')
+      setUploadPhase(phases.finalizing)
       setUploadPercent(85)
       const categoryValue = category || 'autre'
       const insertPayload = {
@@ -741,7 +750,7 @@ export default function CreateDropScreen() {
       }
 
       setUploadPercent(100)
-      setUploadPhase('Publié !')
+      setUploadPhase(phases.published)
       setSuccess(true)
       await new Promise(resolve => setTimeout(resolve, 1500))
       try {
@@ -754,7 +763,7 @@ export default function CreateDropScreen() {
         }
       }
     } catch (err: any) {
-      Alert.alert('Erreur', err.message ?? 'Une erreur est survenue')
+      Alert.alert(t('common.error'), err.message ?? t('common.error'))
       setUploadPercent(0)
       setUploadPhase('')
     } finally {
@@ -780,7 +789,7 @@ export default function CreateDropScreen() {
             <Ionicons name="close" size={22} color={colors.textSecondary} />
           </TouchableOpacity>
           <View style={s.headerCenter}>
-            <Text style={s.headerTitle}>Relancer ce drop</Text>
+            <Text style={s.headerTitle}>{t('story.create.relaunch_title')}</Text>
           </View>
           <View style={s.headerBtn} />
         </View>
@@ -834,7 +843,7 @@ export default function CreateDropScreen() {
         {success && (
           <View style={s.successOverlay}>
             <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
-            <Text style={s.successOverlayText}>Drop publié !</Text>
+            <Text style={s.successOverlayText}>{t('story.create.drop_published')}</Text>
           </View>
         )}
       </SafeAreaView>
@@ -850,7 +859,7 @@ export default function CreateDropScreen() {
         </TouchableOpacity>
         <View style={s.headerCenter}>
           <Text style={s.headerStep}>{step} / {TOTAL_STEPS}</Text>
-          <Text style={s.headerTitle}>{STEP_TITLES[step - 1]}</Text>
+          <Text style={s.headerTitle}>{[t('story.create.step_video'), t('story.create.step_details'), t('story.create.step_pricing'), t('story.create.step_publish')][step - 1]}</Text>
         </View>
         <View style={s.headerBtn} />
       </View>
@@ -919,7 +928,7 @@ export default function CreateDropScreen() {
             {step > 1 ? (
               <TouchableOpacity style={s.prevBtn} onPress={goPrev} activeOpacity={0.8}>
                 <Ionicons name="chevron-back" size={18} color={colors.text} />
-                <Text style={s.prevText}>Précédent</Text>
+                <Text style={s.prevText}>{t('story.create.previous')}</Text>
               </TouchableOpacity>
             ) : <View style={s.prevBtn} />}
 
@@ -929,7 +938,7 @@ export default function CreateDropScreen() {
               disabled={!canNext}
               activeOpacity={0.85}
             >
-              <Text style={[s.nextText, !canNext && s.nextTextDisabled]}>Suivant</Text>
+              <Text style={[s.nextText, !canNext && s.nextTextDisabled]}>{t('common.next')}</Text>
               <Ionicons
                 name="chevron-forward"
                 size={18}
@@ -958,14 +967,13 @@ export default function CreateDropScreen() {
       {success && (
         <View style={s.successOverlay}>
           <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
-          <Text style={s.successOverlayText}>Drop publié !</Text>
+          <Text style={s.successOverlayText}>{t('story.create.drop_published')}</Text>
         </View>
       )}
     </SafeAreaView>
   )
 }
 
-const STEP_TITLES = ['Vidéo', 'Détails', 'Tarification', 'Publier']
 
 // ─── Step 1: Capture / Upload ─────────────────────────────────────────────────
 
@@ -982,6 +990,8 @@ function Step1({
   onGallery: () => void
   onClear: () => void
 }) {
+  const { t } = useTranslation()
+
   if (videoUri) {
     return (
       <View>
@@ -999,35 +1009,35 @@ function Step1({
           </TouchableOpacity>
           <View style={s.readyPill}>
             <Ionicons name="checkmark-circle" size={13} color="#0F0F0F" />
-            <Text style={s.readyText}>Vidéo prête</Text>
+            <Text style={s.readyText}>{t('story.create.video_ready')}</Text>
           </View>
         </View>
         {thumbnailUri && (
           <View style={s.thumbRow}>
             <Image source={{ uri: thumbnailUri }} style={s.thumbImg} />
             <View>
-              <Text style={s.thumbLabel}>Miniature générée</Text>
-              <Text style={s.thumbSub}>Aperçu automatique depuis ta vidéo</Text>
+              <Text style={s.thumbLabel}>{t('story.create.thumbnail_generated')}</Text>
+              <Text style={s.thumbSub}>{t('story.create.thumbnail_sub')}</Text>
             </View>
           </View>
         )}
-        <Text style={s.hintText}>Appuie sur "Suivant" pour continuer →</Text>
+        <Text style={s.hintText}>{t('story.create.hint_next')}</Text>
       </View>
     )
   }
 
   return (
     <View style={s.captureWrap}>
-      <Text style={s.captureTitle}>Ajoute une vidéo</Text>
-      <Text style={s.captureSub}>Max 30 sec · Format vertical recommandé</Text>
+      <Text style={s.captureTitle}>{t('story.create.add_video')}</Text>
+      <Text style={s.captureSub}>{t('story.create.add_video_sub')}</Text>
 
       <TouchableOpacity style={s.captureBtn} onPress={onCamera} activeOpacity={0.85}>
         <View style={s.captureBtnIcon}>
           <Ionicons name="videocam" size={32} color="#0F0F0F" />
         </View>
         <View style={s.captureBtnText}>
-          <Text style={s.captureBtnTitle}>Filmer</Text>
-          <Text style={s.captureBtnSub}>Ouvrir la caméra</Text>
+          <Text style={s.captureBtnTitle}>{t('story.create.record')}</Text>
+          <Text style={s.captureBtnSub}>{t('story.create.record_sub')}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -1037,8 +1047,8 @@ function Step1({
           <Ionicons name="images" size={32} color={colors.primary} />
         </View>
         <View style={s.captureBtnText}>
-          <Text style={s.captureBtnTitle}>Importer</Text>
-          <Text style={s.captureBtnSub}>Depuis la galerie</Text>
+          <Text style={s.captureBtnTitle}>{t('story.create.import')}</Text>
+          <Text style={s.captureBtnSub}>{t('story.create.import_sub')}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -1063,6 +1073,8 @@ function Step2({
   onGenerate: () => void
   generating: boolean
 }) {
+  const { t } = useTranslation()
+
   return (
     <View style={s.formWrap}>
       {thumbnailUri && (
@@ -1080,44 +1092,44 @@ function Step2({
             {generating ? (
               <>
                 <ActivityIndicator size="small" color="#0F0F0F" />
-                <Text style={s.generateBtnText}>Génération en cours...</Text>
+                <Text style={s.generateBtnText}>{t('story.create.generate_ai_loading')}</Text>
               </>
             ) : (
-              <Text style={s.generateBtnText}>✨ Générer avec l'IA</Text>
+              <Text style={s.generateBtnText}>{t('story.create.generate_ai')}</Text>
             )}
           </TouchableOpacity>
           <Text style={s.generateBtnSub}>
-            Titre, description et catégorie remplis automatiquement
+            {t('story.create.generate_ai_sub')}
           </Text>
         </>
       )}
 
-      <Text style={s.fieldLabel}>Titre *</Text>
+      <Text style={s.fieldLabel}>{t('story.create.field_title')}</Text>
       <TextInput
         style={s.titleInput}
-        placeholder="Ex: Nike Air Max 90 Taille 42"
+        placeholder={t('story.create.listing_title_placeholder')}
         placeholderTextColor={colors.textSecondary}
         value={title}
-        onChangeText={(t) => onTitle(t.slice(0, 80))}
+        onChangeText={(v) => onTitle(v.slice(0, 80))}
         returnKeyType="next"
         autoFocus
       />
       <Text style={s.counter}>{title.length}/80</Text>
 
-      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>{t('story.create.field_description')}</Text>
       <TextInput
         style={s.descInput}
-        placeholder="État, détails, défauts éventuels..."
+        placeholder={t('story.create.description_placeholder')}
         placeholderTextColor={colors.textSecondary}
         value={description}
-        onChangeText={(t) => onDescription(t.slice(0, 300))}
+        onChangeText={(v) => onDescription(v.slice(0, 300))}
         multiline
         numberOfLines={4}
         textAlignVertical="top"
       />
       <Text style={s.counter}>{description.length}/300</Text>
 
-      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Catégorie</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>{t('story.create.field_category')}</Text>
       <CategoryPicker value={category} onChange={onCategory} />
     </View>
   )
@@ -1142,14 +1154,21 @@ function Step3({
   dropPerMin: string
   durationLabel: string
 }) {
+  const { t } = useTranslation()
   const hasPrices = sp > 0 && fp >= 0 && sp > fp
+
+  const PRESETS: { key: SpeedPreset; emoji: string; label: string; tagline: string }[] = [
+    { key: 'FLASH',    emoji: '⚡', label: 'FLASH',    tagline: '1h · ' + t('story.create.speed_fast')    },
+    { key: 'STANDARD', emoji: '🎯', label: 'STANDARD', tagline: '24h · ' + t('story.create.speed_standard') },
+    { key: 'RELAX',    emoji: '🌙', label: 'RELAX',    tagline: '7j · ' + t('story.create.speed_slow')    },
+  ]
 
   return (
     <View style={s.formWrap}>
       {/* Price inputs */}
       <View style={s.priceRow}>
         <View style={s.priceCol}>
-          <Text style={s.priceColLabel}>Prix de départ</Text>
+          <Text style={s.priceColLabel}>{t('story.create.price_start')}</Text>
           <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
             <Text style={s.chfTag}>CHF</Text>
             <TextInput
@@ -1166,7 +1185,7 @@ function Step3({
           <Ionicons name="arrow-forward" size={18} color={colors.textSecondary} />
         </View>
         <View style={s.priceCol}>
-          <Text style={s.priceColLabel}>Prix plancher</Text>
+          <Text style={s.priceColLabel}>{t('story.create.price_floor')}</Text>
           <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
             <Text style={s.chfTag}>CHF</Text>
             <TextInput
@@ -1178,7 +1197,7 @@ function Step3({
               onChangeText={onFloor}
             />
           </View>
-          <Text style={s.floorHint}>Prix minimum accepté</Text>
+          <Text style={s.floorHint}>{t('story.create.price_floor_hint')}</Text>
         </View>
       </View>
 
@@ -1186,17 +1205,17 @@ function Step3({
       <View style={s.shippingBanner}>
         <Ionicons name="cube-outline" size={14} color="#00D2B8" style={{ marginTop: 1 }} />
         <Text style={s.shippingBannerText}>
-          <Text style={s.shippingBold}>Livraison offerte obligatoire.</Text>
-          {' '}Inclus les frais d'envoi dans ton prix plancher (env. CHF 7 via La Poste).
+          <Text style={s.shippingBold}>{t('story.create.shipping_banner')}</Text>
+          {' '}{t('story.create.shipping_banner_detail')}
         </Text>
       </View>
 
       {floorGtStart && (
-        <Text style={s.priceError}>Le prix plancher doit être inférieur au prix de départ</Text>
+        <Text style={s.priceError}>{t('story.create.price_floor_error')}</Text>
       )}
 
       {/* Speed presets */}
-      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>Vitesse de vente</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>{t('story.create.speed_title')}</Text>
       <View style={s.presetRow}>
         {PRESETS.map((p) => {
           const active = preset === p.key
@@ -1220,7 +1239,7 @@ function Step3({
       {hasPrices && (
         <View style={s.chartCard}>
           <View style={s.chartHeader}>
-            <Text style={s.chartTitle}>Aperçu de la descente</Text>
+            <Text style={s.chartTitle}>{t('story.create.chart_title')}</Text>
             <View style={s.chartPricePills}>
               <Text style={s.chartPriceFrom}>CHF {sp.toFixed(0)}</Text>
               <Ionicons name="arrow-forward" size={12} color={colors.textSecondary} />
@@ -1229,11 +1248,11 @@ function Step3({
           </View>
           <PriceCurve startPrice={sp} floorPrice={fp} preset={preset} />
           <Text style={s.chartSummary}>
-            Le prix passera de{' '}
+            {t('story.create.chart_summary_prefix')}{' '}
             <Text style={s.chartBold}>CHF {sp.toFixed(2)}</Text>
-            {' '}à{' '}
+            {' '}{t('story.create.chart_summary_to')}{' '}
             <Text style={s.chartBold}>CHF {fp.toFixed(2)}</Text>
-            {' '}en{' '}
+            {' '}{t('story.create.chart_summary_in')}{' '}
             <Text style={s.chartBold}>{durationLabel}</Text>
             {', '}−CHF{' '}
             <Text style={s.chartBold}>{dropPerMin}</Text>
@@ -1261,13 +1280,13 @@ function Step4({
   uploadPercent: number
   onPublish: () => void
 }) {
+  const { t } = useTranslation()
   const accent = PRESET_ACCENT[preset]
-  const presetMeta = PRESETS.find((p) => p.key === preset)!
 
   return (
     <View style={s.publishWrap}>
-      <Text style={s.publishHeadline}>Prêt à publier ?</Text>
-      <Text style={s.publishSub}>Vérifiez les informations avant de lancer l'enchère.</Text>
+      <Text style={s.publishHeadline}>{t('story.create.publish_ready_title')}</Text>
+      <Text style={s.publishSub}>{t('story.create.publish_ready_sub')}</Text>
 
       {/* Summary card */}
       <View style={s.summaryCard}>
@@ -1287,7 +1306,7 @@ function Step4({
           </View>
           <View style={[s.summaryBadge, { backgroundColor: `${accent}22` }]}>
             <Text style={[s.summaryBadgeText, { color: accent }]}>
-              {presetMeta.emoji} {presetMeta.label} · {durationLabel}
+              {preset === 'FLASH' ? '⚡' : preset === 'STANDARD' ? '🎯' : '🌙'} {preset} · {durationLabel}
             </Text>
           </View>
         </View>
@@ -1313,13 +1332,13 @@ function Step4({
         ) : (
           <>
             <Ionicons name="rocket" size={20} color="#0F0F0F" style={{ marginRight: 8 }} />
-            <Text style={s.publishBtnText}>Publier le drop</Text>
+            <Text style={s.publishBtnText}>{t('story.create.publish_btn')}</Text>
           </>
         )}
       </TouchableOpacity>
 
       <Text style={s.publishDisclaimer}>
-        En publiant, votre enchère sera immédiatement visible par tous les utilisateurs.
+        {t('story.create.publish_disclaimer')}
       </Text>
     </View>
   )
@@ -1362,14 +1381,16 @@ function StepRelaunch({
   onPublish: () => void
   onCancel: () => void
 }) {
+  const { t } = useTranslation()
+
   const showVideoActions = () => {
     Alert.alert(
-      'Vidéo',
+      t('story.create.step_video'),
       undefined,
       [
-        { text: 'Garder la vidéo', style: 'cancel' },
-        { text: 'Filmer une nouvelle vidéo', onPress: onCameraVideo },
-        { text: 'Choisir depuis la galerie', onPress: onReplaceVideo },
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('story.create.record'), onPress: onCameraVideo },
+        { text: t('story.create.import_sub'), onPress: onReplaceVideo },
       ]
     )
   }
@@ -1384,9 +1405,9 @@ function StepRelaunch({
 
   return (
     <View style={s.formWrap}>
-      <Text style={s.relaunchHeadline}>Relancer ce drop</Text>
+      <Text style={s.relaunchHeadline}>{t('story.create.relaunch_title')}</Text>
       <Text style={s.relaunchSub}>
-        Tous les champs sont déjà remplis. Modifie ce qui doit l'être.
+        {t('story.create.relaunch_sub')}
       </Text>
 
       <TouchableOpacity
@@ -1403,40 +1424,40 @@ function StepRelaunch({
         )}
         <View style={s.relaunchVideoOverlay}>
           <Ionicons name="create-outline" size={14} color="#FFFFFF" />
-          <Text style={s.relaunchVideoOverlayText}>Modifier la vidéo</Text>
+          <Text style={s.relaunchVideoOverlayText}>{t('story.create.relaunch_change_video')}</Text>
         </View>
       </TouchableOpacity>
 
-      <Text style={s.fieldLabel}>Titre *</Text>
+      <Text style={s.fieldLabel}>{t('story.create.field_title')}</Text>
       <TextInput
         style={s.titleInput}
-        placeholder="Titre"
+        placeholder={t('story.create.listing_title')}
         placeholderTextColor={colors.textSecondary}
         value={title}
-        onChangeText={(t) => onTitle(t.slice(0, 80))}
+        onChangeText={(v) => onTitle(v.slice(0, 80))}
         returnKeyType="next"
       />
       <Text style={s.counter}>{title.length}/80</Text>
 
-      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Description</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>{t('story.create.field_description')}</Text>
       <TextInput
         style={s.descInput}
-        placeholder="Description"
+        placeholder={t('story.create.description')}
         placeholderTextColor={colors.textSecondary}
         value={description}
-        onChangeText={(t) => onDescription(t.slice(0, 300))}
+        onChangeText={(v) => onDescription(v.slice(0, 300))}
         multiline
         numberOfLines={4}
         textAlignVertical="top"
       />
       <Text style={s.counter}>{description.length}/300</Text>
 
-      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>Catégorie</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.md }]}>{t('story.create.field_category')}</Text>
       <CategoryPicker value={category} onChange={onCategory} />
 
       <View style={[s.priceRow, { marginTop: spacing.lg }]}>
         <View style={s.priceCol}>
-          <Text style={s.priceColLabel}>Prix de départ</Text>
+          <Text style={s.priceColLabel}>{t('story.create.price_start')}</Text>
           <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
             <Text style={s.chfTag}>CHF</Text>
             <TextInput
@@ -1453,7 +1474,7 @@ function StepRelaunch({
           <Ionicons name="arrow-forward" size={18} color={colors.textSecondary} />
         </View>
         <View style={s.priceCol}>
-          <Text style={s.priceColLabel}>Prix plancher</Text>
+          <Text style={s.priceColLabel}>{t('story.create.price_floor')}</Text>
           <View style={[s.priceBox, floorGtStart && { borderColor: colors.error }]}>
             <Text style={s.chfTag}>CHF</Text>
             <TextInput
@@ -1468,12 +1489,16 @@ function StepRelaunch({
         </View>
       </View>
       {floorGtStart && (
-        <Text style={s.priceError}>Le prix plancher doit être inférieur au prix de départ</Text>
+        <Text style={s.priceError}>{t('story.create.price_floor_error')}</Text>
       )}
 
-      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>Vitesse de vente</Text>
+      <Text style={[s.fieldLabel, { marginTop: spacing.lg }]}>{t('story.create.speed_title')}</Text>
       <View style={s.presetRow}>
-        {PRESETS.map((p) => {
+        {[
+          { key: 'FLASH' as SpeedPreset, emoji: '⚡', label: 'FLASH', tagline: '1h · ' + t('story.create.speed_fast') },
+          { key: 'STANDARD' as SpeedPreset, emoji: '🎯', label: 'STANDARD', tagline: '24h · ' + t('story.create.speed_standard') },
+          { key: 'RELAX' as SpeedPreset, emoji: '🌙', label: 'RELAX', tagline: '7j · ' + t('story.create.speed_slow') },
+        ].map((p) => {
           const active = preset === p.key
           const accent = PRESET_ACCENT[p.key]
           return (
@@ -1500,7 +1525,7 @@ function StepRelaunch({
         {loading ? (
           <View style={s.publishLoadingWrap}>
             <View style={s.publishProgressRow}>
-              <Text style={s.publishBtnText}>{uploadPhase || 'Publication...'}</Text>
+              <Text style={s.publishBtnText}>{uploadPhase || t('story.create.publishing')}</Text>
               <Text style={s.publishPercentText}>{uploadPercent}%</Text>
             </View>
             <View style={s.publishProgressTrack}>
@@ -1510,7 +1535,7 @@ function StepRelaunch({
         ) : (
           <>
             <Ionicons name="rocket" size={20} color="#0F0F0F" style={{ marginRight: 8 }} />
-            <Text style={s.publishBtnText}>Publier le drop</Text>
+            <Text style={s.publishBtnText}>{t('story.create.publish_btn')}</Text>
           </>
         )}
       </TouchableOpacity>
@@ -1521,7 +1546,7 @@ function StepRelaunch({
         disabled={loading}
         activeOpacity={0.8}
       >
-        <Text style={s.relaunchCancelText}>Annuler</Text>
+        <Text style={s.relaunchCancelText}>{t('common.cancel')}</Text>
       </TouchableOpacity>
     </View>
   )

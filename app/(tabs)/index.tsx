@@ -111,10 +111,10 @@ interface Comment {
   userLike?: 1 | -1 | null
 }
 
-function formatRelativeDate(iso: string): string {
+function formatRelativeDate(iso: string, t: (key: string) => string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'maintenant'
+  if (mins < 1) return t('feed.now')
   if (mins < 60) return `${mins} min`
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs} h`
@@ -134,9 +134,9 @@ function formatTimeAgo(dateStr: string): string {
   return `il y a ${d}j`
 }
 
-function formatCountdown(expiresAt: string): string {
+function formatCountdown(expiresAt: string, t: (key: string) => string): string {
   const ms = new Date(expiresAt).getTime() - Date.now()
-  if (ms <= 0) return 'Expiré'
+  if (ms <= 0) return t('feed.expired')
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   const s = Math.floor((ms % 60000) / 1000)
@@ -144,11 +144,12 @@ function formatCountdown(expiresAt: string): string {
 }
 
 function RecentViewersPill({ count }: { count: number }) {
+  const { t } = useTranslation()
   if (count < 2) return null
   let label: string
-  if (count >= 51) label = 'Populaire'
-  else if (count >= 11) label = '+10 personnes regardent'
-  else label = `${count} personnes regardent`
+  if (count >= 51) label = t('feed.popular')
+  else if (count >= 11) label = t('feed.viewers_many')
+  else label = t('feed.viewers_count', { count })
   const icon = count >= 51 ? '🔥' : '👁'
   return (
     <View style={styles.recentViewersPill}>
@@ -433,10 +434,10 @@ function CommentsSheet({
   }
 
   const handleDelete = (c: Comment) => {
-    Alert.alert('Supprimer ce commentaire ?', undefined, [
-      { text: 'Annuler', style: 'cancel' },
+    Alert.alert(t('feed.delete_comment_title'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Supprimer',
+        text: t('common.confirm'),
         style: 'destructive',
         onPress: async () => {
           setComments(prev => prev.filter(x => x.id !== c.id))
@@ -484,7 +485,7 @@ function CommentsSheet({
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 6 }}>
             <Text style={{ color: '#666', fontSize: 11 }}>
-              {formatRelativeDate(comment.created_at)}
+              {formatRelativeDate(comment.created_at, t)}
             </Text>
             <TouchableOpacity onPress={onReply}>
               <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600' }}>
@@ -551,8 +552,10 @@ function CommentsSheet({
           ) : (
             <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600' }}>
               {expandedReplies.has(item.id)
-                ? 'Masquer les réponses'
-                : `Afficher ${item.replies_count} réponse${item.replies_count > 1 ? 's' : ''}`}
+                ? t('feed.hide_replies')
+                : item.replies_count > 1
+                  ? t('feed.show_replies_plural', { count: item.replies_count })
+                  : t('feed.show_replies', { count: item.replies_count })}
               {' '}{expandedReplies.has(item.id) ? '▲' : '▼'}
             </Text>
           )}
@@ -709,6 +712,7 @@ function DropItem({
   currentUserId: string
   fromProfile?: string
 }) {
+  const { t } = useTranslation()
   const { profile: authProfile } = useAuth()
   const currentUserProfile = {
     username: authProfile?.username ?? null,
@@ -730,7 +734,7 @@ function DropItem({
 
   const [price, setPrice] = useState(() => computePrice(story))
   const [progress, setProgress] = useState(() => computeProgress(story))
-  const [countdown, setCountdown] = useState(() => formatCountdown(story.expires_at))
+  const [countdown, setCountdown] = useState(() => formatCountdown(story.expires_at, t))
   const [localSold, setLocalSold] = useState(false)
   const [recentViewers, setRecentViewers] = useState<number>(0)
 
@@ -769,7 +773,7 @@ function DropItem({
     const tick = () => {
       setPrice(computePrice(story))
       setProgress(computeProgress(story))
-      setCountdown(formatCountdown(story.expires_at))
+      setCountdown(formatCountdown(story.expires_at, t))
     }
     tick()
     const h = setInterval(tick, 250)
@@ -781,7 +785,7 @@ function DropItem({
     if (!detailVisible) return
     const tick = () => {
       setPrice(computePrice(story))
-      setCountdown(formatCountdown(story.expires_at))
+      setCountdown(formatCountdown(story.expires_at, t))
     }
     tick()
     const h = setInterval(tick, 250)
@@ -927,7 +931,7 @@ function DropItem({
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Annuler', 'Signaler', 'Bloquer le vendeur'],
+          options: [t('common.cancel'), t('feed.report'), t('feed.block_seller')],
           cancelButtonIndex: 0,
           destructiveButtonIndex: 2,
         },
@@ -952,7 +956,7 @@ function DropItem({
     await handlePurchase(story.id, snapshotPrice, () => {
       setBuyVisible(false)
       setLocalSold(true)
-      Alert.alert('Achat confirmé !', '', [{ text: 'OK' }])
+      Alert.alert(t('feed.purchase_confirmed'), '', [{ text: 'OK' }])
     })
   }
 
@@ -979,12 +983,12 @@ function DropItem({
     ? Math.round(((story.start_price_chf - price) / story.start_price_chf) * 100)
     : 0
   const ctaLabel = isSold
-    ? 'Vendu'
+    ? t('feed.sold')
     : isSeller
-    ? 'Votre drop'
+    ? t('feed.your_drop')
     : story.status !== 'active'
-    ? 'Enchère terminée'
-    : `Acheter maintenant — CHF ${price.toFixed(2)}`
+    ? t('feed.auction_ended')
+    : t('feed.buy_now', { price: price.toFixed(2) })
 
   return (
     <View
@@ -1144,7 +1148,7 @@ function DropItem({
           <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
           <View style={[styles.freeShipBadge, { alignSelf: 'flex-start', marginTop: 4 }]}>
             <Ionicons name="cube-outline" size={12} color="#00D2B8" />
-            <Text style={styles.freeShipText}>Livraison offerte</Text>
+            <Text style={styles.freeShipText}>{t('feed.free_shipping')}</Text>
           </View>
           {savingsPct > 0 && (
             <View style={styles.savingsBadge}>
@@ -1152,7 +1156,7 @@ function DropItem({
             </View>
           )}
           <View style={styles.priceMeta}>
-            <Text style={styles.priceMin}>Min: CHF {story.floor_price_chf.toFixed(2)}</Text>
+            <Text style={styles.priceMin}>{t('feed.price_floor', { price: story.floor_price_chf.toFixed(2) })}</Text>
           </View>
         </View>
 
@@ -1191,7 +1195,7 @@ function DropItem({
                 }}
               >
                 <Ionicons name="flag-outline" size={18} color="#FFFFFF" />
-                <Text style={styles.menuText}>Signaler</Text>
+                <Text style={styles.menuText}>{t('feed.report')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
@@ -1201,10 +1205,10 @@ function DropItem({
                 }}
               >
                 <Ionicons name="person-remove-outline" size={18} color="#FF4757" />
-                <Text style={[styles.menuText, { color: '#FF4757' }]}>Bloquer le vendeur</Text>
+                <Text style={[styles.menuText, { color: '#FF4757' }]}>{t('feed.block_seller')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.menuCancel} onPress={() => setMenuVisible(false)}>
-                <Text style={styles.menuCancelText}>Annuler</Text>
+                <Text style={styles.menuCancelText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -1287,7 +1291,7 @@ function DropItem({
                     activeOpacity={0.8}
                   >
                     <Text style={[detailStyles.followBtnText, isFollowing && detailStyles.followBtnTextActive]}>
-                      {isFollowing ? 'Abonné' : 'Suivre'}
+                      {isFollowing ? t('feed.following_btn') : t('feed.follow_btn')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1327,26 +1331,26 @@ function DropItem({
             <View style={detailStyles.divider} />
 
             {/* Price section */}
-            <Text style={detailStyles.priceLabel}>PRIX ACTUEL</Text>
+            <Text style={detailStyles.priceLabel}>{t('feed.price_label')}</Text>
             <Text style={detailStyles.priceBig}>CHF {price.toFixed(2)}</Text>
             <View style={[detailStyles.freeShipBadge, { alignSelf: 'flex-start', marginTop: 6 }]}>
               <Ionicons name="cube-outline" size={12} color="#00D2B8" />
-              <Text style={detailStyles.freeShipText}>Livraison offerte</Text>
+              <Text style={detailStyles.freeShipText}>{t('feed.free_shipping')}</Text>
             </View>
             {dropPerMinute(story) > 0 && (
               <Text style={detailStyles.priceDrop}>
-                ↓ baisse toutes les {story.price_drop_seconds ?? 60}s
+                {t('feed.price_drop_every', { seconds: story.price_drop_seconds ?? 60 })}
               </Text>
             )}
             <Text style={detailStyles.priceFloor}>
-              Prix plancher : CHF {story.floor_price_chf.toFixed(2)}
+              {t('feed.price_floor_label', { price: story.floor_price_chf.toFixed(2) })}
             </Text>
 
             <View style={detailStyles.divider} />
 
             {/* Expiry */}
             <Text style={detailStyles.expires}>
-              Expire dans {countdown}
+              {t('feed.expires_in', { time: countdown })}
             </Text>
           </ScrollView>
 
@@ -1360,12 +1364,12 @@ function DropItem({
             >
               <Text style={[detailStyles.buyBtnText, disabled && detailStyles.buyBtnTextDisabled]}>
                 {isSold
-                  ? 'Vendu'
+                  ? t('feed.sold')
                   : isSeller
-                  ? 'Votre drop'
+                  ? t('feed.your_drop')
                   : story.status !== 'active'
-                  ? 'Enchère terminée'
-                  : `Acheter maintenant — CHF ${price.toFixed(2)}`}
+                  ? t('feed.auction_ended')
+                  : t('feed.buy_now', { price: price.toFixed(2) })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1382,16 +1386,16 @@ function DropItem({
         <Pressable style={styles.buyBackdrop} onPress={() => setBuyVisible(false)} />
         <View style={styles.buySheet}>
           <View style={styles.buyHandle} />
-          <Text style={styles.buySheetTitle}>Confirmer l'achat</Text>
+          <Text style={styles.buySheetTitle}>{t('feed.buy_confirm_title')}</Text>
           <View style={styles.buyPriceWrap}>
             <Text style={styles.buyChf}>CHF</Text>
             <Text style={styles.buyPriceValue}>{snapshotPrice.toFixed(2)}</Text>
           </View>
-          <Text style={styles.buySubtitle}>Enchère hollandaise · Premier arrivé, premier servi</Text>
+          <Text style={styles.buySubtitle}>{t('feed.buy_subtitle')}</Text>
           <View style={styles.buyWarn}>
             <Ionicons name="information-circle-outline" size={18} color="#FFA502" />
             <Text style={styles.buyWarnText}>
-              Ce prix n'est valable que quelques secondes. Le montant débité sera celui au moment de la confirmation.
+              {t('feed.buy_warning')}
             </Text>
           </View>
           <TouchableOpacity
@@ -1403,12 +1407,12 @@ function DropItem({
               <ActivityIndicator color="#0F0F0F" />
             ) : (
               <Text style={styles.buyConfirmText}>
-                CHF {snapshotPrice.toFixed(2)} — Confirmer
+                {t('feed.buy_confirm_btn', { price: snapshotPrice.toFixed(2) })}
               </Text>
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.buyCancel} onPress={() => setBuyVisible(false)}>
-            <Text style={styles.buyCancelText}>Annuler</Text>
+            <Text style={styles.buyCancelText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
