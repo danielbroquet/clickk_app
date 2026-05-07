@@ -177,19 +177,23 @@ function FramePickerModal({
   visible,
   videoUri,
   videoDurationSeconds,
+  initialPosition,
+  onPositionChange,
   onConfirm,
   onCancel,
 }: {
   visible: boolean
   videoUri: string
   videoDurationSeconds: number
+  initialPosition: number
+  onPositionChange: (seconds: number) => void
   onConfirm: (thumbUri: string) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation()
   const [previewThumbnail, setPreviewThumbnail] = useState<string | null>(null)
   const [capturingFrame, setCapturingFrame] = useState(false)
-  const [sliderValue, setSliderValue] = useState(0) // seconds
+  const [sliderValue, setSliderValue] = useState(initialPosition)
   const trackWidth = useRef(0)
   const thumbX = useRef(0)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -210,22 +214,23 @@ function FramePickerModal({
     }
   }, [videoUri])
 
-  // Capture initial frame when modal opens
+  // Capture frame at current position when modal opens; don't reset position
   useEffect(() => {
     if (!visible) return
-    setSliderValue(0)
-    thumbX.current = 0
-    captureFrame(0)
-  }, [visible, captureFrame])
+    setSliderValue(initialPosition)
+    captureFrame(initialPosition)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
 
   const onSliderMove = useCallback((newSeconds: number) => {
     const clamped = Math.min(Math.max(newSeconds, 0), videoDurationSeconds)
     setSliderValue(clamped)
+    onPositionChange(clamped)
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
       captureFrame(clamped)
     }, 300)
-  }, [videoDurationSeconds, captureFrame])
+  }, [videoDurationSeconds, captureFrame, onPositionChange])
 
   const panResponder = useRef(
     PanResponder.create({
@@ -258,6 +263,7 @@ function FramePickerModal({
         thumbX.current = newX
         const secs = (newX / w) * videoDurationSeconds
         setSliderValue(secs)
+        onPositionChange(secs)
         if (debounceTimer.current) clearTimeout(debounceTimer.current)
         captureFrame(secs)
       },
@@ -397,6 +403,7 @@ export default function CreateDropScreen() {
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
   const [videoDurationSeconds, setVideoDurationSeconds] = useState<number>(30)
   const [showFramePicker, setShowFramePicker] = useState(false)
+  const [scrubPosition, setScrubPosition] = useState(0)
   // Step 2
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -481,6 +488,7 @@ export default function CreateDropScreen() {
       ? Math.min(Math.max(Math.round(assetDurationMs / 1000), 1), 30)
       : 30
     setVideoDurationSeconds(durationSec)
+    setScrubPosition(0)
     setVideoUri(asset.uri)
     setShowFramePicker(true)
 
@@ -823,6 +831,8 @@ export default function CreateDropScreen() {
             visible={showFramePicker}
             videoUri={videoUri}
             videoDurationSeconds={videoDurationSeconds}
+            initialPosition={scrubPosition}
+            onPositionChange={setScrubPosition}
             onConfirm={(thumbUri) => {
               setThumbnailUri(thumbUri)
               setShowFramePicker(false)
@@ -1410,7 +1420,7 @@ function StepRelaunch({
         style={s.relaunchVideoWrap}
       >
         {thumbnailUri ? (
-          <Image source={{ uri: thumbnailUri }} style={s.relaunchVideoImg} />
+          <Image source={{ uri: thumbnailUri }} style={s.relaunchVideoImg} resizeMode="cover" />
         ) : (
           <View style={[s.relaunchVideoImg, { justifyContent: 'center', alignItems: 'center' }]}>
             <Ionicons name="videocam-outline" size={32} color={colors.border} />
@@ -1976,8 +1986,8 @@ const s = StyleSheet.create({
   },
   relaunchVideoWrap: {
     width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 14,
+    aspectRatio: 9 / 16,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: colors.surfaceHigh,
     marginBottom: spacing.md,
@@ -1985,6 +1995,7 @@ const s = StyleSheet.create({
   relaunchVideoImg: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   relaunchVideoOverlay: {
     position: 'absolute',

@@ -72,7 +72,7 @@ export default {
       ai_error_message: 'AI could not analyze the image',
       frame_picker_title: 'Choose cover frame',
       frame_picker_subtitle: 'Slide to find the best moment in your video',
-      frame_picker_confirm: '✅ Use this frame',
+      frame_picker_confirm: 'Use as cover photo',
       frame_picker_change: '↩ Choose another video',
       add_video: 'Add a video',
       add_video_sub: 'Max 30 sec · Vertical format recommended',

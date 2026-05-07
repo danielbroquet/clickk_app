@@ -72,7 +72,7 @@ export default {
       ai_error_message: 'Die KI konnte das Bild nicht analysieren',
       frame_picker_title: 'Cover-Bild wählen',
       frame_picker_subtitle: 'Schiebe, um den besten Moment deines Videos zu finden',
-      frame_picker_confirm: '✅ Dieses Bild verwenden',
+      frame_picker_confirm: 'Als Titelbild verwenden',
       frame_picker_change: '↩ Anderes Video wählen',
       add_video: 'Video hinzufügen',
       add_video_sub: 'Max 30 Sek. · Hochformat empfohlen',

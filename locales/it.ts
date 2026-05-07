@@ -72,7 +72,7 @@ export default {
       ai_error_message: 'L\'IA non è riuscita ad analizzare l\'immagine',
       frame_picker_title: 'Scegli la copertina',
       frame_picker_subtitle: 'Scorri per trovare il momento migliore del tuo video',
-      frame_picker_confirm: '✅ Usa questo fotogramma',
+      frame_picker_confirm: 'Usa come foto di copertina',
       frame_picker_change: '↩ Scegli un altro video',
       add_video: 'Aggiungi un video',
       add_video_sub: 'Max 30 sec · Formato verticale consigliato',

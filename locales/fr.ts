@@ -72,7 +72,7 @@ export default {
       ai_error_message: 'L\'IA n\'a pas pu analyser l\'image',
       frame_picker_title: 'Choisir la couverture',
       frame_picker_subtitle: 'Fais glisser pour trouver le meilleur moment de ta vidéo',
-      frame_picker_confirm: '✅ Utiliser cette frame',
+      frame_picker_confirm: 'Choisir comme photo de couverture',
       frame_picker_change: '↩ Choisir une autre vidéo',
       add_video: 'Ajoute une vidéo',
       add_video_sub: 'Max 30 sec · Format vertical recommandé',
