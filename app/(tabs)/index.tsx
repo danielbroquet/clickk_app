@@ -375,9 +375,12 @@ function CommentsSheet({
     const text = input.trim()
     if (!text || !currentUserId || sending) return
     const pendingReplyTo = replyTo
+
+    inputRef.current?.focus()
     setSending(true)
     setInput('')
     setReplyTo(null)
+
     if (Platform.OS !== 'web') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
@@ -402,10 +405,10 @@ function CommentsSheet({
       }
       setComments(prev => [optimisticComment, ...prev])
       setCount(n => n + 1)
-      listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      setTimeout(() => {
+        listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      }, 100)
     }
-
-    inputRef.current?.focus()
 
     const { data: { session: liveSession } } = await supabase.auth.getSession()
     if (!liveSession) await supabase.auth.refreshSession()
@@ -448,6 +451,8 @@ function CommentsSheet({
       ))
       onCommentAdded({ ...data, profiles: { username: currentUserProfile.username, avatar_url: currentUserProfile.avatar_url }, likes_count: 0, dislikes_count: 0, replies_count: 0, userLike: null })
     }
+
+    setTimeout(() => inputRef.current?.focus(), 50)
   }
 
   const handleDelete = (c: Comment) => {
@@ -646,6 +651,8 @@ function CommentsSheet({
                 renderItem={renderItem}
                 contentContainerStyle={{ paddingVertical: 8 }}
                 style={{ flex: 1 }}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="none"
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
                 }
