@@ -715,6 +715,8 @@ function DropItem({
   const videoRef = useRef<Video>(null)
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
+  const [remountKey, setRemountKey] = useState(0)
+  const prevShouldUnloadRef = useRef<boolean>(!!shouldUnload)
   const viewerCount = useDropPresence(story.id, active && tabFocused)
   const { isWatchlisted, watchlistCount, toggleWatchlist } = useWatchlist(story.id)
   const sellerId = story.seller?.id ?? ''
@@ -818,6 +820,15 @@ function DropItem({
       videoRef.current?.unloadAsync().catch(() => {})
     }
   }, [active, isPreload, shouldUnload])
+
+  useEffect(() => {
+    const wasUnloaded = prevShouldUnloadRef.current
+    const isUnloaded = !!shouldUnload
+    if (wasUnloaded && !isUnloaded) {
+      setRemountKey(k => k + 1)
+    }
+    prevShouldUnloadRef.current = isUnloaded
+  }, [shouldUnload])
 
   useEffect(() => {
     const ref = videoRef
@@ -994,21 +1005,22 @@ function DropItem({
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
     >
-      {shouldUnload ? (
-        story.thumbnail_url ? (
-          <Image
-            source={{ uri: toCdnUrl(story.thumbnail_url) ?? '' }}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
-        )
+      {story.thumbnail_url ? (
+        <Image
+          source={{ uri: toCdnUrl(story.thumbnail_url) ?? '' }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
       ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }]} />
+      )}
+
+      {!shouldUnload && (
         <Video
+          key={remountKey}
           ref={videoRef}
           source={{ uri: toCdnUrl(story.video_url) ?? '' }}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]}
           resizeMode={ResizeMode.COVER}
           isLooping
           isMuted={active ? muted : true}
