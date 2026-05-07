@@ -21,7 +21,6 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
-import { decode } from 'base64-arraybuffer'
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -208,6 +207,39 @@ function CategoryPicker({
       </Modal>
     </>
   )
+}
+
+// ─── R2 upload helper ─────────────────────────────────────────────────────────
+
+async function uploadToR2(opts: {
+  session: any
+  bucket: 'story-videos' | 'story-thumbnails' | 'listing-images'
+  filename: string
+  base64: string
+  contentType: string
+}): Promise<string> {
+  const { session, bucket, filename, base64, contentType } = opts
+  const res = await fetch(
+    `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/r2-presign`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bucket, filename, contentType }),
+    }
+  )
+  const { presignedUrl, publicUrl, error } = await res.json()
+  if (error) throw new Error(error)
+  const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+  const uploadRes = await fetch(presignedUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: binary,
+  })
+  if (!uploadRes.ok) throw new Error(`R2 upload failed: ${uploadRes.status}`)
+  return publicUrl
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -486,7 +518,6 @@ export default function CreateDropScreen() {
         thumbnailPublicUrl = thumbnailUri ?? null
       } else {
         // Step 1 — copy to cache if needed (5%)
-        const path = `${user.id}/${Date.now()}.mp4`
         let localUri = videoUri!
         if (localUri.startsWith('ph://') || !localUri.startsWith('file://')) {
           setUploadPhase('Copie du fichier…')
@@ -508,29 +539,31 @@ export default function CreateDropScreen() {
         // Step 3 — upload video (60%)
         setUploadPhase('Envoi de la vidéo…')
         setUploadPercent(30)
-        const { error: uploadError } = await supabase.storage
-          .from('story-videos')
-          .upload(path, decode(base64), { contentType: 'video/mp4' })
-        if (uploadError) throw uploadError
-        setUploadPercent(60)
+        const { data: { session: uploadSession } } = await supabase.auth.getSession()
+        if (!uploadSession) throw new Error('Non authentifié')
 
-        const { data: { publicUrl: uploadedUrl } } = supabase.storage.from('story-videos').getPublicUrl(path)
-        publicUrl = uploadedUrl
+        publicUrl = await uploadToR2({
+          session: uploadSession,
+          bucket: 'story-videos',
+          filename: `${Date.now()}.mp4`,
+          base64,
+          contentType: 'video/mp4',
+        })
+        setUploadPercent(60)
 
         // Step 4 — upload thumbnail (75%)
         if (thumbnailUri && (thumbnailUri.startsWith('file://') || thumbnailUri.startsWith('ph://'))) {
           try {
             setUploadPhase('Envoi de la miniature…')
             setUploadPercent(65)
-            const thumbPath = `${user.id}/${Date.now()}_thumb.jpg`
             const thumbBase64 = await FileSystem.readAsStringAsync(thumbnailUri, { encoding: 'base64' })
-            const { error: te } = await supabase.storage
-              .from('story-thumbnails')
-              .upload(thumbPath, decode(thumbBase64), { contentType: 'image/jpeg' })
-            if (!te) {
-              const { data: { publicUrl: tu } } = supabase.storage.from('story-thumbnails').getPublicUrl(thumbPath)
-              thumbnailPublicUrl = tu
-            }
+            thumbnailPublicUrl = await uploadToR2({
+              session: uploadSession,
+              bucket: 'story-thumbnails',
+              filename: `${Date.now()}_thumb.jpg`,
+              base64: thumbBase64,
+              contentType: 'image/jpeg',
+            })
             setUploadPercent(75)
           } catch {}
         } else if (thumbnailUri) {
