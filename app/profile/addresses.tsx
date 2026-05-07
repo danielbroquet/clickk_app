@@ -245,7 +245,8 @@ function AddressForm({
       })).filter((r: any) => r.street && r.postal_code && r.city)
       setStreetSuggestions(results)
       setShowSuggestions(results.length > 0)
-    } catch {
+    } catch (err) {
+      console.error('[searchSwissAddress] API error:', err)
       setStreetSuggestions([])
       setShowSuggestions(false)
     } finally {
@@ -371,36 +372,36 @@ function AddressForm({
                 style={styles.line1Spinner}
               />
             )}
+            {showSuggestions && streetSuggestions.length > 0 && (
+              <View style={styles.suggestionBox}>
+                {streetSuggestions.map((s, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.suggestionItem,
+                      i < streetSuggestions.length - 1 && styles.suggestionBorder]}
+                    onPress={() => {
+                      setLine1((s.street + ' ' + s.number).trim())
+                      setPostalCode(s.postal_code)
+                      setCity(s.city)
+                      setShowSuggestions(false)
+                      if (searchTimeout.current) clearTimeout(searchTimeout.current)
+                    }}
+                  >
+                    <Ionicons name="location-outline" size={14}
+                      color={colors.textSecondary} style={{ marginRight: 8, marginTop: 1 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.suggestionStreet}>
+                        {s.street} {s.number}
+                      </Text>
+                      <Text style={styles.suggestionCity}>
+                        {s.postal_code} {s.city}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
-          {showSuggestions && streetSuggestions.length > 0 && (
-            <View style={styles.suggestionBox}>
-              {streetSuggestions.map((s, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.suggestionItem,
-                    i < streetSuggestions.length - 1 && styles.suggestionBorder]}
-                  onPress={() => {
-                    setLine1(`${s.street} ${s.number}`.trim())
-                    setPostalCode(s.postal_code)
-                    setCity(s.city)
-                    setShowSuggestions(false)
-                    setStreetSuggestions([])
-                  }}
-                >
-                  <Ionicons name="location-outline" size={14}
-                    color={colors.textSecondary} style={{ marginRight: 8, marginTop: 1 }} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.suggestionStreet}>
-                      {s.street} {s.number}
-                    </Text>
-                    <Text style={styles.suggestionCity}>
-                      {s.postal_code} {s.city}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
 
           <Text style={styles.fieldLabel}>{t('addresses.field_complement')}</Text>
           <TextInput
@@ -569,6 +570,7 @@ const styles = StyleSheet.create({
   line1Wrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
   },
   line1Spinner: {
     position: 'absolute',
@@ -588,15 +590,18 @@ const styles = StyleSheet.create({
   },
   ctaText: { color: '#000', fontSize: 16, fontWeight: '700' },
   suggestionBox: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    marginTop: 4,
-    marginBottom: 4,
+    borderRadius: 8,
     overflow: 'hidden',
-    zIndex: 999,
-    elevation: 5,
+    zIndex: 9999,
+    elevation: 10,
+    maxHeight: 200,
   },
   suggestionItem: {
     flexDirection: 'row',
