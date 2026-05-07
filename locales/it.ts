@@ -19,7 +19,7 @@ export default {
       step_settings: 'Impostazioni',
       pick_video: 'Scegli dalla galleria',
       record_video: 'Registra',
-      video_tip: 'Max 60 secondi · Formato verticale consigliato',
+      video_tip: 'Max 30 sec · Formato verticale · Compressione automatica',
       listing_title: 'Titolo dell\'articolo',
       listing_title_placeholder: 'Es: Nike Air Max 90 Taglia 42',
       description: 'Descrizione',

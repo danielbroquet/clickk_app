@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as VideoThumbnails from 'expo-video-thumbnails'
 import { Video as AvVideo, ResizeMode } from 'expo-av'
+import { Video as VideoCompressor } from 'react-native-compressor'
 import { decode } from 'base64-arraybuffer'
 import Animated, {
   useSharedValue,
@@ -226,6 +227,7 @@ export default function CreateDropScreen() {
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
   const [videoDurationSeconds, setVideoDurationSeconds] = useState<number>(30)
+  const [compressing, setCompressing] = useState(false)
 
   // Step 2
   const [title, setTitle] = useState('')
@@ -288,30 +290,67 @@ export default function CreateDropScreen() {
     } catch { return null }
   }
 
+  const getFileSizeMB = async (uri: string): Promise<number> => {
+    try {
+      const info = await FileSystem.getInfoAsync(uri, { size: true }) as FileSystem.FileInfo & { size?: number }
+      if (!info.exists || typeof info.size !== 'number') return 0
+      return info.size / (1024 * 1024)
+    } catch {
+      return 0
+    }
+  }
+
   const handleVideoSelected = async (asset: ImagePicker.ImagePickerAsset) => {
-    setVideoUri(asset.uri)
     const durationMs = asset.duration ?? null
+
+    if (durationMs != null && durationMs > 30000) {
+      Alert.alert('Vidéo trop longue', 'Sélectionne un segment de 30s maximum')
+      setVideoUri(null)
+      setThumbnailUri(null)
+      return
+    }
+
     const durationSec = durationMs != null && durationMs > 0
       ? Math.min(Math.max(Math.round(durationMs / 1000), 1), 30)
       : 30
     setVideoDurationSeconds(durationSec)
+    setVideoUri(asset.uri)
+
     const thumb = await generateThumbnail(asset.uri)
     setThumbnailUri(thumb)
 
-    try {
-      const info = await FileSystem.getInfoAsync(asset.uri, { size: true })
-      const sizeMB = (info as any).size / (1024 * 1024)
-      if (sizeMB > 25) {
-        Alert.alert(
-          'Vidéo trop lourde',
-          `Cette vidéo fait ${sizeMB.toFixed(1)} MB. Privilégie une vidéo plus courte ou de qualité plus basse pour un upload plus rapide.`,
-          [
-            { text: 'Annuler', style: 'cancel', onPress: () => setVideoUri(null) },
-            { text: 'Continuer quand même', onPress: () => {} },
-          ]
-        )
+    let finalUri = asset.uri
+    const sizeMB = await getFileSizeMB(finalUri)
+
+    if (sizeMB > 10) {
+      setCompressing(true)
+      try {
+        const compressedUri = await VideoCompressor.compress(finalUri, {
+          compressionMethod: 'auto',
+          maxSize: 1280,
+          bitrate: 1500000,
+        })
+        finalUri = compressedUri
+        const afterMB = await getFileSizeMB(finalUri)
+        if (afterMB > 10) {
+          Alert.alert(
+            'Vidéo trop lourde',
+            'La vidéo est trop lourde même après compression. Essaie une vidéo plus courte ou filmée en qualité standard.'
+          )
+          setVideoUri(null)
+          setThumbnailUri(null)
+          setCompressing(false)
+          return
+        }
+        setVideoUri(finalUri)
+        const newThumb = await generateThumbnail(finalUri)
+        if (newThumb) setThumbnailUri(newThumb)
+      } catch {
+        // compression failed — keep original and let pre-flight decide
+      } finally {
+        setCompressing(false)
       }
-    } catch {}
+    }
   }
 
   const launchCamera = async () => {
@@ -323,10 +362,10 @@ export default function CreateDropScreen() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       quality: 0.5,
-      videoMaxDuration: 60,
+      videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
       allowsEditing: true,
-      ...(Platform.OS === 'android' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality }),
+      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -335,10 +374,10 @@ export default function CreateDropScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       quality: 0.5,
-      videoMaxDuration: 60,
+      videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
       allowsEditing: true,
-      ...(Platform.OS === 'android' && { videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality }),
+      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -480,6 +519,10 @@ export default function CreateDropScreen() {
         // Step 2 — read video (15%)
         setUploadPhase('Lecture de la vidéo…')
         setUploadPercent(15)
+        const preflight = await FileSystem.getInfoAsync(localUri, { size: true }) as FileSystem.FileInfo & { size?: number }
+        if (preflight.exists && typeof preflight.size === 'number' && preflight.size / (1024 * 1024) > 10) {
+          throw new Error('Vidéo trop lourde après compression')
+        }
         const base64 = await FileSystem.readAsStringAsync(localUri, { encoding: 'base64' })
 
         // Step 3 — upload video (60%)
@@ -568,7 +611,7 @@ export default function CreateDropScreen() {
   // ── can advance? ───────────────────────────────────────────────────────────
 
   const canNext =
-    (step === 1 && videoUri !== null) ||
+    (step === 1 && videoUri !== null && !compressing) ||
     (step === 2 && title.trim().length > 0) ||
     (step === 3 && startPrice !== '' && floorPrice !== '' && !floorGtStart) ||
     step === TOTAL_STEPS
@@ -610,6 +653,7 @@ export default function CreateDropScreen() {
               onGallery={launchGallery}
               onClear={() => { setVideoUri(null); setThumbnailUri(null); setVideoDurationSeconds(30) }}
               isRelaunch={!!relaunchId}
+              compressing={compressing}
             />
           )}
           {step === 2 && (
@@ -689,6 +733,7 @@ function Step1({
   onGallery,
   onClear,
   isRelaunch,
+  compressing,
 }: {
   videoUri: string | null
   thumbnailUri: string | null
@@ -696,8 +741,9 @@ function Step1({
   onGallery: () => void
   onClear: () => void
   isRelaunch?: boolean
+  compressing: boolean
 }) {
-  if (videoUri) {
+  if (videoUri || compressing) {
     return (
       <View>
         {isRelaunch && (
@@ -712,23 +758,32 @@ function Step1({
           </View>
         )}
         <View style={s.videoWrap}>
-          <AvVideo
-            source={{ uri: videoUri }}
-            style={s.videoPreview}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay={false}
-            useNativeControls
-            isLooping
-          />
-          <TouchableOpacity style={s.clearBtn} onPress={onClear}>
-            <Ionicons name="close" size={16} color="#FFFFFF" />
-          </TouchableOpacity>
-          <View style={s.readyPill}>
-            <Ionicons name="checkmark-circle" size={13} color="#0F0F0F" />
-            <Text style={s.readyText}>Vidéo prête</Text>
-          </View>
+          {compressing ? (
+            <View style={s.compressOverlay}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={s.compressText}>Compression en cours…</Text>
+            </View>
+          ) : (
+            <>
+              <AvVideo
+                source={{ uri: videoUri! }}
+                style={s.videoPreview}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay={false}
+                useNativeControls
+                isLooping
+              />
+              <TouchableOpacity style={s.clearBtn} onPress={onClear}>
+                <Ionicons name="close" size={16} color="#FFFFFF" />
+              </TouchableOpacity>
+              <View style={s.readyPill}>
+                <Ionicons name="checkmark-circle" size={13} color="#0F0F0F" />
+                <Text style={s.readyText}>Vidéo prête</Text>
+              </View>
+            </>
+          )}
         </View>
-        {thumbnailUri && (
+        {!compressing && thumbnailUri && (
           <View style={s.thumbRow}>
             <Image source={{ uri: thumbnailUri }} style={s.thumbImg} />
             <View>
@@ -737,7 +792,9 @@ function Step1({
             </View>
           </View>
         )}
-        <Text style={s.hintText}>Appuie sur "Suivant" pour continuer →</Text>
+        {!compressing && (
+          <Text style={s.hintText}>Appuie sur "Suivant" pour continuer →</Text>
+        )}
       </View>
     )
   }
@@ -745,7 +802,7 @@ function Step1({
   return (
     <View style={s.captureWrap}>
       <Text style={s.captureTitle}>Ajoute une vidéo</Text>
-      <Text style={s.captureSub}>Max 60 secondes · Format vertical recommandé</Text>
+      <Text style={s.captureSub}>Max 30 sec · Format vertical · Compression auto</Text>
 
       <TouchableOpacity style={s.captureBtn} onPress={onCamera} activeOpacity={0.85}>
         <View style={s.captureBtnIcon}>
@@ -1132,6 +1189,19 @@ const s = StyleSheet.create({
     backgroundColor: '#000',
   },
   videoPreview: { width: '100%', height: '100%' },
+  compressOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#0F0F0F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 14,
+  },
+  compressText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 14,
+    color: colors.text,
+    letterSpacing: 0.3,
+  },
   clearBtn: {
     position: 'absolute',
     top: 10,
