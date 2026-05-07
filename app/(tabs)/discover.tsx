@@ -377,7 +377,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 44,
     marginHorizontal: spacing.md,
-    marginBottom: 12,
+    marginBottom: 0,
   },
   searchFocus: { borderColor: colors.primary },
   searchIcon: { marginLeft: 12, marginRight: 8 },
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
   },
   clearBtn: { paddingHorizontal: 10 },
 
-  sortScroll: { marginBottom: 8 },
+  sortScroll: { marginTop: 8, marginBottom: 8, flexShrink: 0 },
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
