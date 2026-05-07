@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, Stack } from 'expo-router'
@@ -245,6 +246,7 @@ function AddressForm({
         postal_code: r.attrs?.zip ?? '',
         city: r.attrs?.city ?? '',
       })).filter((r: any) => r.street && r.postal_code && r.city)
+      console.error('[address] results:', results.length, results[0]?.label)
       setStreetSuggestions(results)
       setShowSuggestions(results.length > 0)
     } catch (err) {
@@ -365,9 +367,6 @@ function AddressForm({
                   searchSwissAddress(v)
                 }, 350)
               }}
-              onBlur={() => {
-                setTimeout(() => setShowSuggestions(false), 150)
-              }}
               placeholderTextColor={C.muted}
               placeholder="Rue du Lac 12"
             />
@@ -447,6 +446,13 @@ function AddressForm({
         </View>
       </KeyboardAvoidingView>
 
+      {showSuggestions && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setShowSuggestions(false)}
+        />
+      )}
+
       {showSuggestions && streetSuggestions.length > 0 && (
         <View style={{
           position: 'absolute',
@@ -466,7 +472,7 @@ function AddressForm({
           shadowOpacity: 0.15,
           shadowRadius: 8,
         }}>
-          <ScrollView keyboardShouldPersistTaps="handled">
+          <ScrollView keyboardShouldPersistTaps="always">
             {streetSuggestions.map((s, i) => (
               <TouchableOpacity
                 key={i}

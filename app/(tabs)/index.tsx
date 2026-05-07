@@ -614,7 +614,7 @@ function CommentsSheet({
       >
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '60%' }}
             onPress={onClose}
           />
           <View style={commentStyles.sheet}>
@@ -651,7 +651,7 @@ function CommentsSheet({
                 renderItem={renderItem}
                 contentContainerStyle={{ paddingVertical: 8 }}
                 style={{ flex: 1 }}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
                 keyboardDismissMode="none"
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D2B8" />
