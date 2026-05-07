@@ -780,6 +780,34 @@ export default function ProfileScreen() {
 
   const currentUserId = session?.user?.id ?? ''
 
+  const fetchWatchlist = useCallback(async () => {
+    if (!currentUserId) return
+    const { data, error } = await supabase
+      .from('watchlist')
+      .select(`
+        story_id,
+        stories (
+          id,
+          title,
+          thumbnail_url,
+          video_url,
+          current_price_chf,
+          status
+        )
+      `)
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(60)
+    if (error) {
+      console.log('[profile] watchlist fetch error', error)
+      return
+    }
+    const normalized = (data ?? [])
+      .map((row: any) => row.stories)
+      .filter(Boolean) as LikedStory[]
+    setLikedStories(normalized)
+  }, [currentUserId])
+
   const loadProfileData = useCallback(async () => {
     if (!currentUserId) return
 
@@ -806,16 +834,7 @@ export default function ProfileScreen() {
         .limit(60)
         .then(({ data }) => setOwnDrops((data ?? []) as DropCell[])),
 
-      supabase
-        .from('likes')
-        .select('story:story_id(id, title, thumbnail_url, video_url, current_price_chf, status)')
-        .eq('user_id', currentUserId)
-        .order('created_at', { ascending: false })
-        .limit(60)
-        .then(({ data }) => {
-          const list = (data ?? []).map((r: any) => r.story).filter(Boolean)
-          setLikedStories(list as LikedStory[])
-        }),
+      fetchWatchlist(),
     ])
 
     if (profile?.role === 'seller') {
@@ -826,6 +845,10 @@ export default function ProfileScreen() {
   }, [currentUserId, profile?.role])
 
   useEffect(() => { loadProfileData() }, [loadProfileData])
+
+  useEffect(() => {
+    if (activeTab === 'favoris') fetchWatchlist()
+  }, [activeTab, fetchWatchlist])
 
   useEffect(() => {
     if (!profile?.id || profile.role !== 'seller') return
@@ -1094,7 +1117,13 @@ export default function ProfileScreen() {
             {likedStories.map(s => (
               <DropGridCell
                 key={s.id}
-                drop={{ id: s.id, thumbnail_url: s.thumbnail_url, video_url: s.video_url, current_price_chf: s.current_price_chf, status: s.status }}
+                drop={{
+                  id: s.id,
+                  thumbnail_url: toCdnUrl(s.thumbnail_url),
+                  video_url: toCdnUrl(s.video_url),
+                  current_price_chf: s.current_price_chf,
+                  status: s.status,
+                }}
                 variant="purchase"
                 editMode={false}
                 onLongPress={() => {}}
