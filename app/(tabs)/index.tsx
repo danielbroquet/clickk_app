@@ -522,7 +522,7 @@ function CommentsSheet({
           </View>
         </View>
 
-        <View style={{ alignItems: 'center', gap: 8, marginLeft: 12 }}>
+        <View style={{ alignItems: 'center', marginLeft: 12 }}>
           <TouchableOpacity onPress={() => onVote(1)} style={{ alignItems: 'center' }}>
             <Ionicons
               name={comment.userLike === 1 ? 'heart' : 'heart-outline'}
@@ -532,13 +532,6 @@ function CommentsSheet({
             <Text style={{ color: '#A0A0A0', fontSize: 11, marginTop: 2 }}>
               {comment.likes_count > 0 ? comment.likes_count : ''}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => onVote(-1)} style={{ alignItems: 'center' }}>
-            <Ionicons
-              name={comment.userLike === -1 ? 'thumbs-down' : 'thumbs-down-outline'}
-              size={18}
-              color={comment.userLike === -1 ? '#00D2B8' : '#A0A0A0'}
-            />
           </TouchableOpacity>
         </View>
       </View>
@@ -614,7 +607,7 @@ function CommentsSheet({
       >
         <View style={{ flex: 1, justifyContent: 'flex-end' }}>
           <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '60%' }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: '55%' }}
             onPress={onClose}
           />
           <View style={commentStyles.sheet}>
@@ -702,7 +695,7 @@ function CommentsSheet({
                 editable={!!currentUserId && !sending}
               />
               {input.trim().length > 0 && (
-                <TouchableOpacity style={commentStyles.sendBtn} onPress={handleSend} disabled={sending}>
+                <TouchableOpacity style={commentStyles.sendBtn} onPress={handleSend} disabled={sending} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   {sending ? (
                     <ActivityIndicator size="small" color="#0F0F0F" />
                   ) : (
@@ -2447,7 +2440,7 @@ const detailStyles = StyleSheet.create({
 
 const commentStyles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1A1A1A' },
-  sheet: { height: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden' },
+  sheet: { height: '85%', backgroundColor: '#1A1A1A', borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: 'hidden', zIndex: 10, elevation: 10 },
   header: { paddingTop: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#2A2A2A' },
   handle: {
     width: 40,
@@ -2518,6 +2511,8 @@ const commentStyles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#2A2A2A',
     backgroundColor: '#1A1A1A',
+    zIndex: 11,
+    elevation: 11,
   },
   inputAvatarFallback: {
     width: 28,
