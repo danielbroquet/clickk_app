@@ -14,6 +14,7 @@ import {
   Dimensions,
   Pressable,
   Modal,
+  PanResponder,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router'
@@ -173,6 +174,174 @@ function CategoryPicker({
   )
 }
 
+// ─── Frame picker modal ───────────────────────────────────────────────────────
+
+function FramePickerModal({
+  visible,
+  videoUri,
+  videoDurationSeconds,
+  onConfirm,
+  onCancel,
+}: {
+  visible: boolean
+  videoUri: string
+  videoDurationSeconds: number
+  onConfirm: (thumbUri: string) => void
+  onCancel: () => void
+}) {
+  const [previewThumbnail, setPreviewThumbnail] = useState<string | null>(null)
+  const [capturingFrame, setCapturingFrame] = useState(false)
+  const [sliderValue, setSliderValue] = useState(0) // seconds
+  const trackWidth = useRef(0)
+  const thumbX = useRef(0)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const captureFrame = useCallback(async (seconds: number) => {
+    if (!videoUri) return
+    setCapturingFrame(true)
+    try {
+      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: Math.round(seconds * 1000),
+        quality: 0.8,
+      })
+      setPreviewThumbnail(uri)
+    } catch {
+      // keep last preview
+    } finally {
+      setCapturingFrame(false)
+    }
+  }, [videoUri])
+
+  // Capture initial frame when modal opens
+  useEffect(() => {
+    if (!visible) return
+    setSliderValue(0)
+    thumbX.current = 0
+    captureFrame(0)
+  }, [visible, captureFrame])
+
+  const onSliderMove = useCallback((newSeconds: number) => {
+    const clamped = Math.min(Math.max(newSeconds, 0), videoDurationSeconds)
+    setSliderValue(clamped)
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      captureFrame(clamped)
+    }, 300)
+  }, [videoDurationSeconds, captureFrame])
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (e) => {
+        const w = trackWidth.current
+        if (w <= 0) return
+        const tapX = e.nativeEvent.locationX
+        thumbX.current = Math.min(Math.max(tapX, 0), w)
+        const secs = (thumbX.current / w) * videoDurationSeconds
+        onSliderMove(secs)
+      },
+      onPanResponderMove: (_, gs) => {
+        const w = trackWidth.current
+        if (w <= 0) return
+        const newX = Math.min(Math.max(thumbX.current + gs.dx, 0), w)
+        const secs = (newX / w) * videoDurationSeconds
+        setSliderValue(secs)
+        if (debounceTimer.current) clearTimeout(debounceTimer.current)
+        debounceTimer.current = setTimeout(() => {
+          captureFrame(secs)
+          thumbX.current = newX
+        }, 300)
+      },
+      onPanResponderRelease: (_, gs) => {
+        const w = trackWidth.current
+        if (w <= 0) return
+        const newX = Math.min(Math.max(thumbX.current + gs.dx, 0), w)
+        thumbX.current = newX
+        const secs = (newX / w) * videoDurationSeconds
+        setSliderValue(secs)
+        if (debounceTimer.current) clearTimeout(debounceTimer.current)
+        captureFrame(secs)
+      },
+    })
+  ).current
+
+  const thumbPosition = trackWidth.current > 0
+    ? (sliderValue / Math.max(videoDurationSeconds, 1)) * trackWidth.current
+    : 0
+
+  const formatSec = (s: number) => {
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+      onRequestClose={onCancel}
+    >
+      <View style={fp.root}>
+        <Text style={fp.title}>Choisir la couverture</Text>
+        <Text style={fp.subtitle}>
+          Fais glisser pour trouver le meilleur moment de ta vidéo
+        </Text>
+
+        {/* Preview */}
+        <View style={fp.previewWrap}>
+          {previewThumbnail ? (
+            <Image source={{ uri: previewThumbnail }} style={fp.previewImg} resizeMode="cover" />
+          ) : (
+            <View style={[fp.previewImg, fp.previewPlaceholder]}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          )}
+          {capturingFrame && (
+            <View style={fp.capturingOverlay}>
+              <ActivityIndicator color="#FFFFFF" size="large" />
+            </View>
+          )}
+        </View>
+
+        {/* Slider */}
+        <View style={fp.sliderSection}>
+          <View
+            style={fp.trackContainer}
+            onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width }}
+            {...panResponder.panHandlers}
+          >
+            <View style={fp.track}>
+              <View style={[fp.trackFill, { width: `${(sliderValue / Math.max(videoDurationSeconds, 1)) * 100}%` }]} />
+            </View>
+            <View style={[fp.thumb, { left: thumbPosition - 12 }]} />
+          </View>
+          <View style={fp.sliderLabels}>
+            <Text style={fp.sliderLabel}>0s</Text>
+            <Text style={fp.sliderLabelCenter}>{formatSec(sliderValue)}</Text>
+            <Text style={fp.sliderLabel}>{formatSec(videoDurationSeconds)}</Text>
+          </View>
+        </View>
+
+        {/* Actions */}
+        <TouchableOpacity
+          style={[fp.confirmBtn, (!previewThumbnail || capturingFrame) && { opacity: 0.5 }]}
+          onPress={() => previewThumbnail && onConfirm(previewThumbnail)}
+          disabled={!previewThumbnail || capturingFrame}
+          activeOpacity={0.85}
+        >
+          <Text style={fp.confirmBtnText}>✅ Utiliser cette frame</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={fp.cancelBtn} onPress={onCancel} activeOpacity={0.8}>
+          <Text style={fp.cancelBtnText}>↩ Choisir une autre vidéo</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  )
+}
+
 // ─── R2 upload helper ─────────────────────────────────────────────────────────
 
 async function uploadToR2(opts: {
@@ -228,6 +397,7 @@ export default function CreateDropScreen() {
   const [videoUri, setVideoUri] = useState<string | null>(null)
   const [thumbnailUri, setThumbnailUri] = useState<string | null>(null)
   const [videoDurationSeconds, setVideoDurationSeconds] = useState<number>(30)
+  const [showFramePicker, setShowFramePicker] = useState(false)
   // Step 2
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -313,9 +483,7 @@ export default function CreateDropScreen() {
       : 30
     setVideoDurationSeconds(durationSec)
     setVideoUri(asset.uri)
-
-    const thumb = await generateThumbnail(asset.uri)
-    setThumbnailUri(thumb)
+    setShowFramePicker(true)
 
     const sizeMB = await getFileSizeMB(asset.uri)
     if (sizeMB > 20) {
@@ -647,6 +815,22 @@ export default function CreateDropScreen() {
             />
           </ScrollView>
         </KeyboardAvoidingView>
+        {videoUri && (
+          <FramePickerModal
+            visible={showFramePicker}
+            videoUri={videoUri}
+            videoDurationSeconds={videoDurationSeconds}
+            onConfirm={(thumbUri) => {
+              setThumbnailUri(thumbUri)
+              setShowFramePicker(false)
+            }}
+            onCancel={() => {
+              setShowFramePicker(false)
+              setVideoUri(null)
+              setThumbnailUri(null)
+            }}
+          />
+        )}
         {success && (
           <View style={s.successOverlay}>
             <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
@@ -755,6 +939,22 @@ export default function CreateDropScreen() {
           </View>
         ) : null}
       </KeyboardAvoidingView>
+      {videoUri && (
+        <FramePickerModal
+          visible={showFramePicker}
+          videoUri={videoUri}
+          videoDurationSeconds={videoDurationSeconds}
+          onConfirm={(thumbUri) => {
+            setThumbnailUri(thumbUri)
+            setShowFramePicker(false)
+          }}
+          onCancel={() => {
+            setShowFramePicker(false)
+            setVideoUri(null)
+            setThumbnailUri(null)
+          }}
+        />
+      )}
       {success && (
         <View style={s.successOverlay}>
           <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
@@ -1811,5 +2011,129 @@ const s = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: 22,
     color: '#FFFFFF',
+  },
+})
+
+// ─── Frame picker styles ──────────────────────────────────────────────────────
+
+const fp = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#0F0F0F',
+    paddingHorizontal: 24,
+    paddingTop: 56,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+  title: {
+    fontFamily: fontFamily.bold,
+    fontSize: 22,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 19,
+  },
+  previewWrap: {
+    width: '100%',
+    height: 420,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#1A1A1A',
+    marginBottom: 28,
+  },
+  previewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  previewPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  capturingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sliderSection: {
+    width: '100%',
+    marginBottom: 32,
+  },
+  trackContainer: {
+    width: '100%',
+    height: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  track: {
+    height: 4,
+    backgroundColor: '#2A2A2A',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  trackFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
+  },
+  thumb: {
+    position: 'absolute',
+    top: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingHorizontal: 12,
+  },
+  sliderLabel: {
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+  },
+  sliderLabelCenter: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.primary,
+  },
+  confirmBtn: {
+    width: '100%',
+    height: 52,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  confirmBtnText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
+    color: '#0F0F0F',
+  },
+  cancelBtn: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  cancelBtnText: {
+    fontFamily: fontFamily.medium,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
   },
 })

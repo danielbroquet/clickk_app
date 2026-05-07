@@ -19,7 +19,7 @@ export default {
       step_settings: 'Settings',
       pick_video: 'Choose from gallery',
       record_video: 'Record',
-      video_tip: 'Max 30 sec · Quality auto-optimized',
+      video_tip: 'Max 30 sec · Pick your best frame',
       listing_title: 'Item title',
       listing_title_placeholder: 'e.g. Nike Air Max 90 Size 9',
       description: 'Description',
