@@ -638,9 +638,9 @@ function FollowersModal({
                     </View>
                   )}
                   <View style={followersStyles.info}>
-                    <Text style={followersStyles.name}>{name}</Text>
+                    <Text style={followersStyles.name} numberOfLines={1} ellipsizeMode="tail">{name}</Text>
                     {f.username && (
-                      <Text style={followersStyles.username}>@{f.username}</Text>
+                      <Text style={followersStyles.username} numberOfLines={1} ellipsizeMode="tail">@{f.username}</Text>
                     )}
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
@@ -700,8 +700,8 @@ const followersStyles = StyleSheet.create({
   },
   avatarInitial: { fontFamily: fontFamily.bold, fontSize: 16, color: colors.primary },
   info: { flex: 1 },
-  name: { fontFamily: fontFamily.semiBold, fontSize: 14, color: colors.text },
-  username: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  name: { fontFamily: fontFamily.semiBold, fontSize: 14, color: colors.text, flexShrink: 1 },
+  username: { fontSize: 12, color: colors.textSecondary, marginTop: 1, flexShrink: 1 },
 })
 
 // ── StarRating ───────────────────────────────────────────────────────────────
@@ -1000,10 +1000,10 @@ export default function ProfileScreen() {
           >
             <View style={styles.walletLeft}>
               <Ionicons name="wallet-outline" size={22} color={colors.primary} />
-              <Text style={styles.walletLabel}>{t('wallet.title')}</Text>
+              <Text style={styles.walletLabel} numberOfLines={1} ellipsizeMode="tail">{t('wallet.title')}</Text>
             </View>
             <View style={styles.walletRight}>
-              <Text style={styles.walletAmount}>
+              <Text style={styles.walletAmount} numberOfLines={1} ellipsizeMode="tail">
                 {walletBalance === null ? '--' : `CHF ${walletBalance.toFixed(2)}`}
               </Text>
               <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
@@ -1019,7 +1019,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="cube-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>{t('profile.my_orders')}</Text>
+            <Text style={styles.quickLabel} numberOfLines={1} ellipsizeMode="tail">{t('profile.my_orders')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1028,7 +1028,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="card-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>{t('profile.payment_methods')}</Text>
+            <Text style={styles.quickLabel} numberOfLines={1} ellipsizeMode="tail">{t('profile.payment_methods')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1037,7 +1037,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="location-outline" size={20} color={colors.primary} />
-            <Text style={styles.quickLabel}>{t('profile.addresses_link')}</Text>
+            <Text style={styles.quickLabel} numberOfLines={1} ellipsizeMode="tail">{t('profile.addresses_link')}</Text>
           </TouchableOpacity>
 
           {profile?.role === 'seller' && (
@@ -1047,7 +1047,7 @@ export default function ProfileScreen() {
               activeOpacity={0.85}
             >
               <Ionicons name="receipt-outline" size={20} color={colors.primary} />
-              <Text style={styles.quickLabel}>{t('profile.sales')}</Text>
+              <Text style={styles.quickLabel} numberOfLines={1} ellipsizeMode="tail">{t('profile.sales')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1282,17 +1282,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  walletLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  walletLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   walletLabel: {
     fontFamily: fontFamily.semiBold,
     fontSize: 14,
     color: colors.text,
+    flexShrink: 1,
   },
   walletRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   walletAmount: {
     fontFamily: fontFamily.bold,
     fontSize: 15,
     color: colors.primary,
+    flexShrink: 1,
   },
 
   // Quick links
@@ -1314,6 +1316,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.textSecondary,
     fontFamily: fontFamily.medium,
+    flexShrink: 1,
   },
 
   // Tabs
@@ -1337,6 +1340,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     fontFamily: fontFamily.medium,
+    flexShrink: 1,
   },
   tabLabelActive: { color: colors.primary, fontFamily: fontFamily.semiBold },
 
