@@ -717,8 +717,6 @@ function DropItem({
   const videoRef = useRef<Video>(null)
   const [muted, setMuted] = useState(true)
   const [paused, setPaused] = useState(false)
-  const [remountKey, setRemountKey] = useState(0)
-  const prevShouldUnloadRef = useRef<boolean>(!!shouldUnload)
   const viewerCount = useDropPresence(story.id, active && tabFocused)
   const { isWatchlisted, watchlistCount, toggleWatchlist } = useWatchlist(story.id)
   const sellerId = story.seller?.id ?? ''
@@ -817,26 +815,14 @@ function DropItem({
   }, [active, tabFocused, paused, buyVisible])
 
   useEffect(() => {
-    if (shouldUnload || (!active && !isPreload)) {
-      videoRef.current?.pauseAsync().catch(() => {})
+    if (shouldUnload) {
       videoRef.current?.unloadAsync().catch(() => {})
     }
-  }, [active, isPreload, shouldUnload])
-
-  useEffect(() => {
-    const wasUnloaded = prevShouldUnloadRef.current
-    const isUnloaded = !!shouldUnload
-    if (wasUnloaded && !isUnloaded) {
-      setRemountKey(k => k + 1)
-    }
-    prevShouldUnloadRef.current = isUnloaded
   }, [shouldUnload])
 
   useEffect(() => {
-    const ref = videoRef
     return () => {
-      ref.current?.pauseAsync().catch(() => {})
-      ref.current?.unloadAsync().catch(() => {})
+      videoRef.current?.unloadAsync().catch(() => {})
     }
   }, [])
 
@@ -1019,13 +1005,12 @@ function DropItem({
 
       {!shouldUnload && (
         <Video
-          key={remountKey}
           ref={videoRef}
           source={{ uri: toCdnUrl(story.video_url) ?? '' }}
           style={[StyleSheet.absoluteFill, { backgroundColor: 'transparent' }]}
           resizeMode={ResizeMode.COVER}
           isLooping
-          isMuted={active ? muted : true}
+          isMuted={!active || muted}
           shouldPlay={active && tabFocused && !paused && !buyVisible}
           posterSource={story.thumbnail_url ? { uri: toCdnUrl(story.thumbnail_url) ?? '' } : undefined}
           usePoster={!!story.thumbnail_url && !active}
@@ -1685,7 +1670,7 @@ export default function FeedScreen() {
         story={item}
         active={index === activeIndex}
         isPreload={index === activeIndex + 1}
-        shouldUnload={Math.abs(index - activeIndex) > 2}
+        shouldUnload={Math.abs(index - activeIndex) > 1}
         tabFocused={tabFocused}
         onSwipeDown={handleSwipeDown}
         currentUserId={currentUserId}
