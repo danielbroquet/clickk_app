@@ -136,6 +136,7 @@ function RootRedirector() {
       <Stack.Screen name="profile/orders" />
       <Stack.Screen name="profile/about" />
       <Stack.Screen name="profile/[id]" />
+      <Stack.Screen name="comments/[storyId]" />
     </Stack>
   )
 }

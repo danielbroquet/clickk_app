@@ -234,22 +234,42 @@ function AddressForm({
     }
     setSearchingAddress(true)
     try {
-      const res = await fetch(
-        `https://api3.geo.admin.ch/rest/services/api/SearchServer?searchText=${encodeURIComponent(query)}&type=locations&origins=address&limit=6&sr=4326`,
-        { headers: { 'Accept': 'application/json' } }
-      )
+      const url = `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query)}&` +
+        `countrycodes=ch&` +
+        `format=json&` +
+        `addressdetails=1&` +
+        `limit=6`
+
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'CLICKK-App/1.0',
+        },
+      })
       const json = await res.json()
-      const results = (json.results ?? []).map((r: any) => ({
-        label: r.attrs?.label?.replace(/<[^>]*>/g, '') ?? '',
-        street: r.attrs?.strname ?? '',
-        number: r.attrs?.num ?? '',
-        postal_code: r.attrs?.zip ?? '',
-        city: r.attrs?.city ?? '',
-      })).filter((r: any) => r.street && r.postal_code && r.city)
+
+      const results = (json ?? [])
+        .map((r: any) => {
+          const addr = r.address ?? {}
+          const street = addr.road ?? addr.pedestrian ?? addr.street ?? ''
+          const number = addr.house_number ?? ''
+          const postal_code = addr.postcode ?? ''
+          const city = addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? ''
+          return {
+            label: r.display_name ?? '',
+            street,
+            number,
+            postal_code,
+            city,
+          }
+        })
+        .filter((r: any) => r.street && r.postal_code && r.city)
+
       setStreetSuggestions(results)
       setShowSuggestions(results.length > 0)
     } catch (err) {
-      console.error('[searchSwissAddress] API error:', err)
+      console.error('[address] error:', err instanceof Error ? err.message : 'unknown')
       setStreetSuggestions([])
       setShowSuggestions(false)
     } finally {
@@ -364,7 +384,7 @@ function AddressForm({
                 if (searchTimeout.current) clearTimeout(searchTimeout.current)
                 searchTimeout.current = setTimeout(() => {
                   searchSwissAddress(v)
-                }, 350)
+                }, 500)
               }}
               placeholderTextColor={C.muted}
               placeholder="Rue du Lac 12"
