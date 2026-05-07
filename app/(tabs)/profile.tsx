@@ -72,12 +72,14 @@ function DropGridCell({
   editMode,
   onLongPress,
   onDelete,
+  sellerId,
 }: {
   drop: DropCell
   variant: 'own' | 'purchase'
   editMode: boolean
   onLongPress: () => void
   onDelete: (id: string) => void
+  sellerId?: string
 }) {
   const { t } = useTranslation()
   const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
@@ -107,7 +109,11 @@ function DropGridCell({
 
   const handlePress = () => {
     if (editMode) return
-    router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })
+    if (sellerId) {
+      router.push({ pathname: '/seller-feed/[sellerId]', params: { sellerId, initialStoryId: drop.id, showAll: 'true' } })
+    } else {
+      router.push({ pathname: '/(tabs)', params: { initialStoryId: drop.id } })
+    }
   }
 
   const handleDeletePress = () => {
@@ -1110,6 +1116,7 @@ export default function ProfileScreen() {
                   editMode={editMode}
                   onLongPress={handleEnterEditMode}
                   onDelete={handleDeleteDrop}
+                  sellerId={currentUserId}
                 />
               ))}
             </View>

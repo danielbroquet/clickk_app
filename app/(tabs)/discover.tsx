@@ -58,7 +58,7 @@ function StoryCard({ item, showExpiry }: { item: StoryWithSeller; showExpiry: bo
     <TouchableOpacity
       style={styles.card}
       activeOpacity={0.85}
-      onPress={() => router.push({ pathname: '/(tabs)', params: { initialStoryId: item.id } })}
+      onPress={() => router.push({ pathname: '/seller-feed/[sellerId]', params: { sellerId: item.seller_id, initialStoryId: item.id } })}
     >
       <View style={styles.cardImageWrap}>
         {thumb ? (

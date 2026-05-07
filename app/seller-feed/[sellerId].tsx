@@ -27,9 +27,10 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window')
 const keyExtractor = (item: FeedStory) => item.id
 
 export default function SellerFeedScreen() {
-  const { sellerId, initialStoryId } = useLocalSearchParams<{
+  const { sellerId, initialStoryId, showAll } = useLocalSearchParams<{
     sellerId: string
     initialStoryId?: string
+    showAll?: string
   }>()
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
@@ -61,14 +62,22 @@ export default function SellerFeedScreen() {
     if (!sellerId) return
     let mounted = true
     ;(async () => {
-      const [storiesRes, profileRes] = await Promise.all([
-        supabase
-          .from('stories')
-          .select(STORY_SELECT)
-          .eq('seller_id', sellerId)
+      let storiesQuery = supabase
+        .from('stories')
+        .select(STORY_SELECT)
+        .eq('seller_id', sellerId)
+        .order('created_at', { ascending: false })
+
+      if (showAll === 'true') {
+        storiesQuery = storiesQuery.in('status', ['active', 'sold', 'shipped', 'delivered'])
+      } else {
+        storiesQuery = storiesQuery
           .eq('status', 'active')
           .gt('expires_at', new Date().toISOString())
-          .order('created_at', { ascending: false }),
+      }
+
+      const [storiesRes, profileRes] = await Promise.all([
+        storiesQuery,
         supabase
           .from('profiles')
           .select('username')
