@@ -9,6 +9,9 @@
       "channel": "development",
       "ios": {
         "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
@@ -16,6 +19,9 @@
       "channel": "preview",
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://ckrttngnwoslypyulwuf.supabase.co",
@@ -29,6 +35,9 @@
       "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium"
+      },
+      "android": {
+        "buildType": "app-bundle"
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production",

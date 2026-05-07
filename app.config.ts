@@ -29,7 +29,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.clickk.app",
     versionCode: 1,
-    permissions: ["INTERNET", "ACCESS_NETWORK_STATE", "VIBRATE"],
+    adaptiveIcon: {
+      foregroundImage: "./assets/images/icon.png",
+      backgroundColor: "#0F0F0F",
+    },
+    googleServicesFile: "./google-services.json",
+    permissions: [
+      "CAMERA",
+      "RECORD_AUDIO",
+      "READ_MEDIA_IMAGES",
+      "READ_MEDIA_VIDEO",
+      "VIBRATE",
+      "RECEIVE_BOOT_COMPLETED",
+    ],
   },
   web: {
     bundler: "metro",
