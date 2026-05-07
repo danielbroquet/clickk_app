@@ -18,6 +18,7 @@ import {
   Animated,
   PanResponder,
   Alert,
+  Modal,
 } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
@@ -109,7 +110,7 @@ function StoryCard({ story }: { story: StorySnippet }) {
 
 // ── Message bubble ────────────────────────────────────────────────────────────
 
-function MessageBubble({ msg, isMe, t }: { msg: Message; isMe: boolean; t: (key: string) => string }) {
+function MessageBubble({ msg, isMe, t, onImagePress }: { msg: Message; isMe: boolean; t: (key: string) => string; onImagePress?: (url: string) => void }) {
   const [sound, setSound] = useState<Audio.Sound | null>(null)
   const [playing, setPlaying] = useState(false)
 
@@ -147,11 +148,16 @@ function MessageBubble({ msg, isMe, t }: { msg: Message; isMe: boolean; t: (key:
     <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowOther]}>
       {msg.message_type === 'image' && msg.media_url ? (
         <View style={{ maxWidth: '75%' }}>
-          <Image
-            source={{ uri: msg.media_url }}
-            style={{ width: 220, height: 220 * (4 / 3), borderRadius: 12, backgroundColor: colors.surface }}
-            resizeMode="cover"
-          />
+          <TouchableOpacity
+            onPress={() => onImagePress?.(msg.media_url!)}
+            activeOpacity={0.9}
+          >
+            <Image
+              source={{ uri: msg.media_url }}
+              style={{ width: 220, height: 220 * (4 / 3), borderRadius: 12, backgroundColor: colors.surface }}
+              resizeMode="cover"
+            />
+          </TouchableOpacity>
           <Text style={[styles.bubbleTime, isMe ? styles.bubbleTimeMe : styles.bubbleTimeOther]}>
             {formatTime(msg.created_at)}
           </Text>
@@ -202,12 +208,13 @@ function MessageBubble({ msg, isMe, t }: { msg: Message; isMe: boolean; t: (key:
 
 // ── Swipeable message bubble ──────────────────────────────────────────────────
 
-function SwipeableMessageBubble({ msg, isMe, onDelete, t }: {
+function SwipeableMessageBubble({ msg, isMe, onDelete, t, onImagePress }: {
   msg: Message
   isMe: boolean
   currentUserId: string
   onDelete: (id: string) => void
   t: (key: string) => string
+  onImagePress?: (url: string) => void
 }) {
   const translateX = useRef(new Animated.Value(0)).current
 
@@ -238,7 +245,7 @@ function SwipeableMessageBubble({ msg, isMe, onDelete, t }: {
   ).current
 
   if (!isMe) {
-    return <MessageBubble msg={msg} isMe={false} t={t} />
+    return <MessageBubble msg={msg} isMe={false} t={t} onImagePress={onImagePress} />
   }
 
   return (
@@ -258,7 +265,7 @@ function SwipeableMessageBubble({ msg, isMe, onDelete, t }: {
         style={{ transform: [{ translateX }] }}
         {...panResponder.panHandlers}
       >
-        <MessageBubble msg={msg} isMe={true} t={t} />
+        <MessageBubble msg={msg} isMe={true} t={t} onImagePress={onImagePress} />
       </Animated.View>
     </View>
   )
@@ -283,9 +290,11 @@ export default function ConversationScreen() {
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const isRecordingRef = useRef(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [cancelIntent, setCancelIntent] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const listRef = useRef<FlatList<Message>>(null)
@@ -474,6 +483,7 @@ export default function ConversationScreen() {
         Alert.alert('Permission refusée', t('conversation.mic_permission'))
         return
       }
+      isRecordingRef.current = true
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -488,11 +498,13 @@ export default function ConversationScreen() {
         setRecordingDuration(d => d + 1)
       }, 1000)
     } catch (err) {
+      isRecordingRef.current = false
       Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
     }
   }, [])
 
   const stopRecording = useCallback(async () => {
+    isRecordingRef.current = false
     if (!recording) return
     try {
       if (durationInterval.current) clearInterval(durationInterval.current)
@@ -509,6 +521,7 @@ export default function ConversationScreen() {
   }, [recording, sendMedia])
 
   const cancelRecording = useCallback(async () => {
+    isRecordingRef.current = false
     if (!recording) return
     if (durationInterval.current) clearInterval(durationInterval.current)
     await recording.stopAndUnloadAsync()
@@ -664,6 +677,7 @@ export default function ConversationScreen() {
               currentUserId={currentUserId}
               onDelete={handleDeleteMessage}
               t={t}
+              onImagePress={setPreviewImage}
             />
           )}
           ListEmptyComponent={
@@ -742,7 +756,7 @@ export default function ConversationScreen() {
                 <TouchableOpacity
                   onLongPress={() => startRecording()}
                   onPressOut={() => {
-                    if (isRecording) {
+                    if (isRecordingRef.current) {
                       if (cancelIntent) {
                         cancelRecording()
                       } else {
@@ -769,6 +783,29 @@ export default function ConversationScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={!!previewImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewImage(null)}
+      >
+        <View style={styles.imagePreviewOverlay}>
+          <TouchableOpacity
+            style={styles.imagePreviewClose}
+            onPress={() => setPreviewImage(null)}
+          >
+            <Ionicons name="close" size={32} color="white" />
+          </TouchableOpacity>
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              style={styles.imagePreviewImg}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -984,5 +1021,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceHigh,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // Image preview modal
+  imagePreviewOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePreviewClose: {
+    position: 'absolute',
+    top: 56,
+    right: 20,
+    zIndex: 10,
+  },
+  imagePreviewImg: {
+    width: '100%',
+    height: '80%',
   },
 })

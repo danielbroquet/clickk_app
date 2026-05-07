@@ -258,24 +258,23 @@ function MessagesTab({ userId }: { userId: string }) {
       .eq('id', convId)
   }, [])
 
-  if (loading) {
-    return (
-      <View style={msgStyles.loadingContainer}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <View key={i} style={msgStyles.skeletonRow}>
-            <View style={msgStyles.skeletonAvatar} />
-            <View style={msgStyles.skeletonLines}>
-              <View style={[msgStyles.skeletonLine, { width: '50%' }]} />
-              <View style={[msgStyles.skeletonLine, { width: '75%', marginTop: 6 }]} />
-              <View style={[msgStyles.skeletonLine, { width: '40%', marginTop: 4 }]} />
-            </View>
-          </View>
-        ))}
-      </View>
-    )
-  }
-
   const renderEmpty = () => {
+    if (loading) {
+      return (
+        <View style={msgStyles.loadingContainer}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <View key={i} style={msgStyles.skeletonRow}>
+              <View style={msgStyles.skeletonAvatar} />
+              <View style={msgStyles.skeletonLines}>
+                <View style={[msgStyles.skeletonLine, { width: '50%' }]} />
+                <View style={[msgStyles.skeletonLine, { width: '75%', marginTop: 6 }]} />
+                <View style={[msgStyles.skeletonLine, { width: '40%', marginTop: 4 }]} />
+              </View>
+            </View>
+          ))}
+        </View>
+      )
+    }
     if (error) {
       return (
         <View style={msgStyles.centered}>
@@ -304,7 +303,7 @@ function MessagesTab({ userId }: { userId: string }) {
 
   return (
     <FlatList
-      data={conversations}
+      data={loading ? [] : conversations}
       keyExtractor={(item) => item.id}
       renderItem={({ item }) => (
         <SwipeableConversationRow
@@ -324,7 +323,9 @@ function MessagesTab({ userId }: { userId: string }) {
           tintColor={colors.primary}
         />
       }
-      contentContainerStyle={conversations.length === 0 ? msgStyles.emptyContainer : undefined}
+      contentContainerStyle={
+        (loading || conversations.length === 0) ? msgStyles.emptyContainer : undefined
+      }
       showsVerticalScrollIndicator={false}
     />
   )
