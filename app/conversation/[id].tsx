@@ -19,7 +19,7 @@ import {
   PanResponder,
   Alert,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { ArrowLeft, Send } from 'lucide-react-native'
 import { Ionicons } from '@expo/vector-icons'
@@ -270,9 +270,12 @@ export default function ConversationScreen() {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
 
+  const insets = useSafeAreaInsets()
+
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
+  const [cancelIntent, setCancelIntent] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -516,8 +519,7 @@ export default function ConversationScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
     })
     if (!result.canceled && result.assets[0]) {
       await sendMedia(result.assets[0].uri, 'image')
@@ -532,13 +534,45 @@ export default function ConversationScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       quality: 0.7,
-      allowsEditing: true,
-      aspect: [4, 3],
+      allowsEditing: false,
     })
     if (!result.canceled && result.assets[0]) {
       await sendMedia(result.assets[0].uri, 'image')
     }
   }, [sendMedia])
+
+  // ── Mic PanResponder (press-and-hold to record) ────────────────────────────
+
+  const startRecordingRef = useRef(startRecording)
+  const stopRecordingRef = useRef(stopRecording)
+  const cancelRecordingRef = useRef(cancelRecording)
+  useEffect(() => { startRecordingRef.current = startRecording }, [startRecording])
+  useEffect(() => { stopRecordingRef.current = stopRecording }, [stopRecording])
+  useEffect(() => { cancelRecordingRef.current = cancelRecording }, [cancelRecording])
+
+  const micPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startRecordingRef.current()
+      },
+      onPanResponderMove: (_, gestureState) => {
+        setCancelIntent(gestureState.dx < -80)
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -80) {
+          cancelRecordingRef.current()
+        } else {
+          stopRecordingRef.current()
+        }
+        setCancelIntent(false)
+      },
+      onPanResponderTerminate: () => {
+        cancelRecordingRef.current()
+        setCancelIntent(false)
+      },
+    })
+  ).current
 
   // ── Delete message ─────────────────────────────────────────────────────────
 
@@ -646,23 +680,32 @@ export default function ConversationScreen() {
         />
 
         {/* Input bar */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
           {isRecording ? (
             <View style={styles.recordingBar}>
-              <TouchableOpacity onPress={cancelRecording} hitSlop={8}>
-                <Ionicons name="close-circle" size={28} color={colors.error} />
-              </TouchableOpacity>
-              <View style={styles.recordingIndicator}>
+              <View style={styles.recordingLeft}>
                 <View style={styles.recordingDot} />
                 <Text style={styles.recordingTime}>
                   {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
                   {String(recordingDuration % 60).padStart(2, '0')}
                 </Text>
-                <Text style={styles.recordingHint}>{t('conversation.slide_to_cancel')}</Text>
               </View>
-              <TouchableOpacity onPress={stopRecording} hitSlop={8}>
-                <Ionicons name="stop-circle" size={36} color={colors.error} />
-              </TouchableOpacity>
+              <View style={styles.recordingCancelWrap}>
+                <Ionicons
+                  name="arrow-back"
+                  size={14}
+                  color={cancelIntent ? colors.error : colors.textSecondary}
+                />
+                <Text style={[styles.recordingHint, cancelIntent && styles.recordingHintCancel]}>
+                  {cancelIntent ? 'Annulation...' : t('conversation.slide_to_cancel')}
+                </Text>
+              </View>
+              <View
+                {...micPanResponder.panHandlers}
+                style={styles.micHoldBtn}
+              >
+                <Ionicons name="mic" size={26} color={colors.primary} />
+              </View>
             </View>
           ) : (
             <>
@@ -705,10 +748,8 @@ export default function ConversationScreen() {
                   <Send size={20} color={canSend ? colors.bg : colors.textSecondary} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity
-                  onPress={startRecording}
-                  disabled={sendingMedia}
-                  hitSlop={8}
+                <View
+                  {...micPanResponder.panHandlers}
                   style={{ paddingHorizontal: 4 }}
                 >
                   {sendingMedia ? (
@@ -716,7 +757,7 @@ export default function ConversationScreen() {
                   ) : (
                     <Ionicons name="mic-outline" size={26} color={colors.textSecondary} />
                   )}
-                </TouchableOpacity>
+                </View>
               )}
             </>
           )}
@@ -895,15 +936,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingVertical: 4,
   },
-  recordingIndicator: {
-    flex: 1,
+  recordingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 12,
+    minWidth: 72,
   },
   recordingDot: {
     width: 8,
@@ -916,9 +956,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  recordingCancelWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
   recordingHint: {
     fontFamily: fontFamily.regular,
     fontSize: 12,
     color: colors.textSecondary,
+  },
+  recordingHintCancel: {
+    color: colors.error,
+  },
+  micHoldBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surfaceHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 })
