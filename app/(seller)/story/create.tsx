@@ -317,7 +317,7 @@ export default function CreateDropScreen() {
     setThumbnailUri(thumb)
 
     const sizeMB = await getFileSizeMB(asset.uri)
-    if (sizeMB > 15) {
+    if (sizeMB > 20) {
       Alert.alert(
         'Vidéo assez lourde',
         `Cette vidéo fait ${sizeMB.toFixed(0)} MB. Pour de meilleures performances, filme directement depuis l'app ou choisis une vidéo plus courte.`,
@@ -337,11 +337,11 @@ export default function CreateDropScreen() {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      quality: 0.3,
+      quality: 0.7,
       videoMaxDuration: 30,
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -349,11 +349,11 @@ export default function CreateDropScreen() {
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-      quality: 0.3,
+      quality: 0.7,
       videoMaxDuration: 30,
-      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Low,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.LowQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.MediumQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
