@@ -246,7 +246,6 @@ function AddressForm({
         postal_code: r.attrs?.zip ?? '',
         city: r.attrs?.city ?? '',
       })).filter((r: any) => r.street && r.postal_code && r.city)
-      console.error('[address] results:', results.length, results[0]?.label)
       setStreetSuggestions(results)
       setShowSuggestions(results.length > 0)
     } catch (err) {
