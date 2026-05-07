@@ -382,6 +382,31 @@ function CommentsSheet({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
     }
 
+    const tempId = `temp-${Date.now()}`
+
+    if (!pendingReplyTo) {
+      const optimisticComment: Comment = {
+        id: tempId,
+        content: text,
+        created_at: new Date().toISOString(),
+        user_id: currentUserId,
+        parent_comment_id: null,
+        likes_count: 0,
+        dislikes_count: 0,
+        replies_count: 0,
+        profiles: {
+          username: currentUserProfile.username,
+          avatar_url: currentUserProfile.avatar_url,
+        },
+        userLike: null,
+      }
+      setComments(prev => [optimisticComment, ...prev])
+      setCount(n => n + 1)
+      listRef.current?.scrollToOffset({ offset: 0, animated: true })
+    }
+
+    inputRef.current?.focus()
+
     const { data: { session: liveSession } } = await supabase.auth.getSession()
     if (!liveSession) await supabase.auth.refreshSession()
 
@@ -401,7 +426,12 @@ function CommentsSheet({
     setSending(false)
 
     if (error || !data) {
+      if (!pendingReplyTo) {
+        setComments(prev => prev.filter(c => c.id !== tempId))
+        setCount(n => Math.max(0, n - 1))
+      }
       setInput(text)
+      inputRef.current?.focus()
       return
     }
 
@@ -411,25 +441,12 @@ function CommentsSheet({
       ))
       fetchReplies(pendingReplyTo.id)
     } else {
-      const newComment: Comment = {
-        id: data.id,
-        content: data.content,
-        created_at: data.created_at,
-        user_id: data.user_id,
-        parent_comment_id: null,
-        likes_count: 0,
-        dislikes_count: 0,
-        replies_count: 0,
-        profiles: {
-          username: currentUserProfile.username,
-          avatar_url: currentUserProfile.avatar_url,
-        },
-        userLike: null,
-      }
-      setComments(prev => [newComment, ...prev])
-      setCount(n => n + 1)
-      onCommentAdded(newComment)
-      listRef.current?.scrollToOffset({ offset: 0, animated: true })
+      setComments(prev => prev.map(c =>
+        c.id === tempId
+          ? { ...c, id: data.id, created_at: data.created_at }
+          : c
+      ))
+      onCommentAdded({ ...data, profiles: { username: currentUserProfile.username, avatar_url: currentUserProfile.avatar_url }, likes_count: 0, dislikes_count: 0, replies_count: 0, userLike: null })
     }
   }
 
@@ -674,6 +691,7 @@ function CommentsSheet({
                 onChangeText={setInput}
                 maxLength={300}
                 multiline
+                blurOnSubmit={false}
                 editable={!!currentUserId && !sending}
               />
               {input.trim().length > 0 && (
