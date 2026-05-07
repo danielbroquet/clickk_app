@@ -576,10 +576,24 @@ export default function CreateDropScreen() {
 
   // ── success screen ─────────────────────────────────────────────────────────
 
+  const handleSuccessNav = useCallback(async () => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      router.replace('/(tabs)')
+    } catch {
+      try {
+        router.push('/(tabs)')
+      } catch {
+        setSuccess(false)
+        setLoading(false)
+      }
+    }
+  }, [router])
+
   if (success) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <SuccessCheck onDone={() => router.replace('/(tabs)')} />
+        <SuccessCheck onDone={handleSuccessNav} />
       </View>
     )
   }
