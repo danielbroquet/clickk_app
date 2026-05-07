@@ -364,7 +364,9 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     fontSize: 24,
     color: colors.text,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: 8,
   },
   searchBar: {
     flexDirection: 'row',
@@ -387,11 +389,12 @@ const styles = StyleSheet.create({
   },
   clearBtn: { paddingHorizontal: 10 },
 
-  sortScroll: { marginBottom: 12 },
+  sortScroll: { marginBottom: 8 },
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
+    paddingBottom: 4,
     gap: 8,
   },
   sortPill: {
@@ -418,12 +421,14 @@ const styles = StyleSheet.create({
 
   filtersWrapper: {
     paddingHorizontal: 16,
+    paddingTop: 4,
     marginBottom: 16,
   },
   pillsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 2,
+    paddingBottom: 4,
   },
   priceRow: {
     flexDirection: 'row',
