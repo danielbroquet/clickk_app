@@ -1109,6 +1109,7 @@ function DropItem({
           </TouchableOpacity>
         )}
 
+        <View style={styles.textBlock}>
         <TouchableOpacity style={styles.sellerRow} onPress={openSellerProfile} activeOpacity={0.8}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={styles.sellerAvatar} />
@@ -1132,11 +1133,12 @@ function DropItem({
 
         {!!story.description && (
           <TouchableOpacity activeOpacity={0.75} onPress={() => setDetailVisible(true)}>
-            <Text style={styles.productDesc} numberOfLines={2}>
+            <Text style={styles.productDesc} numberOfLines={2} ellipsizeMode="tail">
               {story.description}
             </Text>
           </TouchableOpacity>
         )}
+        </View>
 
         <View style={styles.priceBlock}>
           <Text style={styles.priceBig}>CHF {price.toFixed(2)}</Text>
@@ -1957,6 +1959,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   carouselSpacer: { color: 'transparent' },
+  textBlock: {
+    paddingRight: 80,
+  },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   sellerAvatar: { width: 28, height: 28, borderRadius: 14 },
   sellerAvatarFallback: {
@@ -1984,13 +1989,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
-    flex: 1,
+    flexShrink: 1,
   },
   productDesc: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 12,
     lineHeight: 17,
     marginBottom: 10,
+    flexShrink: 1,
+    maxWidth: '72%',
   },
 
   priceBlock: {
