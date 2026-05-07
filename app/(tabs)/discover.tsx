@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
 import type { Story, Profile } from '../../types'
 import { useTranslation } from '../../lib/i18n'
@@ -35,7 +36,7 @@ const CATEGORIES = [
 type StoryWithSeller = Omit<Story, 'seller'> & { seller?: Pick<Profile, 'id' | 'username' | 'avatar_url'> }
 
 function StoryCard({ item }: { item: StoryWithSeller }) {
-  const thumb = item.thumbnail_url ?? item.video_url
+  const thumb = toCdnUrl(item.thumbnail_url ?? item.video_url)
   return (
     <TouchableOpacity
       style={styles.card}

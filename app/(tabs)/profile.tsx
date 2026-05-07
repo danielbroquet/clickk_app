@@ -31,6 +31,7 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { colors, fontFamily } from '../../lib/theme'
 import { useTranslation } from '../../lib/i18n'
 import { useFollow } from '../../hooks/useFollow'
@@ -78,7 +79,7 @@ function DropGridCell({
   onLongPress: () => void
   onDelete: (id: string) => void
 }) {
-  const thumb = drop.thumbnail_url ?? drop.video_url
+  const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const status = drop.status
   const rotation = useSharedValue(0)
   const canDelete = variant === 'own' && status !== 'sold' && status !== 'shipped'

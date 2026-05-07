@@ -36,6 +36,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { useAuth } from '../../lib/auth'
 import { useStoryPurchase } from '../../lib/stripe'
 import { useWatchlist } from '../../hooks/useWatchlist'
@@ -996,7 +997,7 @@ function DropItem({
       {shouldUnload ? (
         story.thumbnail_url ? (
           <Image
-            source={{ uri: story.thumbnail_url }}
+            source={{ uri: toCdnUrl(story.thumbnail_url) ?? '' }}
             style={StyleSheet.absoluteFill}
             resizeMode="cover"
           />
@@ -1006,13 +1007,13 @@ function DropItem({
       ) : (
         <Video
           ref={videoRef}
-          source={{ uri: story.video_url }}
+          source={{ uri: toCdnUrl(story.video_url) ?? '' }}
           style={StyleSheet.absoluteFill}
           resizeMode={ResizeMode.COVER}
           isLooping
           isMuted={active ? muted : true}
           shouldPlay={active && tabFocused && !paused && !buyVisible}
-          posterSource={story.thumbnail_url ? { uri: story.thumbnail_url } : undefined}
+          posterSource={story.thumbnail_url ? { uri: toCdnUrl(story.thumbnail_url) ?? '' } : undefined}
           usePoster={!!story.thumbnail_url && !active}
           posterStyle={StyleSheet.absoluteFillObject}
         />

@@ -3,6 +3,7 @@ import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Story } from '../../types'
 import { fontFamily } from '../../lib/theme'
+import { toCdnUrl } from '../../lib/cdn'
 
 interface StoryCircleProps {
   story: Story
@@ -21,7 +22,7 @@ export default function StoryCircle({ story, onPress }: StoryCircleProps) {
         >
           <View style={styles.inner}>
             {story.video_url ? (
-              <Image source={{ uri: story.video_url }} style={styles.image} />
+              <Image source={{ uri: toCdnUrl(story.video_url) ?? '' }} style={styles.image} />
             ) : (
               <View style={[styles.image, styles.placeholder]} />
             )}

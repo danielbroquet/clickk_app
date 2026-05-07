@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { toCdnUrl } from '../../lib/cdn'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
@@ -306,7 +307,7 @@ function ArchiveCard({
   onDelete: (id: string) => void
 }) {
   const { t } = useTranslation()
-  const thumb = drop.thumbnail_url ?? drop.video_url
+  const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const days = daysLeft(drop.archived_at)
 
   const confirmDelete = () =>
@@ -590,7 +591,7 @@ export default function SalesScreen() {
                 <View style={salesStyles.cardRow}>
                   <View style={salesStyles.thumb}>
                     {item.thumbnail_url ? (
-                      <Image source={{ uri: item.thumbnail_url }} style={salesStyles.thumbImg} />
+                      <Image source={{ uri: toCdnUrl(item.thumbnail_url) ?? '' }} style={salesStyles.thumbImg} />
                     ) : (
                       <View style={salesStyles.thumbPlaceholder}>
                         <Ionicons name="play-circle-outline" size={24} color={colors.primary} />

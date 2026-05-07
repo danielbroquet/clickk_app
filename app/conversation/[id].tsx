@@ -28,6 +28,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { decode } from 'base64-arraybuffer'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { useTranslation } from '../../lib/i18n'
@@ -87,7 +88,7 @@ function StoryCard({ story }: { story: StorySnippet }) {
     >
       {story.video_url ? (
         <Image
-          source={{ uri: story.video_url }}
+          source={{ uri: toCdnUrl(story.video_url) ?? '' }}
           style={styles.storyThumb}
           resizeMode="cover"
         />

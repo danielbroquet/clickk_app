@@ -17,6 +17,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
+import { toCdnUrl } from '../../lib/cdn'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { supabase } from '../../lib/supabase'
@@ -241,7 +242,7 @@ function OrderCard({
       <View style={styles.cardRow}>
         <View style={styles.thumb}>
           {item.thumbnail ? (
-            <Image source={{ uri: item.thumbnail }} style={styles.thumbImg} resizeMode="cover" />
+            <Image source={{ uri: toCdnUrl(item.thumbnail) ?? '' }} style={styles.thumbImg} resizeMode="cover" />
           ) : item.hasVideo ? (
             <View style={styles.thumbPlaceholder}>
               <Ionicons name="play-circle-outline" size={28} color={colors.primary} />

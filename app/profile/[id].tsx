@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { useAuth } from '../../lib/auth'
 import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
@@ -141,7 +142,7 @@ const starStyles = StyleSheet.create({
 // ─── Grid cell ────────────────────────────────────────────────────────────────
 
 function DropGridCell({ drop }: { drop: Drop }) {
-  const thumb = drop.thumbnail_url ?? drop.video_url
+  const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const status = drop.status
 
   return (

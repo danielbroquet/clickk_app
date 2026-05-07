@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
+import { toCdnUrl } from '../../lib/cdn'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
 import { useTranslation } from '../../lib/i18n'
@@ -102,7 +103,7 @@ function WatchlistCard({ row, onRemoved }: { row: WatchlistRow; onRemoved: (id: 
         onPress={() => router.push({ pathname: '/story/[id]', params: { id: story.id } })}
       >
         {story.thumbnail_url ? (
-          <Image source={{ uri: story.thumbnail_url }} style={styles.thumbnail} />
+          <Image source={{ uri: toCdnUrl(story.thumbnail_url) ?? '' }} style={styles.thumbnail} />
         ) : (
           <View style={[styles.thumbnail, styles.thumbnailFallback]}>
             <Ionicons name="videocam-outline" size={24} color={colors.border} />

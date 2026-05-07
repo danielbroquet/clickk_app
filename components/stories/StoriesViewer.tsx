@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { toCdnUrl } from '../../lib/cdn'
 import {
   View,
   Text,
@@ -107,7 +108,7 @@ export default function StoriesViewer({ story, visible, onClose }: StoriesViewer
       <View style={styles.container}>
         {story.video_url ? (
           <Video
-            source={{ uri: story.video_url }}
+            source={{ uri: toCdnUrl(story.video_url) ?? '' }}
             style={StyleSheet.absoluteFillObject}
             resizeMode={ResizeMode.COVER}
             shouldPlay={visible}
