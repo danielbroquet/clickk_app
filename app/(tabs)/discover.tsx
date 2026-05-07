@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 44,
     marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: 12,
   },
   searchFocus: { borderColor: colors.primary },
   searchIcon: { marginLeft: 12, marginRight: 8 },
@@ -387,11 +387,11 @@ const styles = StyleSheet.create({
   },
   clearBtn: { paddingHorizontal: 10 },
 
-  sortScroll: { marginBottom: 8 },
+  sortScroll: { marginBottom: 12 },
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 16,
     gap: 8,
   },
   sortPill: {
@@ -417,8 +417,8 @@ const styles = StyleSheet.create({
   sortPillTextInactive: { color: colors.textSecondary },
 
   filtersWrapper: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   pillsRow: {
     flexDirection: 'row',
