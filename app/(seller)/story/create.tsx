@@ -57,14 +57,19 @@ const PRESETS: { key: SpeedPreset; emoji: string; label: string; tagline: string
 ]
 
 const CATEGORIES: { label: string; value: string }[] = [
-  { label: 'Sneakers', value: 'sneakers' },
-  { label: 'Mode',     value: 'mode'     },
-  { label: 'Tech',     value: 'tech'     },
-  { label: 'Montres',  value: 'watches'  },
-  { label: 'Art',      value: 'art'      },
-  { label: 'Sport',    value: 'sport'    },
-  { label: 'Maison',   value: 'maison'   },
-  { label: 'Autre',    value: 'autre'    },
+  { value: 'sneakers',    label: '👟 Sneakers' },
+  { value: 'vetements',   label: '👕 Vêtements' },
+  { value: 'accessoires', label: '👜 Accessoires' },
+  { value: 'montres',     label: '⌚ Montres' },
+  { value: 'tech',        label: '📱 Tech' },
+  { value: 'gaming',      label: '🎮 Gaming' },
+  { value: 'maison',      label: '🏠 Maison & Déco' },
+  { value: 'livres',      label: '📚 Livres & Culture' },
+  { value: 'sport',       label: '⚽ Sport & Outdoor' },
+  { value: 'art',         label: '🎨 Art & Collection' },
+  { value: 'beaute',      label: '🧴 Beauté' },
+  { value: 'auto',        label: '🚗 Auto & Moto' },
+  { value: 'autre',       label: '🎁 Autre' },
 ]
 
 const PRESET_ACCENT: Record<SpeedPreset, string> = {
@@ -406,6 +411,7 @@ export default function CreateDropScreen() {
 
       if (data.title) setTitle(data.title)
       if (data.description) setDescription(data.description)
+      if (data.category) setCategory(data.category)
     } catch (err: any) {
       Alert.alert('Erreur IA', err.message ?? "L'IA n'a pas pu analyser l'image")
     } finally {
