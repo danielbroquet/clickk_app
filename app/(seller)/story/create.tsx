@@ -751,17 +751,11 @@ export default function CreateDropScreen() {
 
       setUploadPercent(100)
       setUploadPhase(phases.published)
+      setLoading(false)
       setSuccess(true)
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      try {
-        router.replace('/(tabs)')
-      } catch {
-        try {
-          router.push('/(tabs)')
-        } catch {
-          // silently fail — user can navigate manually
-        }
-      }
+      await new Promise(r => setTimeout(r, 1000))
+      try { router.dismissAll() } catch {}
+      try { router.replace('/(tabs)') } catch {}
     } catch (err: unknown) {
       Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.error'))
       setUploadPercent(0)
@@ -842,7 +836,7 @@ export default function CreateDropScreen() {
         )}
         {success && (
           <View style={s.successOverlay}>
-            <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
+            <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
             <Text style={s.successOverlayText}>{t('story.create.drop_published')}</Text>
           </View>
         )}
@@ -966,7 +960,7 @@ export default function CreateDropScreen() {
       )}
       {success && (
         <View style={s.successOverlay}>
-          <Ionicons name="checkmark-circle" size={64} color="#22C55E" />
+          <Ionicons name="checkmark-circle" size={64} color={colors.primary} />
           <Text style={s.successOverlayText}>{t('story.create.drop_published')}</Text>
         </View>
       )}
@@ -2026,7 +2020,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     zIndex: 999,
     justifyContent: 'center',
     alignItems: 'center',
