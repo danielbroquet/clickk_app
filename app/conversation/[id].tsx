@@ -289,8 +289,10 @@ export default function ConversationScreen() {
   const insets = useSafeAreaInsets()
 
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
+  const recordingRef = useRef<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const isRecordingRef = useRef(false)
+  const recordingReadyRef = useRef(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [cancelIntent, setCancelIntent] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
@@ -484,6 +486,7 @@ export default function ConversationScreen() {
         return
       }
       isRecordingRef.current = true
+      recordingReadyRef.current = false
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -491,6 +494,8 @@ export default function ConversationScreen() {
       const { recording: rec } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       )
+      recordingRef.current = rec
+      recordingReadyRef.current = true
       setRecording(rec)
       setIsRecording(true)
       setRecordingDuration(0)
@@ -499,36 +504,55 @@ export default function ConversationScreen() {
       }, 1000)
     } catch (err) {
       isRecordingRef.current = false
+      recordingReadyRef.current = false
+      recordingRef.current = null
       Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
     }
   }, [])
 
   const stopRecording = useCallback(async () => {
     isRecordingRef.current = false
-    if (!recording) return
+    const rec = recordingRef.current
+    if (!rec) return
     try {
       if (durationInterval.current) clearInterval(durationInterval.current)
-      await recording.stopAndUnloadAsync()
+      await rec.stopAndUnloadAsync()
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false })
-      const uri = recording.getURI()
+      const uri = rec.getURI()
+      recordingRef.current = null
+      recordingReadyRef.current = false
       setRecording(null)
       setIsRecording(false)
       setRecordingDuration(0)
       if (uri) await sendMedia(uri, 'audio')
     } catch (err) {
+      recordingRef.current = null
+      recordingReadyRef.current = false
+      setRecording(null)
+      setIsRecording(false)
+      setRecordingDuration(0)
       Alert.alert('Erreur', "Impossible d'envoyer le message vocal.")
     }
-  }, [recording, sendMedia])
+  }, [sendMedia])
 
   const cancelRecording = useCallback(async () => {
     isRecordingRef.current = false
-    if (!recording) return
+    const rec = recordingRef.current
+    if (!rec) {
+      recordingReadyRef.current = false
+      setRecording(null)
+      setIsRecording(false)
+      setRecordingDuration(0)
+      return
+    }
     if (durationInterval.current) clearInterval(durationInterval.current)
-    await recording.stopAndUnloadAsync()
+    await rec.stopAndUnloadAsync()
+    recordingRef.current = null
+    recordingReadyRef.current = false
     setRecording(null)
     setIsRecording(false)
     setRecordingDuration(0)
-  }, [recording])
+  }, [])
 
   // ── Photo handlers ─────────────────────────────────────────────────────────
 
@@ -756,12 +780,29 @@ export default function ConversationScreen() {
                 <TouchableOpacity
                   onLongPress={() => startRecording()}
                   onPressOut={() => {
-                    if (isRecordingRef.current) {
+                    if (!isRecordingRef.current) return
+                    if (recordingReadyRef.current) {
                       if (cancelIntent) {
                         cancelRecording()
                       } else {
                         stopRecording()
                       }
+                    } else {
+                      let attempts = 0
+                      const poll = setInterval(() => {
+                        attempts++
+                        if (recordingReadyRef.current) {
+                          clearInterval(poll)
+                          if (cancelIntent) {
+                            cancelRecording()
+                          } else {
+                            stopRecording()
+                          }
+                        } else if (attempts > 20) {
+                          clearInterval(poll)
+                          cancelRecording()
+                        }
+                      }, 50)
                     }
                   }}
                   delayLongPress={200}
