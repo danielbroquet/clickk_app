@@ -513,7 +513,7 @@ export default function CreateDropScreen() {
       return
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['video'],
+      mediaTypes: ['videos'],
       quality: 1.0,
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
@@ -525,7 +525,7 @@ export default function CreateDropScreen() {
 
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['video'],
+      mediaTypes: ['videos'],
       quality: 1.0,
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
