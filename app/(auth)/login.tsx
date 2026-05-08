@@ -8,10 +8,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Alert,
   StyleSheet,
 } from 'react-native'
 import { useRouter } from 'expo-router'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import { useAuth } from '../../lib/auth'
+import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 
 export default function LoginScreen() {
@@ -37,6 +40,33 @@ export default function LoginScreen() {
     const { error } = await signIn(email.trim(), password)
     setLoading(false)
     if (error) setPasswordError(error)
+  }
+
+  const handleAppleSignIn = async () => {
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      })
+      const identityToken = credential.identityToken
+      if (!identityToken) {
+        Alert.alert('Error', 'No identity token received from Apple.')
+        return
+      }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: identityToken,
+      })
+      if (error) {
+        Alert.alert('Error', error.message)
+      }
+    } catch (e: any) {
+      if (e.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Error', e.message ?? 'Apple sign in failed.')
+      }
+    }
   }
 
   return (
@@ -88,6 +118,16 @@ export default function LoginScreen() {
             ? <ActivityIndicator color={colors.bg} />
             : <Text style={styles.btnText}>Se connecter</Text>}
         </TouchableOpacity>
+
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+            cornerRadius={100}
+            style={styles.appleBtn}
+            onPress={handleAppleSignIn}
+          />
+        )}
 
         <View style={styles.linkRow}>
           <Text style={styles.linkGray}>Pas encore de compte ? </Text>
@@ -141,6 +181,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   btnText: { fontFamily: fontFamily.bold, fontSize: 15, color: colors.bg },
+  appleBtn: { height: 52, marginTop: spacing.md },
   linkRow: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.lg },
   linkGray: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
   linkTeal: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.primary },
