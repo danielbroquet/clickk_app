@@ -36,16 +36,9 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    let story_id: string | undefined;
-    try {
-      const text = await req.text();
-      console.log('Raw body:', text);
-      const parsed = JSON.parse(text);
-      story_id = parsed.story_id;
-    } catch (e) {
-      console.error('Body parse error:', e);
-      return jsonResponse({ error: 'invalid_body' }, 400);
-    }
+    const url = new URL(req.url);
+    const story_id = url.searchParams.get('story_id') || undefined;
+    console.log('story_id from query:', story_id);
     if (!story_id) {
       return jsonResponse({ error: "missing_story_id" }, 400);
     }
