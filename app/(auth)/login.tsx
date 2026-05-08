@@ -77,7 +77,9 @@ export default function LoginScreen() {
 
   const handleGoogleSignIn = async () => {
     try {
-      await GoogleSignin.hasPlayServices()
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices()
+      }
       const userInfo = await GoogleSignin.signIn()
       const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken
       if (!idToken) {
