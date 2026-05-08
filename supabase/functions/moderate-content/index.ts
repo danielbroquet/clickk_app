@@ -79,7 +79,7 @@ Deno.serve(async (req: Request) => {
     const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
 
     // 3. Call Gemini 2.5 Flash API
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-latest:generateContent?key=${geminiApiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
     const geminiRes = await fetch(geminiUrl, {
       method: "POST",
