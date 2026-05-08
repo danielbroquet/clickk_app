@@ -668,19 +668,22 @@ export default function SalesScreen() {
     show('Drop supprimé')
   }, [currentUserId, show])
 
-  const handleFlaggedDelete = useCallback(async (dropId: string) => {
-    const { error } = await supabase
-      .from('stories')
-      .delete()
-      .eq('id', dropId)
-      .eq('seller_id', currentUserId)
-    if (error) {
-      Alert.alert('Erreur', 'Impossible de supprimer ce drop. Veuillez réessayer.')
-      return
+  const handleFlaggedDelete = async (storyId: string) => {
+    try {
+      const { error } = await supabase
+        .from('stories')
+        .delete()
+        .eq('id', storyId)
+        .eq('seller_id', session?.user?.id)
+      if (error) {
+        Alert.alert('Error', 'Failed to delete drop. Please try again.')
+        return
+      }
+      setFlagged(prev => prev.filter(d => d.id !== storyId))
+    } catch (e) {
+      Alert.alert('Error', 'Failed to delete drop. Please try again.')
     }
-    setFlagged(prev => prev.filter(d => d.id !== dropId))
-    show('Drop supprimé')
-  }, [currentUserId, show])
+  }
 
   return (
     <SafeAreaView style={salesStyles.safe} edges={['top']}>
