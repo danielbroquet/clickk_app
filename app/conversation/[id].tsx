@@ -718,7 +718,7 @@ export default function ConversationScreen() {
                 onPress={handlePickImage}
                 disabled={sendingMedia}
                 hitSlop={8}
-                style={{ paddingHorizontal: 4 }}
+                style={styles.iconBtn}
               >
                 <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -726,7 +726,7 @@ export default function ConversationScreen() {
                 onPress={handleTakePhoto}
                 disabled={sendingMedia}
                 hitSlop={8}
-                style={{ paddingHorizontal: 4 }}
+                style={styles.iconBtn}
               >
                 <Ionicons name="camera-outline" size={24} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -766,7 +766,7 @@ export default function ConversationScreen() {
                   }}
                   delayLongPress={200}
                   activeOpacity={0.7}
-                  style={{ paddingHorizontal: 4 }}
+                  style={styles.iconBtn}
                 >
                   {sendingMedia ? (
                     <ActivityIndicator size="small" color={colors.primary} />
@@ -941,13 +941,19 @@ const styles = StyleSheet.create({
   // Input bar
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   input: {
     flex: 1,
@@ -969,7 +975,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-end',
   },
   sendBtnDisabled: {
     backgroundColor: colors.surfaceHigh,
