@@ -139,12 +139,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Flagged: set to draft and notify seller
+    // Flagged: set to cancelled and notify seller
     await admin
       .from("stories")
       .update({
         moderation_status: "flagged",
-        status: "draft",
+        status: "cancelled",
         moderation_reason: moderation.reason
       })
       .eq("id", story_id);
