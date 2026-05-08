@@ -66,6 +66,15 @@ interface ArchivedDrop {
   status: string
 }
 
+interface FlaggedDrop {
+  id: string
+  title: string | null
+  thumbnail_url: string | null
+  video_url: string | null
+  current_price_chf: number
+  moderation_reason: string | null
+}
+
 type ScreenTab = 'ventes' | 'archive'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -295,6 +304,127 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// ─── Flagged card ─────────────────────────────────────────────────────────────
+
+function FlaggedCard({
+  drop,
+  onDelete,
+}: {
+  drop: FlaggedDrop
+  onDelete: (id: string) => void
+}) {
+  const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
+
+  const confirmDelete = () =>
+    Alert.alert('Supprimer ce drop', 'Cette action est irréversible.', [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+    ])
+
+  return (
+    <View style={flaggedStyles.card}>
+      <View style={flaggedStyles.media}>
+        {thumb ? (
+          <Image source={{ uri: thumb }} style={flaggedStyles.thumb} />
+        ) : (
+          <View style={[flaggedStyles.thumb, flaggedStyles.placeholder]}>
+            <Ionicons name="videocam-outline" size={22} color={colors.border} />
+          </View>
+        )}
+        <View style={flaggedStyles.refusedBadge}>
+          <Text style={flaggedStyles.refusedBadgeText}>Refusé</Text>
+        </View>
+      </View>
+
+      <View style={flaggedStyles.body}>
+        <Text style={flaggedStyles.title} numberOfLines={2}>
+          {drop.title || 'Drop sans titre'}
+        </Text>
+        {drop.moderation_reason ? (
+          <Text style={flaggedStyles.reason} numberOfLines={3}>
+            {drop.moderation_reason}
+          </Text>
+        ) : null}
+        <TouchableOpacity
+          style={flaggedStyles.deleteBtn}
+          onPress={confirmDelete}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash-outline" size={14} color="#fff" />
+          <Text style={flaggedStyles.deleteBtnText}>Supprimer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  )
+}
+
+const flaggedStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(239,68,68,0.06)',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(239,68,68,0.45)',
+  },
+  media: { width: 90, height: 110 },
+  thumb: { width: 90, height: 110, resizeMode: 'cover' },
+  placeholder: {
+    backgroundColor: colors.surfaceHigh,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refusedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(239,68,68,0.88)',
+    paddingVertical: 3,
+    alignItems: 'center',
+  },
+  refusedBadgeText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 10,
+    color: '#fff',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  body: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  reason: {
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    color: '#EF4444',
+    lineHeight: 16,
+    marginTop: 4,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 32,
+    backgroundColor: '#EF4444',
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  deleteBtnText: {
+    fontSize: 12,
+    fontFamily: fontFamily.semiBold,
+    color: '#fff',
+  },
+})
+
 // ─── Archive card ─────────────────────────────────────────────────────────────
 
 function ArchiveCard({
@@ -460,6 +590,7 @@ export default function SalesScreen() {
   const [activeTab, setActiveTab] = useState<ScreenTab>('ventes')
   const [sales, setSales] = useState<StorySale[]>([])
   const [archived, setArchived] = useState<ArchivedDrop[]>([])
+  const [flagged, setFlagged] = useState<FlaggedDrop[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [shipModal, setShipModal] = useState<{ id: string; title: string } | null>(null)
@@ -488,16 +619,27 @@ export default function SalesScreen() {
     setArchived((data ?? []) as ArchivedDrop[])
   }, [currentUserId])
 
+  const fetchFlagged = useCallback(async () => {
+    if (!currentUserId) return
+    const { data } = await supabase
+      .from('stories')
+      .select('id, title, thumbnail_url, video_url, current_price_chf, moderation_reason')
+      .eq('seller_id', currentUserId)
+      .eq('moderation_status', 'flagged')
+      .order('created_at', { ascending: false })
+    setFlagged((data ?? []) as FlaggedDrop[])
+  }, [currentUserId])
+
   useEffect(() => {
     setLoading(true)
-    Promise.all([fetchSales(), fetchArchived()]).finally(() => setLoading(false))
-  }, [fetchSales, fetchArchived])
+    Promise.all([fetchSales(), fetchArchived(), fetchFlagged()]).finally(() => setLoading(false))
+  }, [fetchSales, fetchArchived, fetchFlagged])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
-    await Promise.all([fetchSales(), fetchArchived()])
+    await Promise.all([fetchSales(), fetchArchived(), fetchFlagged()])
     setRefreshing(false)
-  }, [fetchSales, fetchArchived])
+  }, [fetchSales, fetchArchived, fetchFlagged])
 
   const handleMessage = useCallback(
     async (buyerId: string | null) => {
@@ -518,6 +660,16 @@ export default function SalesScreen() {
 
   const handleHardDelete = useCallback(async (dropId: string) => {
     setArchived(prev => prev.filter(d => d.id !== dropId))
+    await supabase
+      .from('stories')
+      .delete()
+      .eq('id', dropId)
+      .eq('seller_id', currentUserId)
+    show('Drop supprimé')
+  }, [currentUserId, show])
+
+  const handleFlaggedDelete = useCallback(async (dropId: string) => {
+    setFlagged(prev => prev.filter(d => d.id !== dropId))
     await supabase
       .from('stories')
       .delete()
@@ -577,12 +729,32 @@ export default function SalesScreen() {
               colors={[colors.primary]}
             />
           }
+          ListHeaderComponent={
+            flagged.length > 0 ? (
+              <View style={salesStyles.flaggedSection}>
+                <View style={salesStyles.flaggedHeader}>
+                  <Ionicons name="warning-outline" size={15} color="#EF4444" />
+                  <Text style={salesStyles.flaggedHeaderText}>
+                    Drops refusés ({flagged.length})
+                  </Text>
+                </View>
+                {flagged.map((drop) => (
+                  <View key={drop.id} style={{ marginBottom: spacing.sm }}>
+                    <FlaggedCard drop={drop} onDelete={handleFlaggedDelete} />
+                  </View>
+                ))}
+                {sales.length > 0 && <View style={salesStyles.flaggedDivider} />}
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
-            <View style={salesStyles.emptyState}>
-              <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
-              <Text style={salesStyles.emptyText}>{t('sales.no_sales')}</Text>
-              <Text style={salesStyles.emptySubtext}>Vos drops vendus apparaîtront ici.</Text>
-            </View>
+            flagged.length > 0 ? null : (
+              <View style={salesStyles.emptyState}>
+                <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
+                <Text style={salesStyles.emptyText}>{t('sales.no_sales')}</Text>
+                <Text style={salesStyles.emptySubtext}>Vos drops vendus apparaîtront ici.</Text>
+              </View>
+            )
           }
           renderItem={({ item }) => {
             const buyerInitial = (item.buyer?.username ?? 'A').charAt(0).toUpperCase()
@@ -957,5 +1129,25 @@ const salesStyles = StyleSheet.create({
     fontSize: fontSize.caption,
     color: colors.text,
     flex: 1,
+  },
+  flaggedSection: {
+    marginBottom: spacing.sm,
+  },
+  flaggedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  flaggedHeaderText: {
+    fontFamily: fontFamily.semiBold,
+    fontSize: 13,
+    color: '#EF4444',
+  },
+  flaggedDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs ?? 4,
   },
 })
