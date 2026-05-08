@@ -225,7 +225,7 @@ function FramePickerModal({
   const onSliderMove = useCallback((newSeconds: number) => {
     const clamped = Math.min(Math.max(newSeconds, 0), videoDurationSeconds)
     setSliderValue(clamped)
-    onPositionChange(clamped)
+    onPositionChange?.(clamped)
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
       captureFrame(clamped)
@@ -513,7 +513,7 @@ export default function CreateDropScreen() {
       return
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ImagePicker.MediaType.videos,
       quality: 1.0,
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
@@ -525,7 +525,7 @@ export default function CreateDropScreen() {
 
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      mediaTypes: ImagePicker.MediaType.videos,
       quality: 1.0,
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
@@ -968,6 +968,8 @@ export default function CreateDropScreen() {
           visible={showFramePicker}
           videoUri={videoUri}
           videoDurationSeconds={videoDurationSeconds}
+          initialPosition={scrubPosition}
+          onPositionChange={setScrubPosition}
           onConfirm={(thumbUri) => {
             setThumbnailUri(thumbUri)
             setShowFramePicker(false)
