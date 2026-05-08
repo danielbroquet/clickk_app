@@ -292,7 +292,6 @@ export default function ConversationScreen() {
   const recordingRef = useRef<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const isRecordingRef = useRef(false)
-  const recordingReadyRef = useRef(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [cancelIntent, setCancelIntent] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
@@ -486,7 +485,6 @@ export default function ConversationScreen() {
         return
       }
       isRecordingRef.current = true
-      recordingReadyRef.current = false
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -495,7 +493,6 @@ export default function ConversationScreen() {
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       )
       recordingRef.current = rec
-      recordingReadyRef.current = true
       setRecording(rec)
       setIsRecording(true)
       setRecordingDuration(0)
@@ -504,7 +501,6 @@ export default function ConversationScreen() {
       }, 1000)
     } catch (err) {
       isRecordingRef.current = false
-      recordingReadyRef.current = false
       recordingRef.current = null
       Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
     }
@@ -520,14 +516,12 @@ export default function ConversationScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false })
       const uri = rec.getURI()
       recordingRef.current = null
-      recordingReadyRef.current = false
       setRecording(null)
       setIsRecording(false)
       setRecordingDuration(0)
       if (uri) await sendMedia(uri, 'audio')
     } catch (err) {
       recordingRef.current = null
-      recordingReadyRef.current = false
       setRecording(null)
       setIsRecording(false)
       setRecordingDuration(0)
@@ -539,7 +533,6 @@ export default function ConversationScreen() {
     isRecordingRef.current = false
     const rec = recordingRef.current
     if (!rec) {
-      recordingReadyRef.current = false
       setRecording(null)
       setIsRecording(false)
       setRecordingDuration(0)
@@ -548,7 +541,6 @@ export default function ConversationScreen() {
     if (durationInterval.current) clearInterval(durationInterval.current)
     await rec.stopAndUnloadAsync()
     recordingRef.current = null
-    recordingReadyRef.current = false
     setRecording(null)
     setIsRecording(false)
     setRecordingDuration(0)
@@ -732,9 +724,13 @@ export default function ConversationScreen() {
                   {cancelIntent ? 'Annulation...' : t('conversation.slide_to_cancel')}
                 </Text>
               </View>
-              <View style={styles.micHoldBtn}>
-                <Ionicons name="mic" size={26} color={colors.primary} />
-              </View>
+              <TouchableOpacity
+                onPress={stopRecording}
+                activeOpacity={0.7}
+                style={styles.sendVoiceBtn}
+              >
+                <Send size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
           ) : (
             <>
@@ -778,45 +774,17 @@ export default function ConversationScreen() {
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
-                  onLongPress={() => startRecording()}
-                  onPressOut={() => {
-                    if (!isRecordingRef.current) return
-                    if (recordingReadyRef.current) {
-                      if (cancelIntent) {
-                        cancelRecording()
-                      } else {
-                        stopRecording()
-                      }
-                    } else {
-                      let attempts = 0
-                      const poll = setInterval(() => {
-                        attempts++
-                        if (recordingReadyRef.current) {
-                          clearInterval(poll)
-                          if (cancelIntent) {
-                            cancelRecording()
-                          } else {
-                            stopRecording()
-                          }
-                        } else if (attempts > 20) {
-                          clearInterval(poll)
-                          cancelRecording()
-                        }
-                      }, 50)
-                    }
+                  onPress={() => {
+                    if (!isRecording) startRecording()
+                    else stopRecording()
                   }}
-                  delayLongPress={200}
                   activeOpacity={0.7}
                   style={styles.iconBtn}
                 >
                   {sendingMedia ? (
                     <ActivityIndicator size="small" color={colors.primary} />
                   ) : (
-                    <Ionicons
-                      name={isRecording ? 'mic' : 'mic-outline'}
-                      size={26}
-                      color={isRecording ? colors.primary : colors.textSecondary}
-                    />
+                    <Ionicons name="mic-outline" size={26} color={colors.textSecondary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -1060,11 +1028,11 @@ const styles = StyleSheet.create({
   recordingHintCancel: {
     color: colors.error,
   },
-  micHoldBtn: {
+  sendVoiceBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.surfaceHigh,
+    backgroundColor: '#22c55e',
     justifyContent: 'center',
     alignItems: 'center',
   },
