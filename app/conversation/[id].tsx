@@ -478,9 +478,11 @@ export default function ConversationScreen() {
   // ── Voice recording ────────────────────────────────────────────────────────
 
   const startRecording = useCallback(async () => {
+    setIsRecording(true)
     try {
       const { granted } = await Audio.requestPermissionsAsync()
       if (!granted) {
+        setIsRecording(false)
         Alert.alert('Permission refusée', t('conversation.mic_permission'))
         return
       }
@@ -494,7 +496,6 @@ export default function ConversationScreen() {
       )
       recordingRef.current = rec
       setRecording(rec)
-      setIsRecording(true)
       setRecordingDuration(0)
       durationInterval.current = setInterval(() => {
         setRecordingDuration(d => d + 1)
@@ -502,6 +503,7 @@ export default function ConversationScreen() {
     } catch (err) {
       isRecordingRef.current = false
       recordingRef.current = null
+      setIsRecording(false)
       Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
     }
   }, [])
@@ -706,26 +708,28 @@ export default function ConversationScreen() {
         {/* Input bar */}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 12 }]}>
           {isRecording ? (
-            <View style={styles.recordingBar} {...recordingPanResponder.panHandlers}>
-              <View style={styles.recordingLeft}>
-                <View style={styles.recordingDot} />
-                <Text style={styles.recordingTime}>
-                  {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
-                  {String(recordingDuration % 60).padStart(2, '0')}
-                </Text>
-              </View>
-              <View style={styles.recordingCancelWrap}>
-                <Ionicons
-                  name="arrow-back"
-                  size={14}
-                  color={cancelIntent ? colors.error : colors.textSecondary}
-                />
-                <Text style={[styles.recordingHint, cancelIntent && styles.recordingHintCancel]}>
-                  {cancelIntent ? 'Annulation...' : t('conversation.slide_to_cancel')}
-                </Text>
+            <View style={styles.recordingBar}>
+              <View style={styles.recordingPanArea} {...recordingPanResponder.panHandlers}>
+                <View style={styles.recordingLeft}>
+                  <View style={styles.recordingDot} />
+                  <Text style={styles.recordingTime}>
+                    {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:
+                    {String(recordingDuration % 60).padStart(2, '0')}
+                  </Text>
+                </View>
+                <View style={styles.recordingCancelWrap}>
+                  <Ionicons
+                    name="arrow-back"
+                    size={14}
+                    color={cancelIntent ? colors.error : colors.textSecondary}
+                  />
+                  <Text style={[styles.recordingHint, cancelIntent && styles.recordingHintCancel]}>
+                    {cancelIntent ? 'Annulation...' : t('conversation.slide_to_cancel')}
+                  </Text>
+                </View>
               </View>
               <TouchableOpacity
-                onPress={stopRecording}
+                onPress={() => stopRecording()}
                 activeOpacity={0.7}
                 style={styles.sendVoiceBtn}
               >
@@ -992,9 +996,13 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 4,
     paddingVertical: 4,
+  },
+  recordingPanArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   recordingLeft: {
     flexDirection: 'row',
