@@ -669,12 +669,16 @@ export default function SalesScreen() {
   }, [currentUserId, show])
 
   const handleFlaggedDelete = useCallback(async (dropId: string) => {
-    setFlagged(prev => prev.filter(d => d.id !== dropId))
-    await supabase
+    const { error } = await supabase
       .from('stories')
       .delete()
       .eq('id', dropId)
       .eq('seller_id', currentUserId)
+    if (error) {
+      Alert.alert('Erreur', 'Impossible de supprimer ce drop. Veuillez réessayer.')
+      return
+    }
+    setFlagged(prev => prev.filter(d => d.id !== dropId))
     show('Drop supprimé')
   }, [currentUserId, show])
 
