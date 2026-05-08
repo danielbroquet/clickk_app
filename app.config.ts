@@ -9,8 +9,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   icon: "./assets/images/icon.png",
   scheme: "clickk",
   updates: {
-    url: "https://u.expo.dev/c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
-  },
+  url: "https://u.expo.dev/c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
+  enabled: false,
+},
   runtimeVersion: {
     policy: "appVersion",
   },
@@ -53,7 +54,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-font",
     "expo-localization",
     "expo-web-browser",
-    "expo-updates",
     [
       "expo-notifications",
       {
