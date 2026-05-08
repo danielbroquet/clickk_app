@@ -13,9 +13,15 @@ import {
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import * as AppleAuthentication from 'expo-apple-authentication'
+import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+
+GoogleSignin.configure({
+  webClientId: '568448664963-98ol47cd34u54vmi299m1pf114t64be2.apps.googleusercontent.com',
+  iosClientId: '568448664963-4gdsohps2operj8u4mn3qrcoj8ede507.apps.googleusercontent.com',
+})
 
 export default function LoginScreen() {
   const router = useRouter()
@@ -65,6 +71,29 @@ export default function LoginScreen() {
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Error', e.message ?? 'Apple sign in failed.')
+      }
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    try {
+      await GoogleSignin.hasPlayServices()
+      const userInfo = await GoogleSignin.signIn()
+      const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken
+      if (!idToken) {
+        Alert.alert('Error', 'No ID token received from Google.')
+        return
+      }
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: idToken,
+      })
+      if (error) {
+        Alert.alert('Error', error.message)
+      }
+    } catch (e: any) {
+      if (e.code !== '-5') {
+        Alert.alert('Error', e.message ?? 'Google sign in failed.')
       }
     }
   }
@@ -129,6 +158,13 @@ export default function LoginScreen() {
           />
         )}
 
+        <TouchableOpacity style={styles.googleBtn} onPress={handleGoogleSignIn} activeOpacity={0.85}>
+          <View style={styles.googleLogoWrap}>
+            <Text style={styles.googleLogoG}>G</Text>
+          </View>
+          <Text style={styles.googleBtnText}>Sign in with Google</Text>
+        </TouchableOpacity>
+
         <View style={styles.linkRow}>
           <Text style={styles.linkGray}>Pas encore de compte ? </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
@@ -182,6 +218,36 @@ const styles = StyleSheet.create({
   },
   btnText: { fontFamily: fontFamily.bold, fontSize: 15, color: colors.bg },
   appleBtn: { height: 52, marginTop: spacing.md },
+  googleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dadce0',
+    borderRadius: 100,
+    height: 52,
+    marginTop: spacing.md,
+  },
+  googleLogoWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  googleLogoG: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4285F4',
+  },
+  googleBtnText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 15,
+    color: '#3c4043',
+  },
   linkRow: { flexDirection: 'row', justifyContent: 'center', marginTop: spacing.lg },
   linkGray: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
   linkTeal: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.primary },
