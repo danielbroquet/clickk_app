@@ -36,7 +36,16 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { story_id } = await req.json();
+    let story_id: string | undefined;
+    try {
+      const text = await req.text();
+      console.log('Raw body:', text);
+      const parsed = JSON.parse(text);
+      story_id = parsed.story_id;
+    } catch (e) {
+      console.error('Body parse error:', e);
+      return jsonResponse({ error: 'invalid_body' }, 400);
+    }
     if (!story_id) {
       return jsonResponse({ error: "missing_story_id" }, 400);
     }
