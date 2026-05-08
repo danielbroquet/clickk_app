@@ -40,6 +40,7 @@ Deno.serve(async (req: Request) => {
     if (!story_id) {
       return jsonResponse({ error: "missing_story_id" }, 400);
     }
+    console.log('Processing story:', story_id);
 
     // 1. Fetch story
     const { data: story, error: storyErr } = await admin
@@ -56,6 +57,7 @@ Deno.serve(async (req: Request) => {
     if (!thumbnail_url) {
       return jsonResponse({ error: "no_thumbnail" }, 400);
     }
+    console.log('Story found:', story_id, 'thumbnail:', thumbnail_url);
 
     // 2. Download thumbnail and convert to base64
     const imageRes = await fetch(thumbnail_url);
@@ -64,9 +66,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const imageBuffer = await imageRes.arrayBuffer();
-    const base64Image = btoa(
-      String.fromCharCode(...new Uint8Array(imageBuffer))
-    );
+    console.log('Image downloaded, size:', imageBuffer.byteLength);
+    const uint8Array = new Uint8Array(imageBuffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      binary += String.fromCharCode(...uint8Array.subarray(i, i + chunkSize));
+    }
+    const base64Image = btoa(binary);
     const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
 
     // 3. Call Gemini 2.5 Flash API
@@ -105,6 +112,7 @@ Deno.serve(async (req: Request) => {
     const geminiData = await geminiRes.json();
     const rawText =
       geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    console.log('Gemini result:', rawText);
 
     // 4. Parse Gemini response
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
@@ -155,6 +163,7 @@ Deno.serve(async (req: Request) => {
       moderation_status: "flagged",
     });
   } catch (err: unknown) {
+    console.error('Error:', err);
     const message = err instanceof Error ? err.message : "internal_error";
     return jsonResponse({ error: message }, 500);
   }
