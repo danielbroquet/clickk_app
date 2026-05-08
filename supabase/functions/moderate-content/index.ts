@@ -142,7 +142,11 @@ Deno.serve(async (req: Request) => {
     // Flagged: set to draft and notify seller
     await admin
       .from("stories")
-      .update({ moderation_status: "flagged", status: "draft" })
+      .update({
+        moderation_status: "flagged",
+        status: "draft",
+        moderation_reason: moderation.reason
+      })
       .eq("id", story_id);
 
     // Notify seller via send-push
