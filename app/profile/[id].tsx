@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, router } from 'expo-router'
+import { useFocusEffect } from '@react-navigation/native'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { toCdnUrl } from '../../lib/cdn'
@@ -253,6 +254,18 @@ export default function PublicProfileScreen() {
     }
   }, [id, currentUserId])
 
+  const fetchDrops = useCallback(async () => {
+    if (!id) return
+    const { data } = await supabase
+      .from('stories')
+      .select('id, title, video_url, thumbnail_url, current_price_chf, status, expires_at, created_at')
+      .eq('seller_id', id)
+      .eq('status', 'active')
+      .neq('moderation_status', 'flagged')
+      .order('created_at', { ascending: false })
+    setDrops((data ?? []) as Drop[])
+  }, [id])
+
   useEffect(() => {
     if (!id) return
 
@@ -264,38 +277,43 @@ export default function PublicProfileScreen() {
         .eq('id', id)
         .maybeSingle(),
 
-      supabase
-        .from('stories')
-        .select('id, title, video_url, thumbnail_url, current_price_chf, status, expires_at, created_at')
-        .eq('seller_id', id)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false }),
+      fetchDrops(),
 
       supabase
         .from('stories')
         .select('*', { count: 'exact', head: true })
         .eq('seller_id', id)
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .neq('moderation_status', 'flagged'),
 
       supabase
         .from('stories')
         .select('*', { count: 'exact', head: true })
         .eq('seller_id', id)
         .eq('status', 'sold'),
-    ]).then(async ([profileRes, activeRes, dropsCountRes, ventesRes]) => {
+    ]).then(([profileRes, , dropsCountRes, ventesRes]) => {
       if (profileRes.error || !profileRes.data) {
         setFetchError('Profil introuvable')
         setLoading(false)
         return
       }
       setProfile(profileRes.data as Profile)
-      setDropsCount(dropsCountRes.count ?? 0)
-      setVentesCount(ventesRes.count ?? 0)
-
-      setDrops((activeRes.data ?? []) as Drop[])
+      setDropsCount((dropsCountRes as { count: number | null }).count ?? 0)
+      setVentesCount((ventesRes as { count: number | null }).count ?? 0)
       setLoading(false)
     })
-  }, [id])
+  }, [id, fetchDrops])
+
+  const isMounted = React.useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (!isMounted.current) {
+        isMounted.current = true
+        return
+      }
+      fetchDrops()
+    }, [fetchDrops])
+  )
 
   const handleMessage = useCallback(async () => {
     if (!id || !currentUserId) return
