@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Pressable,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
@@ -55,6 +56,52 @@ export default function ShippingAddressScreen() {
   const [postalCode, setPostalCode] = useState('')
   const [city, setCity] = useState('')
   const [phone, setPhone] = useState('')
+
+  const [streetSuggestions, setStreetSuggestions] = useState<any[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchingAddress, setSearchingAddress] = useState(false)
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [line1Y, setLine1Y] = useState(0)
+
+  const searchSwissAddress = useCallback(async (query: string) => {
+    if (query.length < 3) {
+      setStreetSuggestions([])
+      setShowSuggestions(false)
+      setSearchingAddress(false)
+      return
+    }
+    setSearchingAddress(true)
+    try {
+      const url =
+        `https://nominatim.openstreetmap.org/search?` +
+        `q=${encodeURIComponent(query)}&` +
+        `countrycodes=ch&` +
+        `format=json&` +
+        `addressdetails=1&` +
+        `limit=5`
+      const res = await fetch(url, {
+        headers: { Accept: 'application/json', 'User-Agent': 'CLICKK-App/1.0' },
+      })
+      const json = await res.json()
+      const results = (json ?? [])
+        .map((r: any) => {
+          const addr = r.address ?? {}
+          const street = addr.road ?? addr.pedestrian ?? addr.street ?? ''
+          const number = addr.house_number ?? ''
+          const postal_code = addr.postcode ?? ''
+          const city = addr.city ?? addr.town ?? addr.village ?? addr.municipality ?? ''
+          return { street, number, postal_code, city }
+        })
+        .filter((r: any) => r.street && r.postal_code && r.city)
+      setStreetSuggestions(results)
+      setShowSuggestions(results.length > 0)
+    } catch {
+      setStreetSuggestions([])
+      setShowSuggestions(false)
+    } finally {
+      setSearchingAddress(false)
+    }
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -253,13 +300,26 @@ export default function ShippingAddressScreen() {
               />
 
               <Text style={styles.fieldLabel}>{t('shipping.address')}</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Rue du Lac 12"
-                placeholderTextColor={C.muted}
-                value={line1}
-                onChangeText={setLine1}
-              />
+              <View
+                style={styles.line1Wrap}
+                onLayout={(e) => setLine1Y(e.nativeEvent.layout.y + e.nativeEvent.layout.height + 60)}
+              >
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Rue du Lac 12"
+                  placeholderTextColor={C.muted}
+                  value={line1}
+                  onChangeText={(v) => {
+                    setLine1(v)
+                    setShowSuggestions(false)
+                    if (searchTimeout.current) clearTimeout(searchTimeout.current)
+                    searchTimeout.current = setTimeout(() => searchSwissAddress(v), 500)
+                  }}
+                />
+                {searchingAddress && (
+                  <ActivityIndicator size="small" color={C.primary} style={styles.line1Spinner} />
+                )}
+              </View>
 
               <Text style={styles.fieldLabel}>{t('shipping.complement')}</Text>
               <TextInput
@@ -336,6 +396,39 @@ export default function ShippingAddressScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {showSuggestions && (
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowSuggestions(false)} />
+      )}
+
+      {showSuggestions && streetSuggestions.length > 0 && (
+        <View style={[styles.suggestionBox, { top: line1Y }]}>
+          <ScrollView keyboardShouldPersistTaps="always">
+            {streetSuggestions.map((s, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.suggestionItem,
+                  i < streetSuggestions.length - 1 && styles.suggestionBorder,
+                ]}
+                onPress={() => {
+                  setLine1((s.street + ' ' + s.number).trim())
+                  setPostalCode(s.postal_code)
+                  setCity(s.city)
+                  setShowSuggestions(false)
+                  if (searchTimeout.current) clearTimeout(searchTimeout.current)
+                }}
+              >
+                <Ionicons name="location-outline" size={14} color={C.muted} style={{ marginRight: 8, marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.suggestionStreet}>{s.street} {s.number}</Text>
+                  <Text style={styles.suggestionCity}>{s.postal_code} {s.city}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -447,6 +540,51 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   row: { flexDirection: 'row' },
+  line1Wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  line1Spinner: {
+    position: 'absolute',
+    right: 14,
+  },
+  suggestionBox: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 9999,
+    elevation: 10,
+    backgroundColor: C.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    maxHeight: 220,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+  },
+  suggestionBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
+  },
+  suggestionStreet: {
+    fontSize: 14,
+    color: C.text,
+    fontWeight: '500',
+  },
+  suggestionCity: {
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 1,
+  },
   countryHint: {
     flexDirection: 'row',
     alignItems: 'center',
