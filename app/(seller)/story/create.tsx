@@ -727,6 +727,12 @@ export default function CreateDropScreen() {
       // Step 5 — insert record (100%)
       setUploadPhase(phases.finalizing)
       setUploadPercent(85)
+
+      // Refresh session before insert — JWT may have expired during upload
+      const { data: { session: freshSession } } = await supabase.auth.refreshSession()
+      if (!freshSession) throw new Error('Session expired, please log in again')
+      await supabase.auth.getSession()
+
       const categoryValue = category || 'autre'
       const insertPayload = {
         seller_id: user.id,
