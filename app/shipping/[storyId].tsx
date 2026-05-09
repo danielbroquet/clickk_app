@@ -150,9 +150,18 @@ export default function ShippingAddressScreen() {
     setSaving(true)
     setError(null)
     try {
+      console.log('[shipping] handleConfirmPick: attaching address', selectedId, 'to story', storyId)
       await attachToStory(selectedId)
-      router.replace('/(tabs)/profile')
+      console.log('[shipping] handleConfirmPick: attach ok, navigating')
+      try {
+        router.replace('/(tabs)')
+        console.log('[shipping] handleConfirmPick: navigation done')
+      } catch (navErr: any) {
+        console.error('[shipping] handleConfirmPick: navigation error', navErr?.message)
+        router.back()
+      }
     } catch (e: any) {
+      console.error('[shipping] handleConfirmPick: error', e?.message)
       setError(e.message ?? 'Erreur')
     } finally {
       setSaving(false)
@@ -193,9 +202,18 @@ export default function ShippingAddressScreen() {
       if (insertErr) throw insertErr
       if (!created?.id) throw new Error('save_failed')
 
+      console.log('[shipping] handleSaveNew: address created', created.id, 'attaching to story', storyId)
       await attachToStory(created.id)
-      router.replace('/(tabs)/profile')
+      console.log('[shipping] handleSaveNew: attach ok, navigating')
+      try {
+        router.replace('/(tabs)')
+        console.log('[shipping] handleSaveNew: navigation done')
+      } catch (navErr: any) {
+        console.error('[shipping] handleSaveNew: navigation error', navErr?.message)
+        router.back()
+      }
     } catch (e: any) {
+      console.error('[shipping] handleSaveNew: error', e?.message)
       setError(e.message ?? 'Erreur')
     } finally {
       setSaving(false)
