@@ -422,7 +422,6 @@ const styles = StyleSheet.create({
   filtersWrapper: {
     paddingHorizontal: 16,
     paddingTop: 4,
-    marginBottom: 16,
   },
   pillsRow: {
     flexDirection: 'row',
@@ -486,8 +485,8 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
-  listContentEmpty: { flex: 1 },
+  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, flexGrow: 1 },
+  listContentEmpty: {},
   row: { gap: 8, marginBottom: 8 },
   card: {
     flex: 1,
@@ -519,10 +518,8 @@ const styles = StyleSheet.create({
   cardPrice: { fontFamily: fontFamily.bold, fontSize: 14, color: colors.primary, marginTop: 2 },
   cardSeller: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: spacing.xl,
     gap: spacing.sm,
   },
   emptyTitle: { fontFamily: fontFamily.semiBold, fontSize: 17, color: colors.text },
