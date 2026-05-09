@@ -45,7 +45,16 @@ export default function LoginScreen() {
     setLoading(true)
     const { error } = await signIn(email.trim(), password)
     setLoading(false)
-    if (error) setPasswordError(error)
+    if (error) {
+      setPasswordError(error)
+      return
+    }
+    try {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      router.replace('/(tabs)')
+    } catch (navErr: any) {
+      console.error('[login] navigation error', navErr?.message)
+    }
   }
 
   const handleAppleSignIn = async () => {
