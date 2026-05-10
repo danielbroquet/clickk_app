@@ -683,6 +683,18 @@ export default function InboxScreen() {
   const { session } = useAuth()
   const userId = session?.user?.id ?? ''
   const [activeTab, setActiveTab] = useState<'messages' | 'notifications'>('messages')
+  const unreadNotifCount = useUnreadNotifCount(userId)
+
+  const handleTabNotifications = useCallback(async () => {
+    setActiveTab('notifications')
+    if (unreadNotifCount > 0) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+    }
+  }, [userId, unreadNotifCount])
 
   return (
     <SafeAreaView style={inboxStyles.safe} edges={['top']}>
@@ -704,12 +716,17 @@ export default function InboxScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[inboxStyles.pill, activeTab === 'notifications' && inboxStyles.pillActive]}
-          onPress={() => setActiveTab('notifications')}
+          onPress={handleTabNotifications}
           activeOpacity={0.8}
         >
-          <Text style={[inboxStyles.pillText, activeTab === 'notifications' && inboxStyles.pillTextActive]}>
-            {t('inbox.tab_notifications')}
-          </Text>
+          <View style={inboxStyles.pillLabelRow}>
+            <Text style={[inboxStyles.pillText, activeTab === 'notifications' && inboxStyles.pillTextActive]}>
+              {t('inbox.tab_notifications')}
+            </Text>
+            {unreadNotifCount > 0 && activeTab !== 'notifications' && (
+              <View style={inboxStyles.pillDot} />
+            )}
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -762,6 +779,17 @@ const inboxStyles = StyleSheet.create({
   },
   pillTextActive: {
     color: colors.primary,
+  },
+  pillLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pillDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
   },
   content: { flex: 1 },
 })
