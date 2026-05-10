@@ -76,6 +76,13 @@ export default function LoginScreen() {
       })
       if (error) {
         Alert.alert('Error', error.message)
+        return
+      }
+      try {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        router.replace('/(tabs)')
+      } catch (navErr: any) {
+        console.error('[login] apple navigation error', navErr?.message)
       }
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
@@ -101,6 +108,13 @@ export default function LoginScreen() {
       })
       if (error) {
         Alert.alert('Error', error.message)
+        return
+      }
+      try {
+        await new Promise(resolve => setTimeout(resolve, 300))
+        router.replace('/(tabs)')
+      } catch (navErr: any) {
+        console.error('[login] google navigation error', navErr?.message)
       }
     } catch (e: any) {
       if (e.code !== '-5') {
