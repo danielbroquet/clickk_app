@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, flexGrow: 1 },
-  listContentEmpty: {},
+  listContentEmpty: { flexGrow: 1, justifyContent: 'flex-start', paddingTop: 20 },
   row: { gap: 8, marginBottom: 8 },
   card: {
     flex: 1,
@@ -519,7 +519,7 @@ const styles = StyleSheet.create({
   cardSeller: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: spacing.xl,
+    paddingTop: spacing.md,
     gap: spacing.sm,
   },
   emptyTitle: { fontFamily: fontFamily.semiBold, fontSize: 17, color: colors.text },

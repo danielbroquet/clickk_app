@@ -879,6 +879,7 @@ export default function FeedScreen() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [tabFocused, setTabFocused] = useState(true)
   const [toast, setToast] = useState<SaleToastPayload | null>(null)
+  const [atTop, setAtTop] = useState(true)
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 })
   const flatListRef = useRef<FlatList<FeedStory>>(null)
 
@@ -1218,6 +1219,9 @@ export default function FeedScreen() {
         initialNumToRender={1}
         maxToRenderPerBatch={2}
         removeClippedSubviews
+        bounces={atTop}
+        onScroll={(e) => setAtTop(e.nativeEvent.contentOffset.y <= 0)}
+        scrollEventThrottle={16}
         onEndReached={() => {
           if (activeTab === 'foryou') {
             fetchForYou('more')
@@ -1237,6 +1241,7 @@ export default function FeedScreen() {
           <RefreshControl
             refreshing={activeTab === 'foryou' ? forYouRefreshing : followingRefreshing}
             onRefresh={() => {
+              if (!atTop) return
               if (activeTab === 'foryou') {
                 setForYouCursor(null)
                 setForYouHasMore(true)

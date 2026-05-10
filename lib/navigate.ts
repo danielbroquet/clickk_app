@@ -9,6 +9,6 @@ export async function safeNavigate(path: string, options?: { replace?: boolean }
       router.push(path as any)
     }
   } catch (e) {
-    console.error('Navigation error:', e)
+    console.error('Nav error:', e)
   }
 }

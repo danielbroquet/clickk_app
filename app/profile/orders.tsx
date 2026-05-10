@@ -15,6 +15,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   PanResponder,
+  Alert,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -211,25 +212,29 @@ function OrderCard({
     setAwaitingConfirm(false)
     setConfirming(true)
     try {
+      await supabase.auth.refreshSession()
       const { data, error } = await supabase.functions.invoke('confirm-delivery', {
         body: { story_id: item.story_id },
       })
-
       if (error) {
+        console.error('confirm-delivery error:', error)
+        Alert.alert('Erreur', error.message ?? 'Impossible de confirmer la livraison')
         setConfirming(false)
         return
       }
-
       if (!data?.success && !data?.already_delivered) {
+        console.error('confirm-delivery unexpected response:', data)
+        Alert.alert('Erreur', 'Réponse inattendue du serveur')
         setConfirming(false)
         return
       }
-
       if (Platform.OS !== 'web') {
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
       }
       onDelivered(item.id)
-    } catch {
+    } catch (e: any) {
+      console.error('confirm-delivery exception:', e)
+      Alert.alert('Erreur', e?.message ?? 'Une erreur est survenue')
       setConfirming(false)
     }
   }
