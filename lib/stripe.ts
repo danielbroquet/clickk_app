@@ -3,6 +3,7 @@ import { Alert } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { router } from 'expo-router'
 import { callEdgeFunction } from './edgeFunction'
+import { safeNavigate } from './navigate'
 import { supabase } from './supabase'
 
 type InstantSuccessResponse = { status: 'succeeded'; payment_intent_id: string }
@@ -60,7 +61,7 @@ export const useStoryPurchase = () => {
             if (res.status === 'succeeded') {
               setPurchased(true)
               onSuccess?.()
-              router.push(`/shipping/${storyId}`)
+              await safeNavigate(`/shipping/${storyId}`)
               return
             }
 
@@ -99,7 +100,7 @@ export const useStoryPurchase = () => {
       if (result.type === 'success') {
         setPurchased(true)
         onSuccess?.()
-        router.push(`/shipping/${storyId}`)
+        await safeNavigate(`/shipping/${storyId}`)
       }
     } catch (err: unknown) {
       const rawMessage = err instanceof Error ? err.message : 'Erreur paiement'

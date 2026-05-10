@@ -24,6 +24,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
+import { safeNavigate } from '../../lib/navigate'
 import { useTranslation } from '../../lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -646,7 +647,7 @@ export default function SalesScreen() {
       if (!buyerId || !currentUserId) return
       try {
         const convId = await getOrCreateConversation(supabase, buyerId, currentUserId)
-        router.push(`/conversation/${convId}`)
+        await safeNavigate(`/conversation/${convId}`)
       } catch {
         show("Impossible d'ouvrir la conversation")
       }

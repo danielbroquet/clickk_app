@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
+import { safeNavigate } from '../../lib/navigate'
 import { useTranslation } from '../../lib/i18n'
 
 type Address = {
@@ -107,7 +108,7 @@ export default function ShippingAddressScreen() {
     ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.replace('/(auth)/login')
+        await safeNavigate('/(auth)/login', { replace: true })
         return
       }
 
@@ -152,12 +153,7 @@ export default function ShippingAddressScreen() {
     try {
       await attachToStory(selectedId)
       setSaving(false)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      try {
-        router.replace('/(tabs)')
-      } catch (navErr: any) {
-        console.error('[shipping] handleConfirmPick: navigation error', navErr?.message)
-      }
+      await safeNavigate('/(tabs)', { replace: true })
     } catch (e: any) {
       setError(e.message ?? 'Erreur')
       setSaving(false)
@@ -200,12 +196,7 @@ export default function ShippingAddressScreen() {
 
       await attachToStory(created.id)
       setSaving(false)
-      await new Promise(resolve => setTimeout(resolve, 300))
-      try {
-        router.replace('/(tabs)')
-      } catch (navErr: any) {
-        console.error('[shipping] handleSaveNew: navigation error', navErr?.message)
-      }
+      await safeNavigate('/(tabs)', { replace: true })
     } catch (e: any) {
       setError(e.message ?? 'Erreur')
       setSaving(false)

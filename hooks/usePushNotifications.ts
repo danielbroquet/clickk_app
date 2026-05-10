@@ -84,13 +84,13 @@ export function usePushNotifications(userId: string | null): PushNotificationSta
           await supabase.from('profiles').update({ push_token: token }).eq('id', userId)
         }
 
-        const { router } = await import('expo-router')
+        const { safeNavigate } = await import('../lib/navigate')
 
         const sub = Notifications.addNotificationResponseReceivedListener(response => {
           const data = response.notification.request.content.data as Record<string, unknown>
-          if (data.story_id) router.push(`/story/${data.story_id}`)
-          else if (data.order_id) router.push('/profile/orders')
-          else if (data.conversation_id) router.push(`/conversation/${data.conversation_id}`)
+          if (data.story_id) safeNavigate(`/story/${data.story_id}`)
+          else if (data.order_id) safeNavigate('/profile/orders')
+          else if (data.conversation_id) safeNavigate(`/conversation/${data.conversation_id}`)
         })
 
         cleanupRef.current = () => sub.remove()

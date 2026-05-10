@@ -23,6 +23,7 @@ import { useAuth } from '../../lib/auth'
 import { useFollow } from '../../hooks/useFollow'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
+import { safeNavigate } from '../../lib/navigate'
 import ReportModal from '../../components/ui/ReportModal'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -320,7 +321,7 @@ export default function PublicProfileScreen() {
     setChatLoading(true)
     try {
       const convId = await getOrCreateConversation(supabase, currentUserId, id)
-      router.push(`/conversation/${convId}`)
+      await safeNavigate(`/conversation/${convId}`)
     } catch {
       // silently ignore
     } finally {

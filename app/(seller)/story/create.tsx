@@ -27,6 +27,7 @@ import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-nati
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/auth'
+import { safeNavigate } from '../../../lib/navigate'
 import { useTranslation } from '../../../lib/i18n'
 import { colors, fontFamily, spacing, fontSize } from '../../../lib/theme'
 
@@ -770,7 +771,7 @@ export default function CreateDropScreen() {
       setSuccess(true)
       await new Promise(r => setTimeout(r, 1000))
       try { router.dismissAll() } catch {}
-      try { router.replace('/(tabs)') } catch {}
+      await safeNavigate('/(tabs)', { replace: true })
     } catch (err: unknown) {
       Alert.alert(t('common.error'), err instanceof Error ? err.message : t('common.error'))
       setUploadPercent(0)

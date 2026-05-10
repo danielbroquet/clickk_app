@@ -92,6 +92,7 @@ export default function EditProfileScreen() {
       return
     }
     await refreshProfile()
+    await new Promise(resolve => setTimeout(resolve, 300))
     router.back()
   }
 

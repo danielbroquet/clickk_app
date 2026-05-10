@@ -42,6 +42,7 @@ import { useDropPresence } from '../../hooks/useDropPresence'
 import ReportModal from '../../components/ui/ReportModal'
 import { SaleToast, SaleToastPayload } from '../../components/ui/SaleToast'
 import { getOrCreateConversation } from '../../lib/utils'
+import { safeNavigate } from '../../lib/navigate'
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
 
@@ -213,7 +214,7 @@ export function DropItem({
     try {
       const convId = await getOrCreateConversation(supabase, currentUserId, sellerId)
       setDetailVisible(false)
-      router.push(`/conversation/${convId}`)
+      await safeNavigate(`/conversation/${convId}`)
     } catch {
       // silently ignore
     } finally {

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import Avatar from '../ui/Avatar'
 import { colors, fontFamily } from '../../lib/theme'
+import { safeNavigate } from '../../lib/navigate'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 
@@ -48,7 +49,7 @@ export default function ProductCard({ item, onBuyPress, story }: ProductCardProp
         .select('id')
         .single()
       if (!error && data) {
-        router.push(`/conversation/${data.id}`)
+        await safeNavigate(`/conversation/${data.id}`)
       }
     } finally {
       setChatLoading(false)

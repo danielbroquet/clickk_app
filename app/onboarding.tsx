@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LinearGradient } from 'expo-linear-gradient'
+import { safeNavigate } from '../lib/navigate'
 import { colors, fontFamily, spacing } from '../lib/theme'
 
 const { width } = Dimensions.get('window')
@@ -88,7 +89,7 @@ export default function OnboardingScreen() {
 
   const handleDone = async () => {
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true')
-    router.replace('/(auth)/login')
+    await safeNavigate('/(auth)/login', { replace: true })
   }
 
   const handleScroll = (e: any) => {
