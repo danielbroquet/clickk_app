@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ScrollView,
+  PanResponder,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
@@ -106,7 +107,6 @@ function getDisputeReasons(t: (key: string) => string): { key: string; label: st
     { key: 'not_received',    label: t('orders.dispute_reason_not_received') },
     { key: 'not_as_described', label: t('orders.dispute_reason_wrong_item') },
     { key: 'damaged',         label: t('orders.dispute_reason_damaged') },
-    { key: 'counterfeit',     label: t('orders.dispute_reason_other') },
     { key: 'other',           label: t('orders.dispute_reason_other') },
   ]
 }
@@ -504,6 +504,16 @@ function DisputeModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        gestureState.dy > 10 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 50) onClose()
+      },
+    })
+  ).current
+
   useEffect(() => {
     if (!visible) {
       setReason('')
@@ -553,8 +563,8 @@ function DisputeModal({
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalSheet}
         >
-          <View style={styles.modalHandle} />
-          <View style={styles.modalHeader}>
+          <View style={styles.modalHandle} {...panResponder.panHandlers} />
+          <View style={styles.modalHeader} {...panResponder.panHandlers}>
             <Text style={styles.modalTitle}>{t('orders.dispute_title')}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close" size={22} color={colors.textSecondary} />
