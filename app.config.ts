@@ -10,6 +10,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: "clickk",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+  owner: "danielbroquet",
+  updates: {
+    url: "https://u.expo.dev/c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
+  },
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.clickk.app",
