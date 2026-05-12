@@ -165,7 +165,7 @@ function ShipModal({
         body: { story_id: storyId, tracking_number: tracking.trim() },
       })
       if (error) {
-        Alert.alert('Erreur', 'Impossible de marquer comme expédié')
+        Alert.alert(t('common.error'), t('sales_status.mark_shipped_error'))
         setLoading(false)
         return
       }
@@ -183,10 +183,10 @@ function ShipModal({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={shipStyles.backdrop} onPress={onClose}>
         <Pressable style={shipStyles.sheet} onPress={(e) => e.stopPropagation()}>
-          <Text style={shipStyles.title}>Marquer comme expédié</Text>
+          <Text style={shipStyles.title}>{t('sales_status.mark_shipped_title')}</Text>
           <Text style={shipStyles.subtitle} numberOfLines={1}>{title}</Text>
 
-          <Text style={shipStyles.label}>Numéro de suivi</Text>
+          <Text style={shipStyles.label}>{t('sales_status.tracking_label')}</Text>
           <TextInput
             value={tracking}
             onChangeText={setTracking}
@@ -198,7 +198,7 @@ function ShipModal({
 
           <View style={shipStyles.row}>
             <TouchableOpacity style={shipStyles.cancelBtn} onPress={onClose}>
-              <Text style={shipStyles.cancelText}>Annuler</Text>
+              <Text style={shipStyles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[shipStyles.submitBtn, (!tracking.trim() || loading) && { opacity: 0.6 }]}
@@ -314,12 +314,13 @@ function FlaggedCard({
   drop: FlaggedDrop
   onDelete: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
 
   const confirmDelete = () =>
-    Alert.alert('Supprimer ce drop', 'Cette action est irréversible.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Supprimer', style: 'destructive', onPress: () => onDelete(drop.id) },
+    Alert.alert(t('profile.delete_drop_title'), t('sales_status.delete_irreversible'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.delete_confirm_action'), style: 'destructive', onPress: () => onDelete(drop.id) },
     ])
 
   return (
@@ -339,7 +340,7 @@ function FlaggedCard({
 
       <View style={flaggedStyles.body}>
         <Text style={flaggedStyles.title} numberOfLines={2}>
-          {drop.title || 'Drop sans titre'}
+          {drop.title || t('sales_status.drop_no_title')}
         </Text>
         {drop.moderation_reason ? (
           <Text style={flaggedStyles.reason} numberOfLines={3}>
@@ -461,7 +462,7 @@ function ArchiveCard({
 
       <View style={archiveStyles.body}>
         <Text style={archiveStyles.title} numberOfLines={2}>
-          {drop.title || 'Drop sans titre'}
+          {drop.title || t('sales_status.drop_no_title')}
         </Text>
 
         <View style={archiveStyles.priceRow}>
@@ -471,7 +472,7 @@ function ArchiveCard({
           <View style={archiveStyles.expiryBadge}>
             <Ionicons name="time-outline" size={11} color={colors.warning} />
             <Text style={archiveStyles.expiryText}>
-              {days}j restant{days > 1 ? 's' : ''}
+              {days}{days > 1 ? t('sales_status.days_remaining_other') : t('sales_status.days_remaining_one')}
             </Text>
           </View>
         </View>

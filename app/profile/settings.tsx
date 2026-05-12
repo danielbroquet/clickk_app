@@ -99,13 +99,13 @@ export default function SettingsScreen() {
               )
               const json = await res.json()
               if (!res.ok) {
-                Alert.alert('Erreur', json.error ?? 'Impossible de supprimer le compte.')
+                Alert.alert(t('common.error'), json.error ?? t('settings.delete_error'))
                 return
               }
               await supabase.auth.signOut()
               await safeNavigate('/(auth)/login', { replace: true })
             } catch (err: any) {
-              Alert.alert('Erreur', err.message ?? 'Une erreur est survenue.')
+              Alert.alert(t('common.error'), err.message ?? t('common.error'))
             }
           },
         },
@@ -143,19 +143,19 @@ export default function SettingsScreen() {
           <Divider />
           <SettingsRow
             icon="card-outline"
-            label="Moyens de paiement"
+            label={t('settings.payment_methods')}
             onPress={() => router.push('/profile/payment-methods')}
           />
           <Divider />
           <SettingsRow
             icon="wallet-outline"
-            label="Mon Wallet"
+            label={t('settings.my_wallet')}
             onPress={() => router.push('/wallet')}
           />
         </View>
 
         {/* INFORMATIONS */}
-        <SectionHeader title="INFORMATIONS" />
+        <SectionHeader title={t('settings.information_section')} />
         <View style={styles.section}>
           <SettingsRow
             icon="document-text-outline"

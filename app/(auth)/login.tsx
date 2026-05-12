@@ -17,6 +17,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 GoogleSignin.configure({
   webClientId: '568448664963-98ol47cd34u54vmi299m1pf114t64be2.apps.googleusercontent.com',
@@ -26,6 +27,7 @@ GoogleSignin.configure({
 export default function LoginScreen() {
   const router = useRouter()
   const { signIn } = useAuth()
+  const { t } = useTranslation()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -39,8 +41,8 @@ export default function LoginScreen() {
     setEmailError('')
     setPasswordError('')
     let valid = true
-    if (!email.trim()) { setEmailError('Email requis'); valid = false }
-    if (!password) { setPasswordError('Mot de passe requis'); valid = false }
+    if (!email.trim()) { setEmailError(t('auth.email_required')); valid = false }
+    if (!password) { setPasswordError(t('auth.password_required')); valid = false }
     if (!valid) return
     setLoading(true)
     const { error } = await signIn(email.trim(), password)
@@ -118,12 +120,12 @@ export default function LoginScreen() {
           <Text style={styles.logoBlack}>click</Text>
           <Text style={styles.logoTeal}>«</Text>
         </View>
-        <Text style={styles.slogan}>L'Instagram des bonnes affaires</Text>
+        <Text style={styles.slogan}>{t('auth.slogan')}</Text>
 
         <View style={styles.fieldWrap}>
           <TextInput
             style={[styles.input, focusEmail && styles.inputFocus]}
-            placeholder="Email"
+            placeholder={t('auth.email_placeholder')}
             placeholderTextColor={colors.textSecondary}
             value={email}
             onChangeText={setEmail}
@@ -138,7 +140,7 @@ export default function LoginScreen() {
         <View style={styles.fieldWrap}>
           <TextInput
             style={[styles.input, focusPassword && styles.inputFocus]}
-            placeholder="Mot de passe"
+            placeholder={t('auth.password_placeholder')}
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
@@ -152,7 +154,7 @@ export default function LoginScreen() {
         <TouchableOpacity style={styles.btn} onPress={handleLogin} disabled={loading}>
           {loading
             ? <ActivityIndicator color={colors.bg} />
-            : <Text style={styles.btnText}>Se connecter</Text>}
+            : <Text style={styles.btnText}>{t('auth.login_btn')}</Text>}
         </TouchableOpacity>
 
         {Platform.OS === 'ios' && (
@@ -169,13 +171,13 @@ export default function LoginScreen() {
           <View style={styles.googleLogoWrap}>
             <Text style={styles.googleLogoG}>G</Text>
           </View>
-          <Text style={styles.googleBtnText}>Sign in with Google</Text>
+          <Text style={styles.googleBtnText}>{t('auth.google_btn')}</Text>
         </TouchableOpacity>
 
         <View style={styles.linkRow}>
-          <Text style={styles.linkGray}>Pas encore de compte ? </Text>
+          <Text style={styles.linkGray}>{t('auth.no_account')} </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.linkTeal}>S'inscrire</Text>
+            <Text style={styles.linkTeal}>{t('auth.register_link')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

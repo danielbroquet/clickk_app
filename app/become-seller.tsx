@@ -213,7 +213,7 @@ export default function BecomeSellerScreen() {
         <View style={styles.commissionBadge}>
           <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
           <Text style={styles.commissionText}>
-            clickk prend une commission de 8% sur chaque vente. Tu gardes 92% du prix de vente.
+            {t('become_seller.commission')}
           </Text>
         </View>
 
@@ -225,19 +225,19 @@ export default function BecomeSellerScreen() {
           {status === 'loading' ? (
             <ActivityIndicator color={colors.bg} />
           ) : status === 'redirecting' ? (
-            <Text style={styles.mainBtnText}>Ouverture Stripe...</Text>
+            <Text style={styles.mainBtnText}>{t('become_seller.stripe_opening')}</Text>
           ) : (
             <Text style={styles.mainBtnText}>{t('become_seller.cta')}</Text>
           )}
         </TouchableOpacity>
 
         {status === 'error' && errorMsg && (
-          <Text style={styles.errorText}>Erreur : {errorMsg}</Text>
+          <Text style={styles.errorText}>{`${t('common.error')} : ${errorMsg}`}</Text>
         )}
 
         <View style={styles.secureRow}>
           <Ionicons name="lock-closed" size={14} color="#707070" />
-          <Text style={styles.secureText}>Intégration sécurisée par Stripe · Données chiffrées</Text>
+          <Text style={styles.secureText}>{t('become_seller.stripe_secure')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

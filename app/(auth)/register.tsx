@@ -13,10 +13,12 @@ import {
 import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 export default function RegisterScreen() {
   const router = useRouter()
   const { signUp } = useAuth()
+  const { t } = useTranslation()
 
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -94,7 +96,7 @@ export default function RegisterScreen() {
         <View style={styles.fieldWrap}>
           <TextInput
             style={[styles.input, focus.password && styles.inputFocus]}
-            placeholder="Mot de passe"
+            placeholder={t('auth.password_placeholder')}
             placeholderTextColor={colors.textSecondary}
             value={password}
             onChangeText={setPassword}
@@ -108,7 +110,7 @@ export default function RegisterScreen() {
         <View style={styles.fieldWrap}>
           <TextInput
             style={[styles.input, focus.confirm && styles.inputFocus]}
-            placeholder="Confirmer le mot de passe"
+            placeholder={t('auth.password_confirm_placeholder')}
             placeholderTextColor={colors.textSecondary}
             value={confirm}
             onChangeText={setConfirm}
@@ -124,13 +126,13 @@ export default function RegisterScreen() {
         <TouchableOpacity style={styles.btn} onPress={handleRegister} disabled={loading}>
           {loading
             ? <ActivityIndicator color={colors.bg} />
-            : <Text style={styles.btnText}>Créer mon compte</Text>}
+            : <Text style={styles.btnText}>{t('auth.create_account_btn')}</Text>}
         </TouchableOpacity>
 
         <View style={styles.linkRow}>
-          <Text style={styles.linkGray}>Déjà un compte ? </Text>
+          <Text style={styles.linkGray}>{t('auth.already_account')} </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-            <Text style={styles.linkTeal}>Se connecter</Text>
+            <Text style={styles.linkTeal}>{t('auth.login_link')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -34,6 +34,7 @@ function CardRow({
   onRemove: () => void
   removing: boolean
 }) {
+  const { t } = useTranslation()
   const expStr = `${String(method.expMonth).padStart(2, '0')}/${String(method.expYear).slice(-2)}`
   const brandLabel = method.brand.charAt(0).toUpperCase() + method.brand.slice(1)
 
@@ -44,7 +45,7 @@ function CardRow({
       </View>
       <View style={styles.cardInfo}>
         <Text style={styles.cardBrand}>{brandLabel} •••• {method.last4}</Text>
-        <Text style={styles.cardExpiry}>Expire {expStr}</Text>
+        <Text style={styles.cardExpiry}>{t('payment_methods.expires')} {expStr}</Text>
       </View>
       <TouchableOpacity
         style={styles.removeBtn}
@@ -81,10 +82,7 @@ export default function PaymentMethodsScreen() {
 
   const handleAddMethod = async () => {
     if (Platform.OS === 'web') {
-      Alert.alert(
-        'Disponible avec EAS Build',
-        "L'ajout de carte sera disponible dans la version native de l'application."
-      )
+      Alert.alert(t('payment_methods.eas_build_title'), t('payment_methods.eas_build_message'))
       return
     }
 
@@ -101,7 +99,7 @@ export default function PaymentMethodsScreen() {
       })
 
       if (initError) {
-        Alert.alert('Erreur', initError.message)
+        Alert.alert(t('common.error'), initError.message)
         return
       }
 
@@ -109,15 +107,15 @@ export default function PaymentMethodsScreen() {
 
       if (presentError) {
         if (presentError.code !== 'Canceled') {
-          Alert.alert('Erreur', presentError.message)
+          Alert.alert(t('common.error'), presentError.message)
         }
         return
       }
 
       await refreshMethods()
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Une erreur est survenue'
-      Alert.alert('Erreur', message)
+      const message = err instanceof Error ? err.message : t('common.error')
+      Alert.alert(t('common.error'), message)
     } finally {
       setAdding(false)
     }
@@ -125,12 +123,12 @@ export default function PaymentMethodsScreen() {
 
   const handleRemove = async (methodId: string) => {
     Alert.alert(
-      'Supprimer la carte',
-      'Voulez-vous supprimer ce moyen de paiement ?',
+      t('payment_methods.remove_title'),
+      t('payment_methods.remove_message'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: t('payment_methods.remove_btn'),
           style: 'destructive',
           onPress: async () => {
             setRemovingId(methodId)
@@ -138,8 +136,8 @@ export default function PaymentMethodsScreen() {
               await removeMethod(methodId)
               await refreshMethods()
             } catch (err) {
-              const message = err instanceof Error ? err.message : 'Erreur'
-              Alert.alert('Erreur', message)
+              const message = err instanceof Error ? err.message : t('common.error')
+              Alert.alert(t('common.error'), message)
             } finally {
               setRemovingId(null)
             }
