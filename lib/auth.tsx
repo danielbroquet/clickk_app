@@ -30,25 +30,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       if (data.session?.user) {
-        const p = await fetchProfile(data.session.user.id)
-        setProfile(p)
+        const userId = data.session.user.id
+        fetchProfile(userId)
+          .then(p => setProfile(p))
+          .finally(() => setLoading(false))
+      } else {
+        setLoading(false)
       }
-      setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      (async () => {
-        setSession(newSession)
-        if (newSession?.user) {
-          const p = await fetchProfile(newSession.user.id)
-          setProfile(p)
-        } else {
-          setProfile(null)
-        }
-      })()
+      setSession(newSession)
+
+      if (newSession?.user) {
+        const userId = newSession.user.id
+        setTimeout(() => {
+          fetchProfile(userId).then(p => setProfile(p))
+        }, 0)
+      } else {
+        setProfile(null)
+      }
     })
 
     return () => listener.subscription.unsubscribe()
