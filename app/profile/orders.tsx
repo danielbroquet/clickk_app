@@ -212,19 +212,32 @@ function OrderCard({
     setAwaitingConfirm(false)
     setConfirming(true)
     try {
-      await supabase.auth.refreshSession()
-      const { data, error } = await supabase.functions.invoke('confirm-delivery', {
-        body: { story_id: item.story_id },
-      })
-      if (error) {
-        console.error('confirm-delivery error:', error)
-        Alert.alert('Erreur', error.message ?? 'Impossible de confirmer la livraison')
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !session) {
+        Alert.alert(t('common.error'), 'Session expirée, reconnectez-vous.')
+        setConfirming(false)
+        return
+      }
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/confirm-delivery`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ story_id: item.story_id }),
+        }
+      )
+      const data = await response.json()
+      if (!response.ok) {
+        console.error('confirm-delivery error:', data)
+        Alert.alert(t('common.error'), data.error ?? 'Impossible de confirmer la livraison')
         setConfirming(false)
         return
       }
       if (!data?.success && !data?.already_delivered) {
-        console.error('confirm-delivery unexpected response:', data)
-        Alert.alert('Erreur', 'Réponse inattendue du serveur')
+        Alert.alert(t('common.error'), 'Réponse inattendue du serveur')
         setConfirming(false)
         return
       }
