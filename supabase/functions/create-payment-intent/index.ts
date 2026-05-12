@@ -159,9 +159,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { story_id, amount_chf, mode } = await req.json();
+    const { story_id, mode } = await req.json();
 
-    if (!story_id || !amount_chf || typeof amount_chf !== "number" || amount_chf <= 0) {
+    if (!story_id) {
       return jsonResponse({ error: "invalid_params" }, 400);
     }
 
@@ -198,7 +198,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: story, error: storyErr } = await supabaseAdmin
       .from("stories")
-      .select("id, seller_id")
+      .select("id, seller_id, buyer_id, status, current_price_chf, last_drop_at, price_drop_seconds, floor_price_chf, start_price_chf")
       .eq("id", story_id)
       .maybeSingle();
 
@@ -211,11 +211,31 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "story_not_found" }, 404);
     }
 
+    if (story.status !== "active") {
+      return jsonResponse({ error: "story_not_active" }, 400);
+    }
+
+    if (story.buyer_id != null) {
+      return jsonResponse({ error: "story_already_sold" }, 400);
+    }
+
     if (story.seller_id === buyerId) {
       return jsonResponse({ error: "cannot_buy_own_story" }, 403);
     }
 
-    const amountRappen = Math.round(amount_chf * 100);
+    const now = Date.now();
+    const lastDrop = story.last_drop_at
+      ? new Date(story.last_drop_at).getTime()
+      : now;
+    const intervalMs = (story.price_drop_seconds ?? 3600) * 1000;
+    const dropsSince = Math.floor((now - lastDrop) / intervalMs);
+    const dropped = dropsSince * 1;
+    const serverPrice = Math.max(
+      story.floor_price_chf,
+      story.current_price_chf - dropped,
+    );
+    const amountRappen = Math.round(serverPrice * 100);
+
     const resolvedMode: "instant" | "checkout" = mode === "instant" ? "instant" : "checkout";
 
     if (resolvedMode === "instant") {
@@ -223,7 +243,7 @@ Deno.serve(async (req: Request) => {
         stripeKey,
         buyerId,
         storyId: story_id,
-        amountChf: amount_chf,
+        amountChf: serverPrice,
         amountRappen,
       });
     }
@@ -232,7 +252,7 @@ Deno.serve(async (req: Request) => {
       stripeKey,
       buyerId,
       storyId: story_id,
-      amountChf: amount_chf,
+      amountChf: serverPrice,
       amountRappen,
     });
   } catch (err: unknown) {

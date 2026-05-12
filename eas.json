@@ -42,6 +42,8 @@
       },
       "env": {
         "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ckrttngnwoslypyulwuf.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrcnR0bmdud29zbHlweXVsd3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQxNzcsImV4cCI6MjA5MjYwMDE3N30.jjnmjd5DVx6FiMH7XjchAGZkPrpeUOybKKWHnpOfYiU",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51TPh5NBUcMM1poIlTZH4IgdRXKw6sdtCZ4r6uUVxJaZdn9oqdFXYVXvsubdf8IsLDeooNQ9qRl0BIswGC5hKwqOl00xLiD95EV"
       }
     }
