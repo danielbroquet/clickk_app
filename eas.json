@@ -33,7 +33,6 @@
     "production": {
       "distribution": "store",
       "channel": "production",
-      "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium"
       },
