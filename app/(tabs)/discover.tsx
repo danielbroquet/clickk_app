@@ -241,28 +241,30 @@ export default function DiscoverScreen() {
       </View>
 
       {/* Sort pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.sortRow}
-        style={styles.sortScroll}
-      >
-        {SORT_OPTIONS.map(opt => {
-          const active = sortOption === opt.value
-          return (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.sortPill, active ? styles.sortPillActive : styles.sortPillInactive]}
-              onPress={() => setSortOption(opt.value)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.sortPillText, active ? styles.sortPillTextActive : styles.sortPillTextInactive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
+      <View style={styles.sortScrollWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortRow}
+          style={styles.sortScroll}
+        >
+          {SORT_OPTIONS.map(opt => {
+            const active = sortOption === opt.value
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[styles.sortPill, active ? styles.sortPillActive : styles.sortPillInactive]}
+                onPress={() => setSortOption(opt.value)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.sortPillText, active ? styles.sortPillTextActive : styles.sortPillTextInactive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      </View>
 
       <View style={styles.filtersWrapper}>
         <ScrollView
@@ -325,35 +327,37 @@ export default function DiscoverScreen() {
         )}
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          data={stories}
-          keyExtractor={item => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={[
-            styles.listContent,
-            stories.length === 0 && styles.listContentEmpty,
-          ]}
-          showsVerticalScrollIndicator={false}
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.4}
-          ListEmptyComponent={<EmptyState />}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
-          }
-          ListFooterComponent={loadingMore ? (
-            <View style={styles.footer}>
-              <ActivityIndicator size="small" color={colors.primary} />
-            </View>
-          ) : null}
-          renderItem={({ item }) => <StoryCard item={item} showExpiry={sortOption === 'expiring'} />}
-        />
-      )}
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <FlatList
+            data={stories}
+            keyExtractor={item => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={[
+              styles.listContent,
+              stories.length === 0 && styles.listContentEmpty,
+            ]}
+            showsVerticalScrollIndicator={false}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.4}
+            ListEmptyComponent={<EmptyState />}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />
+            }
+            ListFooterComponent={loadingMore ? (
+              <View style={styles.footer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : null}
+            renderItem={({ item }) => <StoryCard item={item} showExpiry={sortOption === 'expiring'} />}
+          />
+        )}
+      </View>
     </SafeAreaView>
   )
 }
@@ -389,12 +393,15 @@ const styles = StyleSheet.create({
   },
   clearBtn: { paddingHorizontal: 10 },
 
-  sortScroll: { marginTop: 8, marginBottom: 8, flexShrink: 0 },
+  sortScrollWrapper: {
+    height: 48,
+    justifyContent: 'center',
+  },
+  sortScroll: { flexShrink: 0 },
   sortRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 4,
     gap: 8,
   },
   sortPill: {
@@ -485,8 +492,17 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg, flexGrow: 1 },
-  listContentEmpty: { flexGrow: 1, justifyContent: 'flex-start', paddingTop: 20 },
+  listContent: {
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  listContentEmpty: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80,
+  },
   row: { gap: 8, marginBottom: 8 },
   card: {
     flex: 1,
@@ -519,8 +535,8 @@ const styles = StyleSheet.create({
   cardSeller: { fontFamily: fontFamily.regular, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
   emptyContainer: {
     alignItems: 'center',
-    paddingTop: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: 32,
+    gap: 8,
   },
   emptyTitle: { fontFamily: fontFamily.semiBold, fontSize: 17, color: colors.text },
   emptySubtitle: { fontFamily: fontFamily.regular, fontSize: 14, color: colors.textSecondary },
