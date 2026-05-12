@@ -82,6 +82,7 @@ function RootRedirector() {
   const [onboardingChecked, setOnboardingChecked] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(true)
   const redirectedRef = useRef(false)
+  const navigatingRef = useRef(false)
 
   const { expoPushToken, notificationPermission } = usePushNotifications(session?.user?.id ?? null)
 
@@ -94,6 +95,7 @@ function RootRedirector() {
 
   useEffect(() => {
     if (loading || !onboardingChecked) return
+    if (navigatingRef.current) return
 
     const inOnboarding = segments[0] === 'onboarding'
     const inAuthGroup = segments[0] === '(auth)'
@@ -101,16 +103,22 @@ function RootRedirector() {
     // First launch: show onboarding (only redirect once)
     if (!onboardingDone && !inOnboarding && !redirectedRef.current) {
       redirectedRef.current = true
+      navigatingRef.current = true
       router.replace('/onboarding')
+      setTimeout(() => { navigatingRef.current = false }, 400)
       return
     }
 
     const inProtectedRoute = !inAuthGroup && !inOnboarding
 
     if (!session && inProtectedRoute) {
+      navigatingRef.current = true
       router.replace('/(auth)/login')
+      setTimeout(() => { navigatingRef.current = false }, 400)
     } else if (session && (inAuthGroup || inOnboarding)) {
+      navigatingRef.current = true
       router.replace('/(tabs)')
+      setTimeout(() => { navigatingRef.current = false }, 400)
     }
   }, [session, loading, segments, onboardingChecked, onboardingDone])
 
