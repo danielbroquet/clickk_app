@@ -16,7 +16,6 @@ import * as AppleAuthentication from 'expo-apple-authentication'
 import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
-import { safeNavigate } from '../../lib/navigate'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 
 GoogleSignin.configure({
@@ -50,7 +49,6 @@ export default function LoginScreen() {
       setPasswordError(error)
       return
     }
-    await safeNavigate('/(tabs)', { replace: true })
   }
 
   const handleAppleSignIn = async () => {
@@ -74,7 +72,6 @@ export default function LoginScreen() {
         Alert.alert('Error', error.message)
         return
       }
-      await safeNavigate('/(tabs)', { replace: true })
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
         Alert.alert('Error', e.message ?? 'Apple sign in failed.')
@@ -101,7 +98,6 @@ export default function LoginScreen() {
         Alert.alert('Error', error.message)
         return
       }
-      await safeNavigate('/(tabs)', { replace: true })
     } catch (e: any) {
       if (e.code !== '-5') {
         Alert.alert('Error', e.message ?? 'Google sign in failed.')
