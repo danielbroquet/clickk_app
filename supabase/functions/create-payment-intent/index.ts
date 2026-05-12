@@ -76,7 +76,7 @@ async function handleInstant(opts: {
   params.set("confirm", "true");
   params.set("metadata[story_id]", storyId);
   params.set("metadata[buyer_id]", buyerId);
-  params.set("metadata[amount_chf]", String(amountChf));
+  params.set("metadata[server_price_chf]", String(amountChf));
 
   const intentRes = await fetch("https://api.stripe.com/v1/payment_intents", {
     method: "POST",
@@ -130,7 +130,7 @@ async function handleCheckout(opts: {
     "cancel_url": `clickk://payment-cancel`,
     "metadata[story_id]": storyId,
     "metadata[buyer_id]": buyerId,
-    "metadata[amount_chf]": String(amountChf),
+    "metadata[server_price_chf]": String(amountChf),
   });
 
   const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
@@ -194,7 +194,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: story, error: storyErr } = await supabaseAdmin
       .from("stories")
-      .select("id, seller_id, buyer_id, status, current_price_chf, last_drop_at, price_drop_seconds, floor_price_chf, start_price_chf")
+      .select("id, seller_id, buyer_id, status, current_price_chf, floor_price_chf")
       .eq("id", story_id)
       .maybeSingle();
 
@@ -219,17 +219,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "cannot_buy_own_story" }, 403);
     }
 
-    const now = Date.now();
-    const lastDrop = story.last_drop_at
-      ? new Date(story.last_drop_at).getTime()
-      : now;
-    const intervalMs = (story.price_drop_seconds ?? 3600) * 1000;
-    const dropsSince = Math.floor((now - lastDrop) / intervalMs);
-    const dropped = dropsSince * 1;
-    const serverPrice = Math.max(
-      story.floor_price_chf,
-      story.current_price_chf - dropped,
-    );
+    const serverPrice = Math.max(story.floor_price_chf ?? 0, story.current_price_chf);
     const amountRappen = Math.round(serverPrice * 100);
 
     const resolvedMode: "instant" | "checkout" = mode === "instant" ? "instant" : "checkout";

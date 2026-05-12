@@ -38,7 +38,7 @@ async function verifyStripeSignature(
 interface StripeEventMetadata {
   story_id?: string;
   buyer_id?: string;
-  amount_chf?: string;
+  server_price_chf?: string;
   seller_id?: string;
   type?: string;
 }
@@ -47,6 +47,9 @@ interface StripeObject {
   id?: string;
   metadata?: StripeEventMetadata;
   details_submitted?: boolean;
+  amount_received?: number;
+  amount?: number;
+  amount_total?: number;
 }
 
 const PI_LOG = "[stripe-webhook payment_intent.succeeded]";
@@ -243,15 +246,16 @@ Deno.serve(async (req: Request) => {
     console.log(`[WEBHOOK] verified event ${event.type} id=${event.id}`);
 
     if (event.type === "checkout.session.completed") {
-      const metadata = event.data.object.metadata ?? {};
+      const sessionObj = event.data.object;
+      const metadata = sessionObj.metadata ?? {};
       console.log("[WEBHOOK] checkout.session.completed received", {
-        session_id: event.data.object.id,
+        session_id: sessionObj.id,
         type: metadata.type,
       });
 
-      const { story_id, buyer_id, amount_chf } = metadata;
+      const { story_id, buyer_id } = metadata;
 
-      if (!story_id || !buyer_id || !amount_chf) {
+      if (!story_id || !buyer_id) {
         console.error("[stripe-webhook] Missing metadata fields:", metadata);
         return new Response(JSON.stringify({ received: true, warning: "missing_metadata" }), {
           status: 200,
@@ -259,8 +263,11 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const sessionPI = (event.data.object as { payment_intent?: string }).payment_intent;
-      await processPurchase(supabase, story_id.trim(), buyer_id.trim(), parseFloat(amount_chf), sessionPI);
+      const amountCents = sessionObj.amount_total ?? sessionObj.amount ?? 0;
+      const amountChf = amountCents / 100;
+
+      const sessionPI = (sessionObj as { payment_intent?: string }).payment_intent;
+      await processPurchase(supabase, story_id.trim(), buyer_id.trim(), amountChf, sessionPI);
     } else if (event.type === "payment_intent.succeeded") {
       const pi = event.data.object;
       const paymentIntentId = pi.id ?? "";
@@ -269,7 +276,7 @@ Deno.serve(async (req: Request) => {
         intent_id: paymentIntentId,
         story_id: metadata.story_id,
       });
-      const { story_id, buyer_id, amount_chf } = metadata;
+      const { story_id, buyer_id } = metadata;
 
       const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
       if (!stripeKey) {
@@ -284,15 +291,16 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      if (!amount_chf) {
-        console.warn(`${PI_LOG} missing amount_chf`);
-        return new Response(JSON.stringify({ received: true, warning: "missing_amount" }), {
+      const amountCents = pi.amount_received ?? pi.amount ?? 0;
+      if (amountCents === 0) {
+        console.warn(`${PI_LOG} zero amount on payment intent`);
+        return new Response(JSON.stringify({ received: true, warning: "zero_amount" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
 
-      const amountChf = parseFloat(amount_chf);
+      const amountChf = amountCents / 100;
 
       if (!story_id) {
         console.warn(`${PI_LOG} no story_id in metadata`);
