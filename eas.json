@@ -34,7 +34,8 @@
       "distribution": "store",
       "channel": "production",
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "m-medium",
+        "image": "macos-sequoia-15.4-xcode-16.3"
       },
       "android": {
         "buildType": "app-bundle"

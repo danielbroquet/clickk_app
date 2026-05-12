@@ -1,0 +1,61 @@
+name: 🍎 Build iOS Production
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: 'Submit to App Store after build?'
+        type: boolean
+        default: false
+
+jobs:
+  build-ios:
+    name: Build iOS (local, no EAS credits)
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: 📦 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📥 Install dependencies
+        run: npm ci
+
+      - name: 🎯 Setup Expo & EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🔍 Xcode version
+        run: xcodebuild -version
+
+      - name: 🏗️ Build iOS
+        run: eas build --platform ios --profile production --local --non-interactive
+        env:
+          EXPO_PUBLIC_ENV: production
+          EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_LIVE_KEY }}
+
+      - name: 📤 Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickk-ios-${{ github.run_number }}
+          path: '*.ipa'
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: 🚀 Submit to App Store
+        if: ${{ inputs.submit == 'true' }}
+        run: |
+          echo "${{ secrets.ASC_API_KEY_BASE64 }}" | base64 --decode > AuthKey_27J887578G.p8
+          IPA=$(find . -name "*.ipa" -maxdepth 2 | head -1)
+          echo "Submitting $IPA"
+          eas submit --platform ios --profile production --non-interactive --path "$IPA"
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: rm -f AuthKey_27J887578G.p8
