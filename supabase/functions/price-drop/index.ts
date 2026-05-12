@@ -18,9 +18,9 @@ interface StoryRow {
 
 function computeDropAmount(startPrice: number, speedPreset: string): number {
   const rates: Record<string, number> = {
-    SLOW: 0.05,
+    FLASH: 0.20,
     STANDARD: 0.10,
-    FAST: 0.20,
+    RELAX: 0.05,
   }
   const rate = rates[speedPreset] ?? 0.10
   const drop = Math.round(startPrice * rate * 100) / 100
