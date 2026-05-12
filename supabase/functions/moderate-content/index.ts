@@ -21,8 +21,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return jsonResponse({ error: "unauthorized" }, 401);
+    }
+    const token = authHeader.replace("Bearer ", "").trim();
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const cronSecret = Deno.env.get("CRON_SECRET");
+
+    const isServiceRole = serviceRoleKey && token === serviceRoleKey;
+    const isCronSecret = cronSecret && token === cronSecret;
+
+    if (!isServiceRole && !isCronSecret) {
+      return jsonResponse({ error: "forbidden" }, 403);
+    }
+
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
 
     if (!supabaseUrl || !serviceRoleKey) {
