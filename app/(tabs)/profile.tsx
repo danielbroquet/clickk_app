@@ -822,29 +822,29 @@ export default function ProfileScreen() {
     if (!currentUserId) return
 
     await Promise.all([
-      supabase
+      Promise.resolve(supabase
         .from('stories')
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', currentUserId)
-        .then(({ count }) => setDropsCount(count ?? 0))
+        .then(({ count }) => setDropsCount(count ?? 0)))
         .catch(() => {}),
 
-      supabase
+      Promise.resolve(supabase
         .from('stories')
         .select('id', { count: 'exact', head: true })
         .eq('seller_id', currentUserId)
         .eq('status', 'sold')
-        .then(({ count }) => setVentesCount(count ?? 0))
+        .then(({ count }) => setVentesCount(count ?? 0)))
         .catch(() => {}),
 
-      supabase
+      Promise.resolve(supabase
         .from('stories')
         .select('id, thumbnail_url, video_url, current_price_chf, status')
         .eq('seller_id', currentUserId)
         .neq('status', 'expired')
         .order('created_at', { ascending: false })
         .limit(60)
-        .then(({ data }) => setOwnDrops((data ?? []) as DropCell[]))
+        .then(({ data }) => setOwnDrops((data ?? []) as DropCell[])))
         .catch(() => {}),
 
       fetchWatchlist().catch(() => {}),

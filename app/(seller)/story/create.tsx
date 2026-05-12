@@ -468,7 +468,7 @@ export default function CreateDropScreen() {
 
   const getFileSizeMB = async (uri: string): Promise<number> => {
     try {
-      const info = await FileSystem.getInfoAsync(uri, { size: true }) as FileSystem.FileInfo & { size?: number }
+      const info = await FileSystem.getInfoAsync(uri, { size: true } as any) as FileSystem.FileInfo & { size?: number }
       if (!info.exists || typeof info.size !== 'number') return 0
       return info.size / (1024 * 1024)
     } catch {
@@ -519,7 +519,7 @@ export default function CreateDropScreen() {
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.HighQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.HighestQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -531,7 +531,7 @@ export default function CreateDropScreen() {
       videoMaxDuration: 30,
       videoQuality: ImagePicker.UIImagePickerControllerQualityType.IFrame1280x720,
       allowsEditing: true,
-      videoExportPreset: ImagePicker.VideoExportPreset.HighQuality,
+      videoExportPreset: ImagePicker.VideoExportPreset.HighestQuality,
     })
     if (!result.canceled && result.assets[0]) await handleVideoSelected(result.assets[0])
   }
@@ -681,7 +681,7 @@ export default function CreateDropScreen() {
         // Step 2 — read video (15%)
         setUploadPhase(phases.reading)
         setUploadPercent(15)
-        const preflight = await FileSystem.getInfoAsync(localUri, { size: true }) as FileSystem.FileInfo & { size?: number }
+        const preflight = await FileSystem.getInfoAsync(localUri, { size: true } as any) as FileSystem.FileInfo & { size?: number }
         if (preflight.exists && typeof preflight.size === 'number' && preflight.size / (1024 * 1024) > 100) {
           throw new Error(t('story.create.upload_too_large'))
         }
