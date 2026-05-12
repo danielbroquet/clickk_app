@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Linking from 'expo-linking'
 import Constants from 'expo-constants'
 import { supabase } from '../../lib/supabase'
-import { safeNavigate } from '../../lib/navigate'
 import { colors, fontFamily } from '../../lib/theme'
 import { useLocale } from '../../lib/LocaleContext'
 import { LOCALE_LABELS, LOCALE_FLAGS, SUPPORTED_LOCALES, Locale } from '../../lib/i18n'
@@ -67,7 +66,6 @@ export default function SettingsScreen() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    await safeNavigate('/(auth)/login', { replace: true })
   }
 
   const handleDeleteAccount = () => {
@@ -84,7 +82,6 @@ export default function SettingsScreen() {
               const { data: { session } } = await supabase.auth.getSession()
               if (!session) {
                 await supabase.auth.signOut()
-                await safeNavigate('/(auth)/login', { replace: true })
                 return
               }
               const res = await fetch(
@@ -103,7 +100,6 @@ export default function SettingsScreen() {
                 return
               }
               await supabase.auth.signOut()
-              await safeNavigate('/(auth)/login', { replace: true })
             } catch (err: any) {
               Alert.alert(t('common.error'), err.message ?? t('common.error'))
             }
