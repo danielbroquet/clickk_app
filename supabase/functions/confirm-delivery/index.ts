@@ -78,7 +78,9 @@ Deno.serve(async (req: Request) => {
     if (story.status === "delivered") {
       return jsonResponse({ success: true, already_delivered: true }, 200);
     }
-    if (!systemMode && story.status !== "sold") {
+    // Buyer can confirm delivery when status is 'sold' (seller hasn't marked shipped yet)
+    // OR 'shipped' (seller already marked shipped). Both are valid pre-delivery states.
+    if (!systemMode && story.status !== "sold" && story.status !== "shipped") {
       return jsonResponse({ error: "invalid_status" }, 400);
     }
     if (systemMode && story.status !== "sold" && story.status !== "shipped") {
@@ -139,7 +141,7 @@ Deno.serve(async (req: Request) => {
       updatePayload.release_reason = "auto_released";
     }
 
-    const allowedStatuses = systemMode ? ["sold", "shipped"] : ["sold"];
+    const allowedStatuses = ["sold", "shipped"];
     const { error: updateErr } = await admin
       .from("stories")
       .update(updatePayload)
