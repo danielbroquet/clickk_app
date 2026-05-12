@@ -39,29 +39,25 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    let userId: string | undefined;
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1])) as { sub?: string };
-      userId = payload.sub;
-    } catch (err) {
-      console.error(`${LOG} failed to parse jwt`, err);
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
 
-    if (!userId) {
-      console.error(`${LOG} jwt missing sub`);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      console.error(`${LOG} auth.getUser failed`, userErr?.message);
       return jsonResponse({ error: "unauthorized" }, 401);
     }
+    const userId = userData.user.id;
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
       console.error(`${LOG} STRIPE_SECRET_KEY not configured`);
       return jsonResponse({ error: "stripe_not_configured" }, 500);
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: profile, error: selectErr } = await supabase
       .from("profiles")

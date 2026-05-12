@@ -49,15 +49,22 @@ Deno.serve(async (req: Request) => {
       );
     }
     const token = authHeader.replace("Bearer ", "");
-    const payload = JSON.parse(atob(token.split(".")[1])) as { sub?: string; email?: string };
-    const userId = payload.sub;
-    const userEmail = payload.email;
-    if (!userId) {
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user) {
       return new Response(
         JSON.stringify({ error: "unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    const userId = userData.user.id;
+    const userEmail = userData.user.email;
 
     // Read optional redirect URLs from request body
     let returnUrl = DEFAULT_RETURN_URL;
@@ -70,10 +77,6 @@ Deno.serve(async (req: Request) => {
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) throw new Error("stripe_not_configured");
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: existing, error: selectErr } = await supabase
       .from("seller_onboarding")
