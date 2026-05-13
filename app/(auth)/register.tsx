@@ -21,6 +21,7 @@ export default function RegisterScreen() {
   const { t } = useTranslation()
 
   const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -30,16 +31,17 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     const errs: Record<string, string> = {}
-    if (!email.trim()) errs.email = 'Email requis'
+    if (!email.trim()) errs.email = t('auth.email_required')
+    if (fullName.trim().length < 2) errs.fullName = t('auth.full_name_required')
     if (!/^[a-z0-9_]{3,}$/.test(username))
-      errs.username = 'Username invalide (min 3 cars, minuscules)'
-    if (password.length < 8) errs.password = 'Mot de passe trop court'
-    if (confirm !== password) errs.confirm = 'Les mots de passe ne correspondent pas'
+      errs.username = t('auth.username_invalid')
+    if (password.length < 8) errs.password = t('auth.password_too_short')
+    if (confirm !== password) errs.confirm = t('auth.password_mismatch')
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
 
     setLoading(true)
-    const { error } = await signUp(email.trim(), password, username)
+    const { error } = await signUp(email.trim(), password, username, fullName.trim())
     setLoading(false)
     if (error) setErrors({ submit: error })
   }
@@ -74,6 +76,20 @@ export default function RegisterScreen() {
             autoCapitalize="none"
           />
           {!!errors.email && <Text style={styles.err}>{errors.email}</Text>}
+        </View>
+
+        <View style={styles.fieldWrap}>
+          <TextInput
+            style={[styles.input, focus.fullName && styles.inputFocus]}
+            placeholder={t('auth.full_name_placeholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={fullName}
+            onChangeText={setFullName}
+            onFocus={() => setF('fullName', true)}
+            onBlur={() => setF('fullName', false)}
+            autoCapitalize="words"
+          />
+          {!!errors.fullName && <Text style={styles.err}>{errors.fullName}</Text>}
         </View>
 
         <View style={styles.fieldWrap}>
