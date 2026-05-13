@@ -20,7 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: false,
     bundleIdentifier: "com.clickk.app",
-    buildNumber: "2",
+    buildNumber: "3",
     associatedDomains: ["applinks:clickk.app"],
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
