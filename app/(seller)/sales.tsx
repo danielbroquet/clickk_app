@@ -334,7 +334,7 @@ function FlaggedCard({
           </View>
         )}
         <View style={flaggedStyles.refusedBadge}>
-          <Text style={flaggedStyles.refusedBadgeText}>Refusé</Text>
+          <Text style={flaggedStyles.refusedBadgeText}>{t('sales.refused')}</Text>
         </View>
       </View>
 
@@ -353,7 +353,7 @@ function FlaggedCard({
           activeOpacity={0.8}
         >
           <Ionicons name="trash-outline" size={14} color="#fff" />
-          <Text style={flaggedStyles.deleteBtnText}>Supprimer</Text>
+          <Text style={flaggedStyles.deleteBtnText}>{t('sales.delete_btn')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -761,7 +761,7 @@ export default function SalesScreen() {
               <View style={salesStyles.emptyState}>
                 <Ionicons name="bag-outline" size={52} color={colors.textSecondary} />
                 <Text style={salesStyles.emptyText}>{t('sales.no_sales')}</Text>
-                <Text style={salesStyles.emptySubtext}>Vos drops vendus apparaîtront ici.</Text>
+                <Text style={salesStyles.emptySubtext}>{t('sales.sales_hint')}</Text>
               </View>
             )
           }

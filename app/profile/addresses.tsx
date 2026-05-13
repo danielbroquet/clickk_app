@@ -366,7 +366,7 @@ function AddressForm({
             onChangeText={setFullName}
             autoCapitalize="words"
             placeholderTextColor={C.muted}
-            placeholder="Marc Dupont"
+            placeholder={t('addresses.field_name')}
           />
 
           <Text style={styles.fieldLabel}>{t('addresses.field_address')}</Text>
@@ -387,7 +387,7 @@ function AddressForm({
                 }, 500)
               }}
               placeholderTextColor={C.muted}
-              placeholder="Rue du Lac 12"
+              placeholder={t('addresses.field_address')}
             />
             {searchingAddress && (
               <ActivityIndicator
@@ -404,7 +404,7 @@ function AddressForm({
             value={line2}
             onChangeText={setLine2}
             placeholderTextColor={C.muted}
-            placeholder="Appartement, étage"
+            placeholder={t('addresses.field_complement')}
           />
 
           <View style={styles.row}>
@@ -416,7 +416,7 @@ function AddressForm({
                 onChangeText={setPostalCode}
                 keyboardType="number-pad"
                 placeholderTextColor={C.muted}
-                placeholder="1003"
+                placeholder={t('addresses.field_postal')}
               />
             </View>
             <View style={{ flex: 2, marginLeft: 10 }}>
@@ -426,7 +426,7 @@ function AddressForm({
                 value={city}
                 onChangeText={setCity}
                 placeholderTextColor={C.muted}
-                placeholder="Lausanne"
+                placeholder={t('addresses.field_city')}
               />
             </View>
           </View>
@@ -438,7 +438,7 @@ function AddressForm({
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholderTextColor={C.muted}
-            placeholder="+41 79 000 00 00"
+            placeholder={t('addresses.field_phone')}
           />
 
           <Text style={styles.fieldLabel}>{t('addresses.field_country')}</Text>

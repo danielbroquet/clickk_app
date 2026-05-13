@@ -453,7 +453,7 @@ export default function ConversationScreen() {
     setSendingMedia(true)
     const mediaUrl = await uploadMedia(mediaUri, type)
     if (!mediaUrl) {
-      Alert.alert('Erreur', t('conversation.media_error'))
+      Alert.alert(t('common.error'), t('conversation.media_error'))
       setSendingMedia(false)
       return
     }
@@ -553,7 +553,7 @@ export default function ConversationScreen() {
   const handlePickImage = useCallback(async () => {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!granted) {
-      Alert.alert('Permission refusée', t('conversation.gallery_permission'))
+      Alert.alert(t('errors.permission_denied'), t('conversation.gallery_permission'))
       return
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -569,7 +569,7 @@ export default function ConversationScreen() {
   const handleTakePhoto = useCallback(async () => {
     const { granted } = await ImagePicker.requestCameraPermissionsAsync()
     if (!granted) {
-      Alert.alert('Permission refusée', t('conversation.camera_permission'))
+      Alert.alert(t('errors.permission_denied'), t('conversation.camera_permission'))
       return
     }
     const result = await ImagePicker.launchCameraAsync({

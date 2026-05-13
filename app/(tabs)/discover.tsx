@@ -22,21 +22,23 @@ import { useTranslation } from '../../lib/i18n'
 
 const PAGE_SIZE = 12
 
-const CATEGORIES = [
-  { value: 'sneakers',    label: '👟 Sneakers' },
-  { value: 'vetements',   label: '👕 Vêtements' },
-  { value: 'accessoires', label: '👜 Accessoires' },
-  { value: 'montres',     label: '⌚ Montres' },
-  { value: 'tech',        label: '📱 Tech' },
-  { value: 'gaming',      label: '🎮 Gaming' },
-  { value: 'maison',      label: '🏠 Maison & Déco' },
-  { value: 'livres',      label: '📚 Livres & Culture' },
-  { value: 'sport',       label: '⚽ Sport & Outdoor' },
-  { value: 'art',         label: '🎨 Art & Collection' },
-  { value: 'beaute',      label: '🧴 Beauté' },
-  { value: 'auto',        label: '🚗 Auto & Moto' },
-  { value: 'autre',       label: '🎁 Autre' },
-]
+const CATEGORY_EMOJIS: Record<string, string> = {
+  sneakers:    '👟',
+  vetements:   '👕',
+  accessoires: '👜',
+  montres:     '⌚',
+  tech:        '📱',
+  gaming:      '🎮',
+  maison:      '🏠',
+  livres:      '📚',
+  sport:       '⚽',
+  art:         '🎨',
+  beaute:      '🧴',
+  auto:        '🚗',
+  autre:       '🎁',
+}
+
+const CATEGORY_VALUES = Object.keys(CATEGORY_EMOJIS)
 
 type SortOption = 'recent' | 'expiring' | 'deal' | 'price_asc'
 
@@ -216,7 +218,7 @@ export default function DiscoverScreen() {
     setLoadingMore(false)
   }, [loadingMore, hasMore, loading, fetchStories, selectedCategory, maxPrice, sortOption])
 
-  const pricePillLabel = maxPrice ? `≤ CHF ${maxPrice}` : 'Prix max'
+  const pricePillLabel = maxPrice ? `≤ CHF ${maxPrice}` : t('discover.max_price')
   const priceActive = maxPrice.length > 0
 
   return (
@@ -273,17 +275,17 @@ export default function DiscoverScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.pillsRow}
         >
-          {CATEGORIES.map(cat => {
-            const active = selectedCategory === cat.value
+          {CATEGORY_VALUES.map(value => {
+            const active = selectedCategory === value
             return (
               <TouchableOpacity
-                key={cat.value}
+                key={value}
                 style={[styles.pill, active ? styles.pillActive : styles.pillInactive]}
-                onPress={() => setSelectedCategory(active ? null : cat.value)}
+                onPress={() => setSelectedCategory(active ? null : value)}
                 activeOpacity={0.75}
               >
                 <Text style={[styles.pillText, active ? styles.pillTextActive : styles.pillTextInactive]}>
-                  {cat.label}
+                  {CATEGORY_EMOJIS[value]} {t(`categories.${value}` as any)}
                 </Text>
               </TouchableOpacity>
             )
@@ -312,7 +314,7 @@ export default function DiscoverScreen() {
           <View style={styles.priceInputRow}>
             <TextInput
               style={styles.priceInput}
-              placeholder="Prix max CHF"
+              placeholder={`${t('discover.max_price')} CHF`}
               placeholderTextColor={colors.textSecondary}
               keyboardType="numeric"
               value={maxPrice}

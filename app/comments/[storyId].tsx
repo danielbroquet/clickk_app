@@ -385,7 +385,7 @@ export default function CommentsScreen() {
             </Text>
             <TouchableOpacity onPress={onReply}>
               <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600' }}>
-                Répondre
+                {t('comments.reply')}
               </Text>
             </TouchableOpacity>
             {comment.user_id === currentUserId && (
@@ -512,7 +512,7 @@ export default function CommentsScreen() {
         {replyTo && (
           <View style={styles.replyBanner}>
             <Text style={{ color: '#A0A0A0', fontSize: 12 }}>
-              Réponse à <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>@{replyTo.username}</Text>
+              {t('comments.replying_to')} <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>@{replyTo.username}</Text>
             </Text>
             <TouchableOpacity onPress={() => setReplyTo(null)}>
               <Ionicons name="close" size={16} color="#A0A0A0" />

@@ -256,7 +256,7 @@ export default function ShippingAddressScreen() {
                         {a.postal_code} {a.city}, {a.country}
                       </Text>
                       {a.is_default && (
-                        <Text style={styles.addressDefault}>Par défaut</Text>
+                        <Text style={styles.addressDefault}>{t('shipping_screen.default_tag')}</Text>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -269,7 +269,7 @@ export default function ShippingAddressScreen() {
                 activeOpacity={0.75}
               >
                 <Ionicons name="add" size={18} color={C.primary} />
-                <Text style={styles.newBtnText}>Ajouter une nouvelle adresse</Text>
+                <Text style={styles.newBtnText}>{t('shipping_screen.add_address')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -282,16 +282,16 @@ export default function ShippingAddressScreen() {
                   onPress={() => setMode('pick')}
                 >
                   <Ionicons name="chevron-back" size={16} color={C.muted} />
-                  <Text style={styles.backToPickText}>Choisir une adresse existante</Text>
+                  <Text style={styles.backToPickText}>{t('shipping_screen.pick_existing')}</Text>
                 </TouchableOpacity>
               )}
 
-              <Text style={styles.sectionLabel}>Nouvelle adresse</Text>
+              <Text style={styles.sectionLabel}>{t('shipping_screen.new_section')}</Text>
 
               <Text style={styles.fieldLabel}>{t('shipping.full_name')}</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Marc Dupont"
+                placeholder={t('shipping.full_name')}
                 placeholderTextColor={C.muted}
                 value={fullName}
                 onChangeText={setFullName}

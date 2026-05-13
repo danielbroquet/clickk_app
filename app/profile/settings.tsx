@@ -155,13 +155,13 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SettingsRow
             icon="document-text-outline"
-            label="Conditions d'utilisation"
+            label={t('settings.terms_link')}
             onPress={() => Linking.openURL('https://clickk.app/cgu')}
           />
           <Divider />
           <SettingsRow
             icon="shield-checkmark-outline"
-            label="Politique de confidentialité"
+            label={t('settings.privacy_link')}
             onPress={() => Linking.openURL('https://clickk.app/privacy')}
           />
           <Divider />
@@ -175,7 +175,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* DANGER ZONE */}
-        <SectionHeader title="DANGER ZONE" />
+        <SectionHeader title={t('settings.danger_zone')} />
         <View style={styles.section}>
           <SettingsRow
             icon="log-out-outline"

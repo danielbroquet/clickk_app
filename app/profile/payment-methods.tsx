@@ -182,12 +182,12 @@ export default function PaymentMethodsScreen() {
             </View>
             <Text style={styles.emptyTitle}>{t('payment_methods.no_method')}</Text>
             <Text style={styles.emptySubtitle}>
-              Ajoutez une carte pour payer en un clic lors de vos prochains achats.
+              {t('payment_methods.add_card_hint')}
             </Text>
           </View>
         ) : (
           <View style={styles.cardList}>
-            <Text style={styles.sectionLabel}>Cartes enregistrées</Text>
+            <Text style={styles.sectionLabel}>{t('payment_methods.saved_cards')}</Text>
             {paymentMethods.map((method: PaymentMethod) => (
               <CardRow
                 key={method.id}

@@ -435,7 +435,7 @@ export default function PublicProfileScreen() {
             {blockLoading ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : (
-              <Text style={styles.unblockLinkText}>Débloquer</Text>
+              <Text style={styles.unblockLinkText}>{t('profile.unblock')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -578,11 +578,11 @@ export default function PublicProfileScreen() {
                 toggleBlock()
               } else {
                 Alert.alert(
-                  'Bloquer cet utilisateur ?',
-                  'Il ne pourra plus voir votre profil ni vous envoyer de messages. Vous ne verrez plus son contenu dans le feed.',
+                  t('profile.block_confirm_title'),
+                  t('profile.block_confirm_message'),
                   [
-                    { text: 'Annuler', style: 'cancel' },
-                    { text: 'Bloquer', style: 'destructive', onPress: toggleBlock },
+                    { text: t('common.cancel'), style: 'cancel' },
+                    { text: t('profile.block'), style: 'destructive', onPress: toggleBlock },
                   ]
                 )
               }

@@ -853,6 +853,7 @@ type FeedTab = 'foryou' | 'following'
 const keyExtractor = (item: FeedStory) => item.id
 
 export default function FeedScreen() {
+  const { t } = useTranslation()
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
   const insets = useSafeAreaInsets()
@@ -1135,7 +1136,7 @@ export default function FeedScreen() {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabLabel, activeTab !== 'following' && styles.tabLabelInactive]}>
-            Abonnements
+            {t('feed.tab_following')}
           </Text>
           {activeTab === 'following' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
@@ -1146,7 +1147,7 @@ export default function FeedScreen() {
           activeOpacity={0.8}
         >
           <Text style={[styles.tabLabel, activeTab !== 'foryou' && styles.tabLabelInactive]}>
-            Pour toi
+            {t('feed.tab_for_you')}
           </Text>
           {activeTab === 'foryou' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
@@ -1173,13 +1174,13 @@ export default function FeedScreen() {
       <View style={styles.root}>
         <View style={styles.empty}>
           <Ionicons name="people-outline" size={48} color="#555" />
-          <Text style={styles.emptyText}>Tu ne suis encore personne.</Text>
+          <Text style={styles.emptyText}>{t('feed.following_empty')}</Text>
           <TouchableOpacity
             style={styles.discoverBtn}
             onPress={() => handleTabSwitch('foryou')}
             activeOpacity={0.85}
           >
-            <Text style={styles.discoverBtnText}>Découvrir des vendeurs</Text>
+            <Text style={styles.discoverBtnText}>{t('feed.discover_sellers')}</Text>
           </TouchableOpacity>
         </View>
         {tabHeader}
@@ -1193,7 +1194,7 @@ export default function FeedScreen() {
       <View style={styles.root}>
         <View style={styles.empty}>
           <Ionicons name="flash-outline" size={48} color="#555" />
-          <Text style={styles.emptyText}>Aucun drop actif</Text>
+          <Text style={styles.emptyText}>{t('feed.no_active_drops')}</Text>
         </View>
         {tabHeader}
       </View>

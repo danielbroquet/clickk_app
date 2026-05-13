@@ -132,7 +132,7 @@ export default function WalletScreen() {
       const res = await callEdgeFunction<WalletData>('get-seller-wallet')
       setData(res)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur inconnue'
+      const msg = err instanceof Error ? err.message : t('errors.unknown')
       setError(msg)
     }
   }, [session, isSeller])

@@ -20,6 +20,7 @@ import Animated, {
 } from 'react-native-reanimated'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
+import { useTranslation } from '../../lib/i18n'
 import { DropItem, STORY_SELECT, type FeedStory } from '../(tabs)/index'
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window')
@@ -32,6 +33,7 @@ export default function SellerFeedScreen() {
     initialStoryId?: string
     showAll?: string
   }>()
+  const { t } = useTranslation()
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
   const insets = useSafeAreaInsets()
@@ -155,13 +157,13 @@ export default function SellerFeedScreen() {
       <View style={styles.root}>
         <View style={styles.empty}>
           <Ionicons name="flash-outline" size={48} color="#555" />
-          <Text style={styles.emptyText}>Aucun drop actif</Text>
+          <Text style={styles.emptyText}>{t('seller_feed.no_active_drops')}</Text>
           <TouchableOpacity
             style={styles.backLink}
             onPress={() => router.back()}
             activeOpacity={0.8}
           >
-            <Text style={styles.backLinkText}>Retour</Text>
+            <Text style={styles.backLinkText}>{t('common.back')}</Text>
           </TouchableOpacity>
         </View>
         {backBtn}

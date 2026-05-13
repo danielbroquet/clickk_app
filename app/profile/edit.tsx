@@ -18,8 +18,10 @@ import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 export default function EditProfileScreen() {
+  const { t } = useTranslation()
   const { profile, session, refreshProfile } = useAuth()
   const userId = session?.user?.id ?? ''
 
@@ -51,7 +53,7 @@ export default function EditProfileScreen() {
     if (result.canceled || !result.assets[0]) return
     const asset = result.assets[0]
     if (!asset.base64) {
-      setError("Impossible de lire l'image.")
+      setError(t('profile.edit_image_error'))
       return
     }
     setAvatarUploading(true)
@@ -105,16 +107,16 @@ export default function EditProfileScreen() {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={8}>
-            <Text style={styles.cancelText}>Annuler</Text>
+            <Text style={styles.cancelText}>{t('profile.edit_cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Modifier le profil</Text>
+          <Text style={styles.headerTitle}>{t('profile.edit_title')}</Text>
           <TouchableOpacity
             onPress={handleSave}
             disabled={saving || avatarUploading}
             hitSlop={8}
           >
             <Text style={[styles.saveText, (saving || avatarUploading) && styles.savingText]}>
-              {saving ? '...' : 'Enregistrer'}
+              {saving ? '...' : t('profile.edit_save')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -150,24 +152,24 @@ export default function EditProfileScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            <Text style={styles.avatarHint}>Modifier la photo</Text>
+            <Text style={styles.avatarHint}>{t('profile.edit_avatar_hint')}</Text>
           </View>
 
           {/* Fields */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Nom affiché</Text>
+            <Text style={styles.fieldLabel}>{t('profile.edit_display_name')}</Text>
             <TextInput
               style={styles.input}
               value={displayName}
               onChangeText={setDisplayName}
-              placeholder="Nom affiché"
+              placeholder={t('profile.edit_display_name')}
               placeholderTextColor={colors.textSecondary}
               returnKeyType="next"
             />
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Nom d'utilisateur</Text>
+            <Text style={styles.fieldLabel}>{t('profile.edit_username')}</Text>
             <TextInput
               style={styles.input}
               value={username}
@@ -181,14 +183,14 @@ export default function EditProfileScreen() {
 
           <View style={styles.fieldGroup}>
             <View style={styles.bioLabelRow}>
-              <Text style={styles.fieldLabel}>Bio</Text>
+              <Text style={styles.fieldLabel}>{t('profile.edit_bio')}</Text>
               <Text style={styles.charCount}>{bio.length}/150</Text>
             </View>
             <TextInput
               style={[styles.input, styles.bioInput]}
               value={bio}
               onChangeText={t => setBio(t.slice(0, 150))}
-              placeholder="Parlez-nous de vous…"
+              placeholder={t('profile.edit_bio_placeholder')}
               placeholderTextColor={colors.textSecondary}
               multiline
               maxLength={150}

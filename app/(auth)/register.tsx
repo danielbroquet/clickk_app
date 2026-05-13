@@ -59,7 +59,7 @@ export default function RegisterScreen() {
           <Text style={styles.logoBlack}>click</Text>
           <Text style={styles.logoTeal}>«</Text>
         </View>
-        <Text style={styles.slogan}>Crée ton compte</Text>
+        <Text style={styles.slogan}>{t('auth.create_account_slogan')}</Text>
 
         <View style={styles.fieldWrap}>
           <TextInput

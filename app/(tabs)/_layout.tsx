@@ -134,7 +134,7 @@ export default function TabLayout() {
               style={styles.cancelBtn}
               onPress={() => setShowSellModal(false)}
             >
-              <Text style={styles.cancelText}>Annuler</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

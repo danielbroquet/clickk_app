@@ -42,7 +42,7 @@ export default function PayoutScreen() {
       setAvailable(res.available_chf)
       setAmount(res.available_chf.toFixed(2))
     } catch (err) {
-      setBalanceError(err instanceof Error ? err.message : 'Erreur inconnue')
+      setBalanceError(err instanceof Error ? err.message : t('errors.unknown'))
     }
   }, [session])
 
@@ -98,14 +98,14 @@ export default function PayoutScreen() {
               </View>
               <Text style={styles.successTitle}>{t('wallet.withdraw_success')}</Text>
               <Text style={styles.successSub}>
-                Arrivée sous 2-3 jours ouvrés sur votre compte bancaire.
+                {t('wallet.payout_arrival')}
               </Text>
               <TouchableOpacity
                 style={styles.backBtn}
                 onPress={() => router.back()}
                 activeOpacity={0.85}
               >
-                <Text style={styles.backBtnText}>Retour au wallet</Text>
+                <Text style={styles.backBtnText}>{t('wallet.back_to_wallet')}</Text>
               </TouchableOpacity>
             </View>
           ) : (

@@ -196,7 +196,7 @@ function SwipeableConversationRow({ conv, userId, onPress, onDelete, t }: {
       <View style={msgStyles.swipeDeleteBg}>
         <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
         <Text style={{ color: '#FFFFFF', fontSize: 11, marginTop: 3, fontFamily: fontFamily.medium }}>
-          Supprimer
+          {t('addresses.delete')}
         </Text>
       </View>
       <Animated.View
@@ -287,7 +287,7 @@ function MessagesTab({ userId }: { userId: string }) {
               fetchConversations().finally(() => setLoading(false))
             }}
           >
-            <Text style={msgStyles.retryText}>Réessayer</Text>
+            <Text style={msgStyles.retryText}>{t('inbox.retry')}</Text>
           </TouchableOpacity>
         </View>
       )
@@ -296,7 +296,7 @@ function MessagesTab({ userId }: { userId: string }) {
       <View style={msgStyles.centered}>
         <MessageSquare size={48} color={colors.border} strokeWidth={1.5} />
         <Text style={msgStyles.emptyTitle}>{t('inbox.no_messages')}</Text>
-        <Text style={msgStyles.emptySubtitle}>Tes conversations apparaîtront ici</Text>
+        <Text style={msgStyles.emptySubtitle}>{t('inbox.conversations_hint')}</Text>
       </View>
     )
   }
