@@ -25,6 +25,12 @@ jobs:
       - name: 📥 Install dependencies
         run: npm ci
 
+      - name: 🧹 Clear CocoaPods cache
+        run: |
+          cd ios 2>/dev/null || true
+          rm -f Podfile.lock 2>/dev/null || true
+          cd ..
+
       - name: 🎯 Setup Expo & EAS
         uses: expo/expo-github-action@v8
         with:
@@ -35,7 +41,7 @@ jobs:
         run: xcodebuild -version
 
       - name: 🏗️ Build iOS
-        run: eas build --platform ios --profile production --local --non-interactive
+        run: eas build --platform ios --profile production --local --non-interactive --clear-cache
         env:
           EXPO_PUBLIC_ENV: production
           EXPO_PUBLIC_SUPABASE_URL: "https://ckrttngnwoslypyulwuf.supabase.co"
