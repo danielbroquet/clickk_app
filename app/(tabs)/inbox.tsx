@@ -115,7 +115,7 @@ function ConversationRow({
       <View style={msgStyles.rowContent}>
         <View style={msgStyles.rowTop}>
           <Text style={msgStyles.name} numberOfLines={1}>
-            {other.display_name ?? 'Utilisateur'}
+            {other.display_name ?? t('profile.default_user')}
           </Text>
           <Text style={msgStyles.time}>{time}</Text>
         </View>
@@ -235,7 +235,7 @@ function MessagesTab({ userId }: { userId: string }) {
       setConversations((data as unknown as Conversation[]) ?? [])
       setError(null)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Erreur inconnue')
+      setError(e instanceof Error ? e.message : t('errors.unknown'))
     }
   }, [userId])
 
@@ -425,6 +425,7 @@ const ICON_CONFIG: Record<NotifType, { name: React.ComponentProps<typeof Ionicon
 const UNREAD_BG = 'rgba(0,210,184,0.08)'
 
 function NotifItem({ notif, onPress }: { notif: Notification; onPress: () => void }) {
+  const { t } = useTranslation()
   const cfg = ICON_CONFIG[notif.type] ?? ICON_CONFIG.sale
 
   return (
@@ -441,7 +442,7 @@ function NotifItem({ notif, onPress }: { notif: Notification; onPress: () => voi
           {!!notif.message && (
             <Text style={notifStyles.itemMsg} numberOfLines={2}>{notif.message}</Text>
           )}
-          <Text style={notifStyles.itemTime}>{formatRelativeTime(notif.created_at)}</Text>
+          <Text style={notifStyles.itemTime}>{formatRelativeTime(notif.created_at, t)}</Text>
         </View>
         {!notif.is_read && <View style={notifStyles.dot} />}
       </View>

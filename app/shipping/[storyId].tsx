@@ -130,10 +130,10 @@ export default function ShippingAddressScreen() {
   }, [])
 
   const validate = () => {
-    if (!fullName.trim()) return 'Nom et prénom requis'
-    if (!line1.trim()) return 'Adresse requise'
-    if (!postalCode.trim()) return 'Code postal requis'
-    if (!city.trim()) return 'Ville requise'
+    if (!fullName.trim()) return t('shipping_screen.error_name')
+    if (!line1.trim()) return t('shipping_screen.error_address')
+    if (!postalCode.trim()) return t('shipping_screen.error_postal')
+    if (!city.trim()) return t('shipping_screen.error_city')
     return null
   }
 
@@ -171,7 +171,7 @@ export default function ShippingAddressScreen() {
     setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Non authentifié')
+      if (!user) throw new Error(t('errors.not_authenticated'))
 
       const isFirst = existing.length === 0
 
@@ -218,12 +218,10 @@ export default function ShippingAddressScreen() {
       <View style={styles.header}>
         <View style={styles.headerBadge}>
           <Ionicons name="checkmark-circle" size={20} color={C.primary} />
-          <Text style={styles.headerBadgeText}>Achat confirmé</Text>
+          <Text style={styles.headerBadgeText}>{t('shipping_screen.purchase_confirmed_badge')}</Text>
         </View>
-        <Text style={styles.title}>Où on t'envoie ça ?</Text>
-        <Text style={styles.subtitle}>
-          Indique ton adresse pour que le vendeur puisse expédier ton colis.
-        </Text>
+        <Text style={styles.title}>{t('shipping_screen.title')}</Text>
+        <Text style={styles.subtitle}>{t('shipping_screen.subtitle')}</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -389,7 +387,7 @@ export default function ShippingAddressScreen() {
             ) : (
               <>
                 <Text style={styles.ctaText}>
-                  {mode === 'pick' ? t('shipping.confirm') : 'Enregistrer et confirmer'}
+                  {mode === 'pick' ? t('shipping.confirm') : t('shipping_screen.save_and_confirm')}
                 </Text>
                 <Ionicons name="arrow-forward" size={18} color="#000" />
               </>

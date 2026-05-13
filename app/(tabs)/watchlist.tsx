@@ -55,9 +55,9 @@ function computePrice(s: WatchlistStory): number {
   return Math.max(s.start_price_chf - (s.start_price_chf - s.floor_price_chf) * r, s.floor_price_chf)
 }
 
-function formatTimeLeft(expiresAt: string): string {
+function formatTimeLeft(expiresAt: string, expired: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now()
-  if (ms <= 0) return 'Expiré'
+  if (ms <= 0) return expired
   const h = Math.floor(ms / 3600000)
   const m = Math.floor((ms % 3600000) / 60000)
   if (h > 0) return `${h}h ${m}m`
@@ -66,14 +66,15 @@ function formatTimeLeft(expiresAt: string): string {
 }
 
 function WatchlistCard({ row, onRemoved }: { row: WatchlistRow; onRemoved: (id: string) => void }) {
+  const { t } = useTranslation()
   const story = row.story
   const [price, setPrice] = useState(() => computePrice(story))
-  const [timeLeft, setTimeLeft] = useState(() => formatTimeLeft(story.expires_at))
+  const [timeLeft, setTimeLeft] = useState(() => formatTimeLeft(story.expires_at, t('watchlist_screen.expired')))
 
   useEffect(() => {
     const h = setInterval(() => {
       setPrice(computePrice(story))
-      setTimeLeft(formatTimeLeft(story.expires_at))
+      setTimeLeft(formatTimeLeft(story.expires_at, t('watchlist_screen.expired')))
     }, 1000)
     return () => clearInterval(h)
   }, [story])
@@ -111,7 +112,7 @@ function WatchlistCard({ row, onRemoved }: { row: WatchlistRow; onRemoved: (id: 
         )}
         {inactive && (
           <View style={styles.soldOverlay}>
-            <Text style={styles.soldOverlayText}>{isSold ? 'Vendu' : 'Expiré'}</Text>
+            <Text style={styles.soldOverlayText}>{isSold ? t('watchlist_screen.sold') : t('watchlist_screen.expired')}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -139,7 +140,7 @@ function WatchlistCard({ row, onRemoved }: { row: WatchlistRow; onRemoved: (id: 
             onPress={() => router.push({ pathname: '/story/[id]', params: { id: story.id } })}
           >
             <Text style={[styles.viewBtnText, inactive && styles.viewBtnTextDisabled]}>
-              {inactive ? (isSold ? 'Vendu' : 'Expiré') : 'Voir le drop'}
+              {inactive ? (isSold ? t('watchlist_screen.sold') : t('watchlist_screen.expired')) : t('watchlist_screen.view_drop')}
             </Text>
           </TouchableOpacity>
 

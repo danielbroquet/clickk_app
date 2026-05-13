@@ -650,7 +650,7 @@ export default function SalesScreen() {
         const convId = await getOrCreateConversation(supabase, buyerId, currentUserId)
         await safeNavigate(`/conversation/${convId}`)
       } catch {
-        show("Impossible d'ouvrir la conversation")
+        show(t('errors.open_conversation'))
       }
     },
     [currentUserId, show],
@@ -667,7 +667,7 @@ export default function SalesScreen() {
       .delete()
       .eq('id', dropId)
       .eq('seller_id', currentUserId)
-    show('Drop supprimé')
+    show(t('sales_screen.drop_deleted'))
   }, [currentUserId, show])
 
   const handleFlaggedDelete = async (storyId: string) => {
@@ -811,7 +811,7 @@ export default function SalesScreen() {
                       <View style={salesStyles.addressBox}>
                         <View style={salesStyles.addressHeader}>
                           <Ionicons name="location-outline" size={13} color={colors.primary} />
-                          <Text style={salesStyles.addressHeaderText}>Adresse de livraison</Text>
+                          <Text style={salesStyles.addressHeaderText}>{t('sales_screen.address_label')}</Text>
                           <TouchableOpacity
                             onPress={() => {
                               const a = item.shipping_address!
@@ -819,7 +819,7 @@ export default function SalesScreen() {
                               if (Platform.OS !== 'web') {
                                 Haptics.selectionAsync()
                               }
-                              show('Adresse copiée')
+                              show(t('sales_screen.address_copied'))
                               import('expo-clipboard').then(({ setStringAsync }) => setStringAsync(txt))
                             }}
                             style={salesStyles.copyBtn}
@@ -915,7 +915,7 @@ export default function SalesScreen() {
         title={shipModal?.title ?? ''}
         onClose={() => setShipModal(null)}
         onSuccess={() => {
-          show('Colis marqué comme expédié')
+          show(t('sales_screen.marked_shipped'))
           fetchSales()
         }}
       />

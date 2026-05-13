@@ -419,7 +419,7 @@ export function DropItem({
     }
   }
 
-  const username = story.seller?.username ?? 'vendeur'
+  const username = story.seller?.username ?? t('discover_screen.default_seller')
   const avatar = story.seller?.avatar_url
   const perMin = dropPerMinute(story)
   const savingsPct = story.start_price_chf > 0
@@ -707,7 +707,7 @@ export function DropItem({
                     </Text>
                   </View>
                 )}
-                <Text style={detailStyles.sellerUsername}>@{story.seller?.username ?? 'vendeur'}</Text>
+                <Text style={detailStyles.sellerUsername}>@{story.seller?.username ?? t('discover_screen.default_seller')}</Text>
               </TouchableOpacity>
 
               {sellerId !== currentUserId && (

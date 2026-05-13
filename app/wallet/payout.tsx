@@ -56,11 +56,11 @@ export default function PayoutScreen() {
 
     const parsed = parseFloat(amount)
     if (isNaN(parsed) || parsed <= 0) {
-      setValidationError('Veuillez saisir un montant valide supérieur à 0.')
+      setValidationError(t('errors.invalid_amount'))
       return
     }
     if (available !== null && parsed > available) {
-      setValidationError(`Le montant dépasse votre solde disponible (CHF ${available.toFixed(2)}).`)
+      setValidationError(t('errors.amount_exceeds_balance', { amount: available!.toFixed(2) }))
       return
     }
 
@@ -69,7 +69,7 @@ export default function PayoutScreen() {
       await callEdgeFunction('create-payout', { amount_chf: parsed })
       setSuccess(true)
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Erreur inconnue')
+      setSubmitError(err instanceof Error ? err.message : t('errors.unknown'))
     } finally {
       setSubmitting(false)
     }

@@ -42,9 +42,9 @@ type SortOption = 'recent' | 'expiring' | 'deal' | 'price_asc'
 
 type StoryWithSeller = Omit<Story, 'seller'> & { seller?: Pick<Profile, 'id' | 'username' | 'avatar_url'> }
 
-function formatTimeLeft(expiresAt: string): string {
+function formatTimeLeft(expiresAt: string, expired: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now()
-  if (ms <= 0) return 'Expiré'
+  if (ms <= 0) return expired
   const totalMins = Math.floor(ms / 60000)
   const h = Math.floor(totalMins / 60)
   const m = totalMins % 60
@@ -53,6 +53,7 @@ function formatTimeLeft(expiresAt: string): string {
 }
 
 function StoryCard({ item, showExpiry }: { item: StoryWithSeller; showExpiry: boolean }) {
+  const { t } = useTranslation()
   const thumb = toCdnUrl(item.thumbnail_url ?? item.video_url)
   return (
     <TouchableOpacity
@@ -70,14 +71,14 @@ function StoryCard({ item, showExpiry }: { item: StoryWithSeller; showExpiry: bo
         )}
         {showExpiry && item.expires_at && (
           <View style={styles.expiryBadge}>
-            <Text style={styles.expiryText}>⏱ {formatTimeLeft(item.expires_at)}</Text>
+            <Text style={styles.expiryText}>⏱ {formatTimeLeft(item.expires_at, t('discover_screen.expired'))}</Text>
           </View>
         )}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.cardPrice}>CHF {Number(item.current_price_chf).toFixed(2)}</Text>
-        <Text style={styles.cardSeller} numberOfLines={1}>@{item.seller?.username ?? 'vendeur'}</Text>
+        <Text style={styles.cardSeller} numberOfLines={1}>@{item.seller?.username ?? t('discover_screen.default_seller')}</Text>
       </View>
     </TouchableOpacity>
   )

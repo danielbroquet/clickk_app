@@ -43,20 +43,20 @@ const DURATION: Record<SpeedPreset, { label: string; hours: number; ms: number }
   RELAX:    { label: '7 jours', hours: 168, ms: 7 * 24 * 60 * 60 * 1000 },
 }
 
-const CATEGORY_KEYS: { value: string; emoji: string; labelKey: string }[] = [
-  { value: 'sneakers',    emoji: '👟', labelKey: 'Sneakers' },
-  { value: 'vetements',   emoji: '👕', labelKey: 'Vêtements' },
-  { value: 'accessoires', emoji: '👜', labelKey: 'Accessoires' },
-  { value: 'montres',     emoji: '⌚', labelKey: 'Montres' },
-  { value: 'tech',        emoji: '📱', labelKey: 'Tech' },
-  { value: 'gaming',      emoji: '🎮', labelKey: 'Gaming' },
-  { value: 'maison',      emoji: '🏠', labelKey: 'Maison & Déco' },
-  { value: 'livres',      emoji: '📚', labelKey: 'Livres & Culture' },
-  { value: 'sport',       emoji: '⚽', labelKey: 'Sport & Outdoor' },
-  { value: 'art',         emoji: '🎨', labelKey: 'Art & Collection' },
-  { value: 'beaute',      emoji: '🧴', labelKey: 'Beauté' },
-  { value: 'auto',        emoji: '🚗', labelKey: 'Auto & Moto' },
-  { value: 'autre',       emoji: '🎁', labelKey: 'Autre' },
+const CATEGORY_KEYS: { value: string; emoji: string; i18nKey: string }[] = [
+  { value: 'sneakers',    emoji: '👟', i18nKey: 'categories.sneakers' },
+  { value: 'vetements',   emoji: '👕', i18nKey: 'categories.vetements' },
+  { value: 'accessoires', emoji: '👜', i18nKey: 'categories.accessoires' },
+  { value: 'montres',     emoji: '⌚', i18nKey: 'categories.montres' },
+  { value: 'tech',        emoji: '📱', i18nKey: 'categories.tech' },
+  { value: 'gaming',      emoji: '🎮', i18nKey: 'categories.gaming' },
+  { value: 'maison',      emoji: '🏠', i18nKey: 'categories.maison' },
+  { value: 'livres',      emoji: '📚', i18nKey: 'categories.livres' },
+  { value: 'sport',       emoji: '⚽', i18nKey: 'categories.sport' },
+  { value: 'art',         emoji: '🎨', i18nKey: 'categories.art' },
+  { value: 'beaute',      emoji: '🧴', i18nKey: 'categories.beaute' },
+  { value: 'auto',        emoji: '🚗', i18nKey: 'categories.auto' },
+  { value: 'autre',       emoji: '🎁', i18nKey: 'categories.autre' },
 ]
 
 const PRESET_ACCENT: Record<SpeedPreset, string> = {
@@ -147,7 +147,7 @@ function CategoryPicker({
     <>
       <TouchableOpacity style={s.catTrigger} onPress={() => setOpen(true)} activeOpacity={0.8}>
         <Text style={[s.catTriggerText, !value && { color: colors.textSecondary }]}>
-          {selected ? `${selected.emoji} ${selected.labelKey}` : t('story.create.category_placeholder')}
+          {selected ? `${selected.emoji} ${t(selected.i18nKey)}` : t('story.create.category_placeholder')}
         </Text>
         <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -162,7 +162,7 @@ function CategoryPicker({
               style={[s.catItem, value === c.value && s.catItemActive]}
               onPress={() => { onChange(c.value); setOpen(false) }}
             >
-              <Text style={[s.catItemText, value === c.value && s.catItemTextActive]}>{c.emoji} {c.labelKey}</Text>
+              <Text style={[s.catItemText, value === c.value && s.catItemTextActive]}>{c.emoji} {t(c.i18nKey)}</Text>
               {value === c.value && <Ionicons name="checkmark" size={18} color={colors.primary} />}
             </TouchableOpacity>
           ))}
@@ -580,7 +580,7 @@ export default function CreateDropScreen() {
         }
       )
       const data = await res.json()
-      if (!res.ok || data.error) throw new Error(data.error ?? 'Erreur')
+      if (!res.ok || data.error) throw new Error(data.error ?? t('common.error'))
 
       if (data.title) setTitle(data.title)
       if (data.description) setDescription(data.description)

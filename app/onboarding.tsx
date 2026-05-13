@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { LinearGradient } from 'expo-linear-gradient'
 import { safeNavigate } from '../lib/navigate'
 import { colors, fontFamily, spacing } from '../lib/theme'
+import { useTranslation } from '../lib/i18n'
 
 const { width } = Dimensions.get('window')
 
@@ -23,8 +24,8 @@ export const ONBOARDING_KEY = 'clickk_onboarding_done'
 interface Slide {
   id: string
   icon: string
-  title: string
-  subtitle: string
+  titleKey: string
+  subtitleKey: string
   gradient: [string, string]
 }
 
@@ -32,33 +33,29 @@ const SLIDES: Slide[] = [
   {
     id: '1',
     icon: '📸',
-    title: 'Stories vidéo en live',
-    subtitle:
-      'Découvre des produits présentés en vidéo courte. Le vendeur montre, tu décides en quelques secondes.',
+    titleKey: 'onboarding.slide1_title',
+    subtitleKey: 'onboarding.slide1_sub',
     gradient: ['#0F2027', '#203A43'],
   },
   {
     id: '2',
     icon: '⏱️',
-    title: 'Enchère hollandaise',
-    subtitle:
-      'Le prix baisse toutes les X secondes. Achète au bon moment — pas trop tôt, pas trop tard.',
+    titleKey: 'onboarding.slide2_title',
+    subtitleKey: 'onboarding.slide2_sub',
     gradient: ['#0F2027', '#16313B'],
   },
   {
     id: '3',
     icon: '🇨🇭',
-    title: '100% Suisse',
-    subtitle:
-      'Paiements sécurisés via Stripe, conformité LPD, livraison Post CH. Une marketplace pensée pour la Suisse.',
+    titleKey: 'onboarding.slide3_title',
+    subtitleKey: 'onboarding.slide3_sub',
     gradient: ['#0F2027', '#1A2A1A'],
   },
   {
     id: '4',
     icon: '🛍️',
-    title: 'Achète ou vends',
-    subtitle:
-      'Parcours les stories en cours ou publie tes propres articles — en quelques secondes, depuis ton téléphone.',
+    titleKey: 'onboarding.slide4_title',
+    subtitleKey: 'onboarding.slide4_sub',
     gradient: ['#0F1623', '#1A2535'],
   },
 ]
@@ -75,6 +72,7 @@ function Dot({ active }: { active: boolean }) {
 }
 
 export default function OnboardingScreen() {
+  const { t } = useTranslation()
   const [currentIndex, setCurrentIndex] = useState(0)
   const flatListRef = useRef<FlatList<Slide>>(null)
   const fadeAnim = useRef(new Animated.Value(1)).current
@@ -113,8 +111,8 @@ export default function OnboardingScreen() {
         renderItem={({ item }) => (
           <LinearGradient colors={item.gradient} style={styles.slide}>
             <Text style={styles.slideIcon}>{item.icon}</Text>
-            <Text style={styles.slideTitle}>{item.title}</Text>
-            <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
+            <Text style={styles.slideTitle}>{t(item.titleKey)}</Text>
+            <Text style={styles.slideSubtitle}>{t(item.subtitleKey)}</Text>
           </LinearGradient>
         )}
       />
@@ -136,7 +134,7 @@ export default function OnboardingScreen() {
             activeOpacity={0.85}
           >
             <Text style={[styles.btnText, isLast && styles.btnTextPrimary]}>
-              {isLast ? "C'est parti !" : 'Suivant'}
+              {isLast ? t('onboarding.go') : t('onboarding.next')}
             </Text>
           </TouchableOpacity>
         </Animated.View>
@@ -144,7 +142,7 @@ export default function OnboardingScreen() {
         {/* Skip */}
         {!isLast && (
           <TouchableOpacity style={styles.skipBtn} onPress={handleDone}>
-            <Text style={styles.skipText}>Passer</Text>
+            <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
           </TouchableOpacity>
         )}
       </View>

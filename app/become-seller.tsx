@@ -83,7 +83,7 @@ export default function BecomeSellerScreen() {
       if (done) return
     }
     setStatus('idle')
-    setErrorMsg('Vérification en cours. Reviens dans quelques secondes ou réessaie.')
+    setErrorMsg(t('errors.verification_pending'))
   }
 
   const fetchOnboardingUrl = async (): Promise<string | null> => {
@@ -155,7 +155,7 @@ export default function BecomeSellerScreen() {
         return
       }
       setStatus('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Erreur inconnue')
+      setErrorMsg(err instanceof Error ? err.message : t('errors.unknown'))
     }
   }
 

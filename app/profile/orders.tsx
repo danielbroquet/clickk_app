@@ -214,7 +214,7 @@ function OrderCard({
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       if (sessionError || !session) {
-        Alert.alert(t('common.error'), 'Session expirée, reconnectez-vous.')
+        Alert.alert(t('common.error'), t('errors.session_expired'))
         setConfirming(false)
         return
       }
@@ -232,12 +232,12 @@ function OrderCard({
       const data = await response.json()
       if (!response.ok) {
         console.error('confirm-delivery error:', data)
-        Alert.alert(t('common.error'), data.error ?? 'Impossible de confirmer la livraison')
+        Alert.alert(t('common.error'), data.error ?? t('errors.confirm_delivery'))
         setConfirming(false)
         return
       }
       if (!data?.success && !data?.already_delivered) {
-        Alert.alert(t('common.error'), 'Réponse inattendue du serveur')
+        Alert.alert(t('common.error'), t('errors.unexpected_server'))
         setConfirming(false)
         return
       }
@@ -247,7 +247,7 @@ function OrderCard({
       onDelivered(item.id)
     } catch (e: any) {
       console.error('confirm-delivery exception:', e)
-      Alert.alert('Erreur', e?.message ?? 'Une erreur est survenue')
+      Alert.alert(t('common.error'), e?.message ?? t('common.error'))
       setConfirming(false)
     }
   }

@@ -4,6 +4,7 @@ import NetInfo from '@react-native-community/netinfo'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors, fontFamily } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 const BANNER_HEIGHT = 36
 
@@ -39,6 +40,7 @@ function useNetworkStatus() {
 }
 
 export default function NetworkBanner() {
+  const { t } = useTranslation()
   const isOnline = useNetworkStatus()
   const [visible, setVisible] = useState(false)
   const translateY = useRef(new Animated.Value(-BANNER_HEIGHT)).current
@@ -86,7 +88,7 @@ export default function NetworkBanner() {
         color="#fff"
       />
       <Text style={styles.text}>
-        {isOnline ? 'Connexion rétablie' : 'Pas de connexion internet'}
+        {isOnline ? t('network.online') : t('network.offline')}
       </Text>
     </Animated.View>
   )

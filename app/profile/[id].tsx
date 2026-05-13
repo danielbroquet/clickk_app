@@ -25,6 +25,7 @@ import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
 import { getOrCreateConversation } from '../../lib/utils'
 import { safeNavigate } from '../../lib/navigate'
 import ReportModal from '../../components/ui/ReportModal'
+import { useTranslation } from '../../lib/i18n'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 const CELL_SIZE = (SCREEN_WIDTH - 4) / 2
@@ -145,6 +146,7 @@ const starStyles = StyleSheet.create({
 // ─── Grid cell ────────────────────────────────────────────────────────────────
 
 function DropGridCell({ drop, profileId }: { drop: Drop; profileId: string }) {
+  const { t } = useTranslation()
   const thumb = toCdnUrl(drop.thumbnail_url ?? drop.video_url)
   const status = drop.status
 
@@ -168,12 +170,12 @@ function DropGridCell({ drop, profileId }: { drop: Drop; profileId: string }) {
 
       {status === 'sold' && (
         <View style={[gridStyles.statusBadge, gridStyles.statusSold]}>
-          <Text style={gridStyles.statusSoldText}>Vendu ✓</Text>
+          <Text style={gridStyles.statusSoldText}>{t('profile_id.status_sold')}</Text>
         </View>
       )}
       {status === 'expired' && (
         <View style={[gridStyles.statusBadge, gridStyles.statusExpired]}>
-          <Text style={gridStyles.statusExpiredText}>Expiré</Text>
+          <Text style={gridStyles.statusExpiredText}>{t('profile_id.status_expired')}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -233,6 +235,7 @@ const gridStyles = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PublicProfileScreen() {
+  const { t } = useTranslation()
   const { id } = useLocalSearchParams<{ id: string }>()
   const { session } = useAuth()
   const currentUserId = session?.user?.id ?? ''
@@ -295,7 +298,7 @@ export default function PublicProfileScreen() {
         .eq('status', 'sold'),
     ]).then(([profileRes, , dropsCountRes, ventesRes]) => {
       if (profileRes.error || !profileRes.data) {
-        setFetchError('Profil introuvable')
+        setFetchError(t('profile_id.not_found'))
         setLoading(false)
         return
       }
@@ -335,7 +338,7 @@ export default function PublicProfileScreen() {
       if (isBlocked) {
         ActionSheetIOS.showActionSheetWithOptions(
           {
-            options: ['Débloquer cet utilisateur', 'Annuler'],
+            options: [t('profile_id.unblock_action'), t('common.cancel')],
             cancelButtonIndex: 1,
           },
           (buttonIndex) => {
@@ -345,7 +348,7 @@ export default function PublicProfileScreen() {
       } else {
         ActionSheetIOS.showActionSheetWithOptions(
           {
-            options: ['Signaler cet utilisateur', 'Bloquer cet utilisateur', 'Annuler'],
+            options: [t('profile_id.report_action'), t('profile_id.block_action'), t('common.cancel')],
             cancelButtonIndex: 2,
             destructiveButtonIndex: 1,
           },
@@ -354,11 +357,11 @@ export default function PublicProfileScreen() {
               setReportUserVisible(true)
             } else if (buttonIndex === 1) {
               Alert.alert(
-                'Bloquer cet utilisateur ?',
-                'Il ne pourra plus voir votre profil ni vous envoyer de messages. Vous ne verrez plus son contenu dans le feed.',
+                t('profile.block_confirm_title'),
+                t('profile.block_confirm_message'),
                 [
-                  { text: 'Annuler', style: 'cancel' },
-                  { text: 'Bloquer', style: 'destructive', onPress: toggleBlock },
+                  { text: t('common.cancel'), style: 'cancel' },
+                  { text: t('profile.block'), style: 'destructive', onPress: toggleBlock },
                 ]
               )
             }
@@ -407,7 +410,7 @@ export default function PublicProfileScreen() {
       <SafeAreaView style={styles.safe} edges={['top']}>
         {headerBar('')}
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{fetchError ?? 'Profil introuvable'}</Text>
+          <Text style={styles.errorText}>{fetchError ?? t('profile_id.not_found')}</Text>
         </View>
       </SafeAreaView>
     )
@@ -423,7 +426,7 @@ export default function PublicProfileScreen() {
         <View style={styles.centered}>
           <Ionicons name="ban-outline" size={48} color={colors.textSecondary} />
           <Text style={styles.blockedUsername}>@{profile.username}</Text>
-          <Text style={styles.blockedMessage}>Vous avez bloqué cet utilisateur</Text>
+          <Text style={styles.blockedMessage}>{t('profile.blocked_message')}</Text>
           <TouchableOpacity
             onPress={toggleBlock}
             disabled={blockLoading}
@@ -483,11 +486,11 @@ export default function PublicProfileScreen() {
             </View>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{followLoading ? '--' : followersCount}</Text>
-              <Text style={styles.statLabel}>Abonnés</Text>
+              <Text style={styles.statLabel}>{t('profile.followers')}</Text>
             </View>
             <View style={styles.stat}>
               <Text style={styles.statNum}>{ventesCount}</Text>
-              <Text style={styles.statLabel}>Ventes</Text>
+              <Text style={styles.statLabel}>{t('profile_id.sales_label')}</Text>
             </View>
           </View>
 
@@ -502,7 +505,7 @@ export default function PublicProfileScreen() {
                 <ActivityIndicator size="small" color={isFollowing ? colors.primary : '#0F0F0F'} />
               ) : (
                 <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextActive]}>
-                  {isFollowing ? 'Abonné' : 'Suivre'}
+                  {isFollowing ? t('profile_id.following') : t('profile_id.follow')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -529,7 +532,7 @@ export default function PublicProfileScreen() {
         {drops.length === 0 ? (
           <View style={styles.emptySection}>
             <Ionicons name="videocam-outline" size={44} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>Ce vendeur n'a pas encore publié de drop</Text>
+            <Text style={styles.emptyText}>{t('profile_id.no_drops')}</Text>
           </View>
         ) : (
           <View style={gridStyles.grid}>
@@ -564,7 +567,7 @@ export default function PublicProfileScreen() {
               }}
             >
               <Ionicons name="flag-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.sheetOptionText}>Signaler cet utilisateur</Text>
+              <Text style={styles.sheetOptionText}>{t('profile_id.report_action')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -591,14 +594,14 @@ export default function PublicProfileScreen() {
               color={isBlocked ? colors.primary : colors.error}
             />
             <Text style={[styles.sheetOptionText, !isBlocked && { color: colors.error }]}>
-              {isBlocked ? 'Débloquer cet utilisateur' : 'Bloquer cet utilisateur'}
+              {isBlocked ? t('profile_id.unblock_action') : t('profile_id.block_action')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.sheetOption, styles.sheetCancel]}
             onPress={() => setMenuVisible(false)}
           >
-            <Text style={styles.sheetCancelText}>Annuler</Text>
+            <Text style={styles.sheetCancelText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>

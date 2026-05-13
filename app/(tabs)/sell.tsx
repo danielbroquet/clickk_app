@@ -4,9 +4,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, fontSize, spacing } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 export default function SellScreen() {
   const { profile, loading } = useAuth()
+  const { t } = useTranslation()
 
   if (loading) {
     return (
@@ -23,7 +25,7 @@ export default function SellScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.container}>
-        <Text style={styles.heading}>Que voulez-vous publier ?</Text>
+        <Text style={styles.heading}>{t('sell_screen.heading')}</Text>
 
         {isSeller ? (
           <View style={styles.cards}>
@@ -36,8 +38,8 @@ export default function SellScreen() {
                 <Ionicons name="play-circle-outline" size={48} color={colors.primary} />
               </View>
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Story Enchère</Text>
-                <Text style={styles.cardSubtitle}>Prix dégressif · Vidéo · 24h à 7 jours</Text>
+                <Text style={styles.cardTitle}>{t('sell_screen.auction_title')}</Text>
+                <Text style={styles.cardSubtitle}>{t('sell_screen.auction_sub')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -51,8 +53,8 @@ export default function SellScreen() {
                 <Ionicons name="bag-check-outline" size={48} color={colors.primary} />
               </View>
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Mes ventes</Text>
-                <Text style={styles.cardSubtitle}>Gérer vos drops vendus</Text>
+                <Text style={styles.cardTitle}>{t('sell_screen.my_sales_title')}</Text>
+                <Text style={styles.cardSubtitle}>{t('sell_screen.my_sales_sub')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -60,13 +62,13 @@ export default function SellScreen() {
         ) : (
           <View style={styles.notSellerBox}>
             <Ionicons name="storefront-outline" size={52} color={colors.border} />
-            <Text style={styles.notSellerText}>Devenez vendeur pour publier</Text>
+            <Text style={styles.notSellerText}>{t('sell_screen.not_seller_text')}</Text>
             <TouchableOpacity
               style={styles.becomeBtn}
               activeOpacity={0.85}
               onPress={() => router.push('/become-seller')}
             >
-              <Text style={styles.becomeBtnText}>Commencer</Text>
+              <Text style={styles.becomeBtnText}>{t('sell_screen.not_seller_btn')}</Text>
             </TouchableOpacity>
           </View>
         )}

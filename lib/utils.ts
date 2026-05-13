@@ -36,15 +36,17 @@ export async function getOrCreateConversation(
   return created.id
 }
 
-export const formatRelativeTime = (dateStr: string): string => {
+type TFunc = (key: string, params?: Record<string, string | number>) => string
+
+export const formatRelativeTime = (dateStr: string, t: TFunc): string => {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "à l'instant"
-  if (mins < 60) return `il y a ${mins} min`
+  if (mins < 1) return t('utils.just_now')
+  if (mins < 60) return t('utils.minutes_ago', { count: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `il y a ${hours}h`
-  return `il y a ${Math.floor(hours / 24)}j`
+  if (hours < 24) return t('utils.hours_ago', { count: hours })
+  return t('utils.days_ago', { count: Math.floor(hours / 24) })
 }
 
-export const getConditionLabel = (c: string): string =>
-  ({ new: 'Neuf', like_new: 'Comme neuf', good: 'Bon état', fair: 'Correct' }[c] ?? c)
+export const getConditionLabel = (c: string, t: TFunc): string =>
+  ({ new: t('utils.condition_new'), like_new: t('utils.condition_like_new'), good: t('utils.condition_good'), fair: t('utils.condition_fair') }[c] ?? c)

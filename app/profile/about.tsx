@@ -12,35 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { colors, fontFamily, spacing, fontSize } from '../../lib/theme'
+import { useTranslation } from '../../lib/i18n'
 
 const APP_VERSION = '1.0.0'
 
-const LEGAL_ITEMS = [
-  {
-    title: "Conditions générales d'utilisation",
-    icon: 'document-text-outline' as const,
-    url: 'https://clickk.app/cgu',
-  },
-  {
-    title: 'Politique de confidentialité',
-    icon: 'shield-outline' as const,
-    url: 'https://clickk.app/privacy',
-  },
-  {
-    title: 'Mentions légales',
-    icon: 'information-circle-outline' as const,
-    url: 'https://clickk.app/legal',
-  },
-  {
-    title: 'Conformité LPD Suisse',
-    icon: 'lock-closed-outline' as const,
-    url: 'https://clickk.app/lpd',
-  },
-]
-
 const SOCIAL_ITEMS = [
-  { title: 'Instagram', icon: 'logo-instagram' as const, url: 'https://instagram.com/clickkapp' },
-  { title: 'TikTok', icon: 'logo-tiktok' as const, url: 'https://tiktok.com/@clickkapp' },
+  { titleKey: 'Instagram', icon: 'logo-instagram' as const, url: 'https://instagram.com/clickkapp' },
+  { titleKey: 'TikTok', icon: 'logo-tiktok' as const, url: 'https://tiktok.com/@clickkapp' },
 ]
 
 function LinkRow({
@@ -64,6 +42,15 @@ function LinkRow({
 }
 
 export default function AboutScreen() {
+  const { t } = useTranslation()
+
+  const LEGAL_ITEMS = [
+    { title: t('about.cgu'), icon: 'document-text-outline' as const, url: 'https://clickk.app/cgu' },
+    { title: t('about.privacy_policy'), icon: 'shield-outline' as const, url: 'https://clickk.app/privacy' },
+    { title: t('about.legal_notice'), icon: 'information-circle-outline' as const, url: 'https://clickk.app/legal' },
+    { title: t('about.lpd'), icon: 'lock-closed-outline' as const, url: 'https://clickk.app/lpd' },
+  ]
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -74,7 +61,7 @@ export default function AboutScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>À propos</Text>
+        <Text style={styles.headerTitle}>{t('about.title')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -88,22 +75,17 @@ export default function AboutScreen() {
           />
           <Text style={styles.appName}>Clickk</Text>
           <Text style={styles.version}>Version {APP_VERSION}</Text>
-          <Text style={styles.tagline}>
-            La marketplace suisse des enchères hollandaises vidéo
-          </Text>
+          <Text style={styles.tagline}>{t('about.tagline')}</Text>
         </View>
 
         {/* Mission */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Notre mission</Text>
-          <Text style={styles.cardText}>
-            Clickk connecte acheteurs et vendeurs suisses via des enchères hollandaises en format
-            vidéo court. Le prix baisse en temps réel — le premier à cliquer achète.
-          </Text>
+          <Text style={styles.cardTitle}>{t('about.mission_title')}</Text>
+          <Text style={styles.cardText}>{t('about.mission_text')}</Text>
         </View>
 
         {/* Legal */}
-        <Text style={styles.sectionLabel}>Légal</Text>
+        <Text style={styles.sectionLabel}>{t('about.legal_section')}</Text>
         <View style={styles.section}>
           {LEGAL_ITEMS.map((item, i) => (
             <React.Fragment key={item.title}>
@@ -118,12 +100,12 @@ export default function AboutScreen() {
         </View>
 
         {/* Social */}
-        <Text style={styles.sectionLabel}>Nous suivre</Text>
+        <Text style={styles.sectionLabel}>{t('about.social_section')}</Text>
         <View style={styles.section}>
           {SOCIAL_ITEMS.map((item, i) => (
-            <React.Fragment key={item.title}>
+            <React.Fragment key={item.titleKey}>
               <LinkRow
-                title={item.title}
+                title={item.titleKey}
                 icon={item.icon}
                 onPress={() => Linking.openURL(item.url)}
               />
@@ -133,18 +115,17 @@ export default function AboutScreen() {
         </View>
 
         {/* Contact */}
-        <Text style={styles.sectionLabel}>Support</Text>
+        <Text style={styles.sectionLabel}>{t('about.support_section')}</Text>
         <View style={styles.section}>
           <LinkRow
-            title="Nous contacter"
+            title={t('about.contact')}
             icon="mail-outline"
             onPress={() => Linking.openURL('mailto:support@clickk.app')}
           />
         </View>
 
         <Text style={styles.footer}>
-          © {new Date().getFullYear()} Clickk SA — Suisse{'\n'}
-          Tous droits réservés
+          {t('about.footer', { year: new Date().getFullYear() })}
         </Text>
       </ScrollView>
     </SafeAreaView>

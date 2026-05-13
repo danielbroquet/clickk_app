@@ -5,6 +5,7 @@ import { router } from 'expo-router'
 import { callEdgeFunction } from './edgeFunction'
 import { safeNavigate } from './navigate'
 import { supabase } from './supabase'
+import { useTranslation } from './i18n'
 
 type InstantSuccessResponse = { status: 'succeeded'; payment_intent_id: string }
 type InstantActionResponse = { status: 'requires_action'; client_secret: string }
@@ -18,6 +19,7 @@ type PaymentIntentResponse =
   | CheckoutResponse
 
 export const useStoryPurchase = () => {
+  const { t } = useTranslation()
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseError, setPurchaseError] = useState<string | null>(null)
   const [purchased, setPurchased] = useState(false)
@@ -68,8 +70,8 @@ export const useStoryPurchase = () => {
             if (res.status === 'requires_action') {
               // TODO (EAS Build): open Stripe SDK 3DS flow with res.client_secret
               Alert.alert(
-                'Authentification requise',
-                "La vérification 3DS sera disponible dans la version native de l'application."
+                t('stripe_screen.auth_required_title'),
+                t('stripe_screen.auth_required_msg')
               )
               return
             }
@@ -103,12 +105,12 @@ export const useStoryPurchase = () => {
         await safeNavigate(`/shipping/${storyId}`)
       }
     } catch (err: unknown) {
-      const rawMessage = err instanceof Error ? err.message : 'Erreur paiement'
+      const rawMessage = err instanceof Error ? err.message : t('errors.payment_error')
       const message = rawMessage === 'cannot_buy_own_story'
-        ? 'Vous ne pouvez pas acheter votre propre article'
+        ? t('errors.own_article')
         : rawMessage
       setPurchaseError(message)
-      Alert.alert('Erreur', message)
+      Alert.alert(t('common.error'), message)
     } finally {
       setPurchasing(false)
       setInstantLoading(false)

@@ -374,7 +374,7 @@ export default function CommentsScreen() {
 
         <View style={{ flex: 1 }}>
           <Text style={{ color: '#A0A0A0', fontSize: 12, fontWeight: '600', marginBottom: 2 }}>
-            {comment.profiles.username ?? 'Utilisateur'}
+            {comment.profiles.username ?? t('profile.default_user')}
           </Text>
           <Text style={{ color: '#FFFFFF', fontSize: 14, lineHeight: 20 }}>
             {comment.content}

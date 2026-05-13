@@ -462,7 +462,7 @@ export default function ConversationScreen() {
       .insert({
         conversation_id: conversationId,
         sender_id: currentUserId,
-        content: type === 'audio' ? '🎤 Message vocal' : '📷 Photo',
+        content: type === 'audio' ? t('conversation_screen.voice_message_content') : t('conversation_screen.photo_content'),
         message_type: type,
         media_url: mediaUrl,
       })
@@ -483,7 +483,7 @@ export default function ConversationScreen() {
       const { granted } = await Audio.requestPermissionsAsync()
       if (!granted) {
         setIsRecording(false)
-        Alert.alert('Permission refusée', t('conversation.mic_permission'))
+        Alert.alert(t('errors.permission_denied'), t('conversation.mic_permission'))
         return
       }
       isRecordingRef.current = true
@@ -504,7 +504,7 @@ export default function ConversationScreen() {
       isRecordingRef.current = false
       recordingRef.current = null
       setIsRecording(false)
-      Alert.alert('Erreur', "Impossible de démarrer l'enregistrement.")
+      Alert.alert(t('common.error'), t('errors.recording_start'))
     }
   }, [])
 
@@ -527,7 +527,7 @@ export default function ConversationScreen() {
       setRecording(null)
       setIsRecording(false)
       setRecordingDuration(0)
-      Alert.alert('Erreur', "Impossible d'envoyer le message vocal.")
+      Alert.alert(t('common.error'), t('errors.recording_send'))
     }
   }, [sendMedia])
 
@@ -663,7 +663,7 @@ export default function ConversationScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={styles.headerName} numberOfLines={1}>
-              {otherUser?.display_name ?? otherUser?.username ?? 'Utilisateur'}
+              {otherUser?.display_name ?? otherUser?.username ?? t('conversation_screen.default_user')}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={colors.textSecondary} />
           </View>
