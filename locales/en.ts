@@ -539,4 +539,12 @@ export default {
     stripe_secure: 'Secure integration by Stripe · Encrypted data',
     commission: 'You keep 92% of the sale price.',
   },
+  reviews_screen: {
+    title: "%{username}'s reviews",
+    average: 'Average',
+    total: '%{count} reviews',
+    no_comment: 'No comment',
+    empty: 'No reviews yet',
+    empty_sub: 'Reviews will appear after the first sales.',
+  },
 }

@@ -539,4 +539,12 @@ export default {
     stripe_secure: 'Sichere Integration durch Stripe · Verschlüsselte Daten',
     commission: 'Du behältst 92% des Verkaufspreises.',
   },
+  reviews_screen: {
+    title: 'Bewertungen von %{username}',
+    average: 'Durchschnitt',
+    total: '%{count} Bewertungen',
+    no_comment: 'Kein Kommentar',
+    empty: 'Noch keine Bewertungen',
+    empty_sub: 'Bewertungen erscheinen nach den ersten Verkäufen.',
+  },
 }

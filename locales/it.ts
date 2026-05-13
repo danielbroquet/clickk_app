@@ -539,4 +539,12 @@ export default {
     stripe_secure: 'Integrazione sicura da Stripe · Dati cifrati',
     commission: 'Tieni il 92% del prezzo di vendita.',
   },
+  reviews_screen: {
+    title: 'Recensioni di %{username}',
+    average: 'Media',
+    total: '%{count} recensioni',
+    no_comment: 'Nessun commento',
+    empty: 'Nessuna recensione per ora',
+    empty_sub: 'Le recensioni appariranno dopo le prime vendite.',
+  },
 }

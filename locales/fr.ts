@@ -539,4 +539,12 @@ export default {
     stripe_secure: 'Intégration sécurisée par Stripe · Données chiffrées',
     commission: 'Tu gardes 92% du prix de vente.',
   },
+  reviews_screen: {
+    title: 'Avis sur %{username}',
+    average: 'Moyenne',
+    total: '%{count} avis',
+    no_comment: 'Aucun commentaire',
+    empty: 'Aucun avis pour le moment',
+    empty_sub: 'Les avis apparaîtront après les premières ventes.',
+  },
 }

@@ -95,13 +95,14 @@ const useBlock = (currentUserId: string, targetUserId: string) => {
 
 // ─── StarRating ───────────────────────────────────────────────────────────────
 
-function StarRating({ avg, count }: { avg: number; count: number }) {
+function StarRating({ avg, count, sellerId, sellerUsername }: { avg: number; count: number; sellerId: string; sellerUsername: string }) {
   if (count === 0) return null
   const stars = Math.round(avg)
   return (
     <TouchableOpacity
       style={starStyles.row}
       activeOpacity={0.8}
+      onPress={() => router.push({ pathname: '/profile/reviews', params: { sellerId, sellerUsername } })}
     >
       <View style={starStyles.stars}>
         {[1,2,3,4,5].map(i => (
@@ -467,7 +468,12 @@ export default function PublicProfileScreen() {
           {profile.bio ? <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text> : null}
 
           {profile.role === 'seller' && (
-            <StarRating avg={profile.rating_avg ?? 0} count={profile.rating_count ?? 0} />
+            <StarRating
+              avg={profile.rating_avg ?? 0}
+              count={profile.rating_count ?? 0}
+              sellerId={profile.id}
+              sellerUsername={profile.username ?? profile.display_name ?? ''}
+            />
           )}
 
           <View style={styles.statsRow}>

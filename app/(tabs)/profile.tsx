@@ -712,7 +712,7 @@ const followersStyles = StyleSheet.create({
 
 // ── StarRating ───────────────────────────────────────────────────────────────
 
-function StarRating({ avg, count }: { avg: number; count: number }) {
+function StarRating({ avg, count, sellerId, sellerUsername }: { avg: number; count: number; sellerId: string; sellerUsername: string }) {
   const { t } = useTranslation()
   if (count === 0) return null
   const stars = Math.round(avg)
@@ -720,6 +720,7 @@ function StarRating({ avg, count }: { avg: number; count: number }) {
     <TouchableOpacity
       style={starStyles.row}
       activeOpacity={0.8}
+      onPress={() => router.push({ pathname: '/profile/reviews', params: { sellerId, sellerUsername } })}
     >
       <View style={starStyles.stars}>
         {[1,2,3,4,5].map(i => (
@@ -958,7 +959,12 @@ export default function ProfileScreen() {
           )}
 
           {profile?.role === 'seller' && (
-            <StarRating avg={ratingData.avg} count={ratingData.count} />
+            <StarRating
+              avg={ratingData.avg}
+              count={ratingData.count}
+              sellerId={profile.id}
+              sellerUsername={profile.username ?? profile.display_name ?? ''}
+            />
           )}
 
           <View style={styles.statsRow}>
