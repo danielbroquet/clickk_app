@@ -16,18 +16,25 @@ export function usePushNotifications(userId: string | null): PushNotificationSta
 
   useEffect(() => {
     if (Platform.OS === 'web') return
+    if (!userId) return
 
     let cancelled = false
 
+    // Defer setup so login navigation/state transitions can settle first.
+    // Without this delay, iOS may terminate the app due to concurrent
+    // native operations (permission prompt, APNs token fetch, navigation).
+    const startTimer = setTimeout(() => { setup() }, 2000)
+
     async function setup() {
+      if (cancelled) return
       try {
         const Device = await import('expo-device')
 
         if (!Device.isDevice) {
-          // Physical device required for push notifications
           return
         }
 
+        if (cancelled) return
         const Notifications = await import('expo-notifications')
 
         Notifications.setNotificationHandler({
@@ -99,10 +106,9 @@ export function usePushNotifications(userId: string | null): PushNotificationSta
       }
     }
 
-    setup()
-
     return () => {
       cancelled = true
+      clearTimeout(startTimer)
       cleanupRef.current?.()
     }
   }, [userId])
