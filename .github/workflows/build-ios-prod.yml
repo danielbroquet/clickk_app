@@ -44,6 +44,17 @@ jobs:
       - name: 🔍 Xcode version
         run: xcodebuild -version
 
+      - name: 🔍 Debug expo config
+        run: |
+          echo "=== Node version ==="
+          node --version
+          echo "=== Installed expo packages ==="
+          ls node_modules/@expo/ || true
+          ls node_modules/expo/ || true
+          echo "=== Running expo config ==="
+          npx expo config --json || echo "EXIT CODE: $?"
+        continue-on-error: true
+
       - name: 🏗️ Build iOS
         run: eas build --platform ios --profile production --local --non-interactive
         env:
