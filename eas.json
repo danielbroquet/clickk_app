@@ -34,7 +34,7 @@
     "production": {
       "distribution": "store",
       "channel": "production",
-      "autoIncrement": "buildNumber",
+      "autoIncrement": true,
       "ios": {
         "resourceClass": "m-medium",
         "image": "macos-sequoia-15.4-xcode-16.3"
