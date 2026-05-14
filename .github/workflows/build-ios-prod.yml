@@ -38,7 +38,7 @@ jobs:
       - name: 🎯 Setup Expo & EAS
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 13.4.2
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 🔍 Xcode version
@@ -58,7 +58,6 @@ jobs:
       - name: 🏗️ Build iOS
         run: eas build --platform ios --profile production --local --non-interactive
         env:
-          NODE_PATH: ${{ github.workspace }}/node_modules
           EXPO_PUBLIC_ENV: production
           EXPO_PUBLIC_SUPABASE_URL: "https://ckrttngnwoslypyulwuf.supabase.co"
           EXPO_PUBLIC_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrcnR0bmdud29zbHlweXVsd3VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwMjQxNzcsImV4cCI6MjA5MjYwMDAxN30.jjnmjd5DVx6FiMH7XjchAGZkPrpeUOybKKWHnpOfYiU"
