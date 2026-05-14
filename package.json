@@ -72,5 +72,10 @@
   },
   "overrides": {
     "react-native-worklets": "0.5.1"
+  },
+  "expo": {
+    "install": {
+      "exclude": ["@stripe/stripe-react-native"]
+    }
   }
 }
