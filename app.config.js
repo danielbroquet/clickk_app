@@ -52,6 +52,12 @@ export default ({ config }) => ({
     "expo-localization",
     "expo-web-browser",
     [
+      "@react-native-google-signin/google-signin",
+      {
+        "iosUrlScheme": "com.googleusercontent.apps.568448664963-4gdsohps2operj8u4mn3qrcoj8ede507"
+      }
+    ],
+    [
       "expo-notifications",
       {
         icon: "./assets/images/notification-icon.png",
