@@ -22,6 +22,13 @@ export default ({ config }) => ({
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
       ITSAppUsesNonExemptEncryption: false,
+      CFBundleURLTypes: [
+        {
+          CFBundleURLSchemes: [
+            "com.googleusercontent.apps.568448664963-4gdsohps2operj8u4mn3qrcoj8ede507"
+          ]
+        }
+      ]
     },
   },
   android: {
@@ -51,12 +58,6 @@ export default ({ config }) => ({
     "expo-font",
     "expo-localization",
     "expo-web-browser",
-    [
-      "@react-native-google-signin/google-signin",
-      {
-        "iosUrlScheme": "com.googleusercontent.apps.568448664963-4gdsohps2operj8u4mn3qrcoj8ede507"
-      }
-    ],
     [
       "expo-notifications",
       {
