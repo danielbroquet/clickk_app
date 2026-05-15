@@ -30,32 +30,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
+
     supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return
       setSession(data.session)
       if (data.session?.user) {
         const userId = data.session.user.id
         fetchProfile(userId)
-          .then(p => setProfile(p))
-          .finally(() => setLoading(false))
+          .then(p => { if (mounted) setProfile(p) })
+          .finally(() => { if (mounted) setLoading(false) })
       } else {
         setLoading(false)
       }
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession)
+      // CRITICAL: defer ALL state updates and side-effects out of the
+      // synchronous auth callback to avoid native deadlocks/crashes on iOS
+      // (e.g. login -> immediate navigation + Supabase calls + Stripe init).
+      setTimeout(() => {
+        if (!mounted) return
+        setSession(newSession)
 
-      if (newSession?.user) {
-        const userId = newSession.user.id
-        setTimeout(() => {
-          fetchProfile(userId).then(p => setProfile(p))
-        }, 0)
-      } else {
-        setProfile(null)
-      }
+        if (newSession?.user) {
+          const userId = newSession.user.id
+          fetchProfile(userId).then(p => { if (mounted) setProfile(p) })
+        } else {
+          setProfile(null)
+        }
+      }, 0)
     })
 
-    return () => listener.subscription.unsubscribe()
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {

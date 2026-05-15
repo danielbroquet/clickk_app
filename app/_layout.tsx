@@ -117,8 +117,15 @@ function RootRedirector() {
       setTimeout(() => { navigatingRef.current = false }, 400)
     } else if (session && (inAuthGroup || inOnboarding)) {
       navigatingRef.current = true
-      router.replace('/(tabs)')
-      setTimeout(() => { navigatingRef.current = false }, 400)
+      // Delay the redirect slightly so the auth screen can dismiss its
+      // keyboard / native inputs before navigation runs. On iOS, doing
+      // the replace synchronously while the keyboard is up + Stripe /
+      // push native modules initialize can crash the app.
+      const id = setTimeout(() => {
+        router.replace('/(tabs)')
+        navigatingRef.current = false
+      }, 250)
+      return () => clearTimeout(id)
     }
   }, [session, loading, segments, onboardingChecked, onboardingDone])
 
