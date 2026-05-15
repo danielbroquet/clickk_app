@@ -18,6 +18,7 @@ import { useAuth } from '../../lib/auth'
 import { supabase } from '../../lib/supabase'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { useTranslation } from '../../lib/i18n'
+import LanguageSelector from '../../components/LanguageSelector'
 
 GoogleSignin.configure({
   webClientId: '568448664963-98ol47cd34u54vmi299m1pf114t64be2.apps.googleusercontent.com',
@@ -108,10 +109,12 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.flex}>
+      <LanguageSelector />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
@@ -181,7 +184,8 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 

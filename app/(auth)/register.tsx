@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '../../lib/auth'
 import { colors, fontFamily, spacing } from '../../lib/theme'
 import { useTranslation } from '../../lib/i18n'
+import LanguageSelector from '../../components/LanguageSelector'
 
 export default function RegisterScreen() {
   const router = useRouter()
@@ -49,10 +50,12 @@ export default function RegisterScreen() {
   const setF = (key: string, val: boolean) => setFocus(prev => ({ ...prev, [key]: val }))
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.flex}>
+      <LanguageSelector />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
@@ -152,7 +155,8 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 

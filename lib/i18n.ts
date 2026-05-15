@@ -61,6 +61,12 @@ export async function setLocale(locale: Locale): Promise<void> {
   notifyLocaleChange(locale)
 }
 
+export function setAppLanguage(locale: Locale): void {
+  i18n.locale = locale
+  AsyncStorage.setItem(STORAGE_KEY, locale).catch(() => {})
+  notifyLocaleChange(locale)
+}
+
 export function getCurrentLocale(): Locale {
   return i18n.locale as Locale
 }
