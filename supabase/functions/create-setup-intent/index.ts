@@ -60,10 +60,42 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: selectErr.message }, 500);
     }
 
-    const customerId = profile?.stripe_customer_id;
+    let customerId = profile?.stripe_customer_id;
+
     if (!customerId) {
-      console.error(`${LOG} customer not initialized for user`, userId);
-      return jsonResponse({ error: "customer_not_initialized" }, 400);
+      // Auto-create Stripe customer
+      const { data: userDataForEmail } = await supabase.auth.admin.getUserById(userId);
+      const email = userDataForEmail?.user?.email;
+
+      const customerParams = new URLSearchParams();
+      if (email) customerParams.set("email", email);
+      customerParams.set("metadata[user_id]", userId);
+
+      const customerRes = await fetch("https://api.stripe.com/v1/customers", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${stripeKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: customerParams.toString(),
+      });
+
+      const customerJson = await customerRes.json();
+
+      if (!customerRes.ok || customerJson.error) {
+        const message = customerJson.error?.message ?? "stripe_customer_creation_failed";
+        console.error(`${LOG} auto customer creation failed`, message);
+        return jsonResponse({ error: message }, 502);
+      }
+
+      customerId = customerJson.id as string;
+
+      await supabase
+        .from("profiles")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", userId);
+
+      console.log(`${LOG} auto-created stripe customer`, customerId, "for user", userId);
     }
 
     const params = new URLSearchParams();
