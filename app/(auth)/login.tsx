@@ -102,7 +102,8 @@ export default function LoginScreen() {
         return
       }
     } catch (e: any) {
-      if (e.code !== '-5') {
+      const cancelCodes = ['-5', 'SIGN_IN_CANCELLED', '12501', 'CANCELED', 'CANCELLED']
+      if (!cancelCodes.includes(String(e.code))) {
         Alert.alert('Error', e.message ?? 'Google sign in failed.')
       }
     }
