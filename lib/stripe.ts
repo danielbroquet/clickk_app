@@ -53,12 +53,12 @@ export const useStoryPurchase = () => {
 
       if (useInstant) {
         setInstantLoading(true)
+        let instantFailed = false
         try {
           const res = await callEdgeFunction<PaymentIntentResponse>(
             'create-payment-intent',
             { story_id: storyId, amount_chf: amountChf, mode: 'instant' }
           )
-
           if ('status' in res) {
             if (res.status === 'succeeded') {
               setPurchased(true)
@@ -66,23 +66,26 @@ export const useStoryPurchase = () => {
               await safeNavigate(`/shipping/${storyId}`)
               return
             }
-
             if (res.status === 'requires_action') {
-              // TODO (EAS Build): open Stripe SDK 3DS flow with res.client_secret
               Alert.alert(
                 t('stripe_screen.auth_required_title'),
                 t('stripe_screen.auth_required_msg')
               )
               return
             }
-
-            if (res.status === 'failed') {
-              // Instant failed — fall through to checkout
-            }
+            // Any other status → fall through to checkout
+            instantFailed = true
+          } else if ('error' in (res as any)) {
+            // no_payment_method or any instant error → fall through to checkout
+            instantFailed = true
           }
+        } catch {
+          // Instant failed for any reason → fall through to checkout
+          instantFailed = true
         } finally {
           setInstantLoading(false)
         }
+        if (!instantFailed) return
       }
 
       // Checkout fallback (also used when: no saved card, instant failed, or no_payment_method)
