@@ -87,22 +87,42 @@ export default function LoginScreen() {
       if (Platform.OS === 'android') {
         await GoogleSignin.hasPlayServices()
       }
-      const userInfo = await GoogleSignin.signIn()
-      const idToken = userInfo.data?.idToken ?? (userInfo as any).idToken
+
+      await GoogleSignin.signOut()
+
+      const response = await GoogleSignin.signIn()
+
+      let idToken: string | null = null
+
+      if (response.type === 'success' && response.data) {
+        idToken = response.data.idToken ?? null
+      } else if ((response as any).idToken) {
+        idToken = (response as any).idToken
+      } else if ((response as any).data?.idToken) {
+        idToken = (response as any).data.idToken
+      }
+
       if (!idToken) {
+        console.warn('Google Sign-In: no idToken in response', JSON.stringify(response))
         Alert.alert('Error', 'No ID token received from Google.')
         return
       }
+
       const { error } = await supabase.auth.signInWithIdToken({
         provider: 'google',
         token: idToken,
       })
+
       if (error) {
         Alert.alert('Error', error.message)
         return
       }
     } catch (e: any) {
-      const cancelCodes = ['-5', 'SIGN_IN_CANCELLED', '12501', 'CANCELED', 'CANCELLED']
+      const cancelCodes = [
+        '-5', '12501', 'SIGN_IN_CANCELLED',
+        'CANCELLED', 'CANCELED', 'ERR_REQUEST_CANCELED',
+        'USER_CANCELED', 'ASYNC_OP_CANCELED'
+      ]
       if (!cancelCodes.includes(String(e.code))) {
         Alert.alert('Error', e.message ?? 'Google sign in failed.')
       }
