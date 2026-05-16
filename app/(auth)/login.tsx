@@ -84,18 +84,23 @@ export default function LoginScreen() {
 
   const handleGoogleSignIn = async () => {
     try {
-      if (Platform.OS === 'android') {
-        await GoogleSignin.hasPlayServices()
-      }
+      GoogleSignin.configure({
+        webClientId: '568448664963-98ol47cd34u54vmi299m1pf114t64be2.apps.googleusercontent.com',
+        iosClientId: '568448664963-4gdsohps2operj8u4mn3qrcoj8ede507.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+        offlineAccess: false,
+      })
 
-      await GoogleSignin.signOut()
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: false })
+      }
 
       const response = await GoogleSignin.signIn()
 
       let idToken: string | null = null
 
-      if (response.type === 'success' && response.data) {
-        idToken = response.data.idToken ?? null
+      if (response && (response as any).type === 'success' && (response as any).data) {
+        idToken = (response as any).data.idToken ?? null
       } else if ((response as any).idToken) {
         idToken = (response as any).idToken
       } else if ((response as any).data?.idToken) {
@@ -123,8 +128,11 @@ export default function LoginScreen() {
         'CANCELLED', 'CANCELED', 'ERR_REQUEST_CANCELED',
         'USER_CANCELED', 'ASYNC_OP_CANCELED'
       ]
-      if (!cancelCodes.includes(String(e.code))) {
-        Alert.alert('Error', e.message ?? 'Google sign in failed.')
+      const code = String(e?.code ?? '')
+      if (!cancelCodes.includes(code)) {
+        const msg = e?.message ?? 'Google sign in failed.'
+        console.error('Google Sign-In error:', code, msg, JSON.stringify(e))
+        Alert.alert('Error', msg)
       }
     }
   }
