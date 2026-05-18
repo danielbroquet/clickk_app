@@ -120,7 +120,8 @@ async function handleCheckout(opts: {
   const { stripeKey, buyerId, storyId, amountChf, amountRappen } = opts;
 
   const params = new URLSearchParams({
-    "payment_method_types[]": "card",
+    "automatic_payment_methods[enabled]": "true",
+    "automatic_payment_methods[allow_redirects]": "always",
     "line_items[0][price_data][currency]": "chf",
     "line_items[0][price_data][unit_amount]": String(amountRappen),
     "line_items[0][price_data][product_data][name]": `clickk — Story ${storyId}`,
