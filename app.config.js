@@ -7,7 +7,7 @@ export default ({ config }) => ({
   icon: "./assets/images/icon.png",
   scheme: "clickk",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
+  newArchEnabled: false,
   owner: "danielbroquet",
   updates: {
     url: "https://u.expo.dev/c721f9ef-783d-4ab3-a51e-d28f4d3c6a12",
