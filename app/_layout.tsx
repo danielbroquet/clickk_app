@@ -26,6 +26,7 @@ import { LocaleProvider } from '../lib/LocaleContext'
 import { StripeWrapper } from '../lib/StripeWrapper'
 import { useFrameworkReady } from '@/hooks/useFrameworkReady'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import { initializePushNotifications } from '../lib/pushNotificationsService'
 import { ONBOARDING_KEY } from './onboarding'
 import NetworkBanner from '../components/ui/NetworkBanner'
 
@@ -159,6 +160,10 @@ function RootRedirector() {
 
 export default function RootLayout() {
   useFrameworkReady()
+
+  useEffect(() => {
+    initializePushNotifications()
+  }, [])
 
   const [splashDone, setSplashDone] = useState(false)
 
