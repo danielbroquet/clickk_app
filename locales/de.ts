@@ -199,6 +199,12 @@ export default {
     already_account: 'Bereits ein Konto?',
     login_link: 'Anmelden',
     create_account_btn: 'Konto erstellen',
+    error_account_exists: 'Es existiert bereits ein Konto mit dieser E-Mail. Melde dich mit E-Mail und Passwort an, oder verwende dieselbe Anmeldemethode wie bei der Registrierung.',
+    error_invalid_credentials: 'Falsche E-Mail oder falsches Passwort.',
+    error_email_not_confirmed: 'Bitte bestätige deine E-Mail vor der Anmeldung.',
+    error_too_many_requests: 'Zu viele Versuche. Bitte warte einige Minuten.',
+    error_network: 'Verbindungsfehler. Überprüfe deine Internetverbindung.',
+    error_google_token: 'Google-Token konnte nicht abgerufen werden. Bitte erneut versuchen.',
   },
   profile: {
     edit: 'Profil bearbeiten',

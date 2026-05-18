@@ -199,6 +199,12 @@ export default {
     already_account: 'Already have an account?',
     login_link: 'Sign in',
     create_account_btn: 'Create my account',
+    error_account_exists: 'An account already exists with this email. Sign in with your email and password, or use the same sign-in method you used when registering.',
+    error_invalid_credentials: 'Incorrect email or password.',
+    error_email_not_confirmed: 'Please confirm your email before signing in.',
+    error_too_many_requests: 'Too many attempts. Please try again in a few minutes.',
+    error_network: 'Connection error. Check your internet connection.',
+    error_google_token: 'Could not retrieve Google token. Please try again.',
   },
   profile: {
     edit: 'Edit profile',

@@ -38,6 +38,34 @@ export default function LoginScreen() {
   const [focusEmail, setFocusEmail] = useState(false)
   const [focusPassword, setFocusPassword] = useState(false)
 
+  const friendlyAuthError = (message: string): string => {
+    const m = message.toLowerCase()
+    if (
+      m.includes('user already registered') ||
+      m.includes('already registered') ||
+      m.includes('email already in use') ||
+      m.includes('already been registered') ||
+      m.includes('email link is invalid') ||
+      m.includes('provider is not enabled') ||
+      m.includes('identity is already linked')
+    ) {
+      return t('auth.error_account_exists')
+    }
+    if (m.includes('invalid login credentials') || m.includes('invalid credentials')) {
+      return t('auth.error_invalid_credentials')
+    }
+    if (m.includes('email not confirmed')) {
+      return t('auth.error_email_not_confirmed')
+    }
+    if (m.includes('too many requests') || m.includes('rate limit')) {
+      return t('auth.error_too_many_requests')
+    }
+    if (m.includes('network') || m.includes('fetch')) {
+      return t('auth.error_network')
+    }
+    return message
+  }
+
   const handleLogin = async () => {
     setEmailError('')
     setPasswordError('')
@@ -49,7 +77,7 @@ export default function LoginScreen() {
     const { error } = await signIn(email.trim(), password)
     setLoading(false)
     if (error) {
-      setPasswordError(error)
+      setPasswordError(friendlyAuthError(error))
       return
     }
   }
@@ -72,7 +100,7 @@ export default function LoginScreen() {
         token: identityToken,
       })
       if (error) {
-        Alert.alert('Error', error.message)
+        Alert.alert(t('common.error'), friendlyAuthError(error.message))
         return
       }
     } catch (e: any) {
@@ -109,7 +137,7 @@ export default function LoginScreen() {
 
       if (!idToken) {
         console.warn('Google Sign-In: no idToken in response', JSON.stringify(response))
-        Alert.alert('Error', 'No ID token received from Google.')
+        Alert.alert(t('common.error'), t('auth.error_google_token'))
         return
       }
 
@@ -119,7 +147,7 @@ export default function LoginScreen() {
       })
 
       if (error) {
-        Alert.alert('Error', error.message)
+        Alert.alert(t('common.error'), friendlyAuthError(error.message))
         return
       }
     } catch (e: any) {
