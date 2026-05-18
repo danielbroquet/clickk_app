@@ -1172,7 +1172,21 @@ export default function FeedScreen() {
   if (activeTab === 'following' && activeStories.length === 0) {
     return (
       <View style={styles.root}>
-        <View style={styles.empty}>
+        <ScrollView
+          contentContainerStyle={styles.empty}
+          refreshControl={
+            <RefreshControl
+              refreshing={followingRefreshing}
+              onRefresh={() => {
+                setFollowingCursor(null)
+                setFollowingHasMore(true)
+                setFollowingRefreshing(true)
+                fetchFollowing('initial')
+              }}
+              tintColor="#00D2B8"
+            />
+          }
+        >
           <Ionicons name="people-outline" size={48} color="#555" />
           <Text style={styles.emptyText}>{t('feed.following_empty')}</Text>
           <TouchableOpacity
@@ -1182,7 +1196,7 @@ export default function FeedScreen() {
           >
             <Text style={styles.discoverBtnText}>{t('feed.discover_sellers')}</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
         {tabHeader}
       </View>
     )
@@ -1192,10 +1206,24 @@ export default function FeedScreen() {
   if (activeTab === 'foryou' && activeStories.length === 0) {
     return (
       <View style={styles.root}>
-        <View style={styles.empty}>
+        <ScrollView
+          contentContainerStyle={styles.empty}
+          refreshControl={
+            <RefreshControl
+              refreshing={forYouRefreshing}
+              onRefresh={() => {
+                setForYouCursor(null)
+                setForYouHasMore(true)
+                setForYouRefreshing(true)
+                fetchForYou('initial')
+              }}
+              tintColor="#00D2B8"
+            />
+          }
+        >
           <Ionicons name="flash-outline" size={48} color="#555" />
           <Text style={styles.emptyText}>{t('feed.no_active_drops')}</Text>
-        </View>
+        </ScrollView>
         {tabHeader}
       </View>
     )
@@ -1275,6 +1303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 12,
+    minHeight: SCREEN_HEIGHT,
   },
   emptyText: { color: '#999', fontSize: 15, fontWeight: '600' },
 
