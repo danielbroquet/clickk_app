@@ -83,7 +83,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    supabase.removeAllChannels()
     await supabase.auth.signOut()
+    setSession(null)
+    setProfile(null)
   }
 
   const refreshProfile = async () => {

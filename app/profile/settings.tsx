@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as Linking from 'expo-linking'
 import Constants from 'expo-constants'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../lib/auth'
 import { colors, fontFamily } from '../../lib/theme'
 import { useLocale } from '../../lib/LocaleContext'
 import { LOCALE_LABELS, LOCALE_FLAGS, SUPPORTED_LOCALES, Locale } from '../../lib/i18n'
@@ -63,9 +64,10 @@ export default function SettingsScreen() {
   const { locale, setLocale } = useLocale()
   const [languageModalVisible, setLanguageModalVisible] = useState(false)
   const { t } = useTranslation()
+  const { signOut } = useAuth()
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await signOut()
   }
 
   const handleDeleteAccount = () => {
@@ -81,7 +83,7 @@ export default function SettingsScreen() {
             try {
               const { data: { session } } = await supabase.auth.getSession()
               if (!session) {
-                await supabase.auth.signOut()
+                await signOut()
                 return
               }
               const res = await fetch(
@@ -99,7 +101,7 @@ export default function SettingsScreen() {
                 Alert.alert(t('common.error'), json.error ?? t('settings.delete_error'))
                 return
               }
-              await supabase.auth.signOut()
+              await signOut()
             } catch (err: any) {
               Alert.alert(t('common.error'), err.message ?? t('common.error'))
             }
