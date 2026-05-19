@@ -10,6 +10,16 @@ const corsHeaders = {
 const DEFAULT_REFRESH_URL = "clickk://onboarding-refresh";
 const DEFAULT_RETURN_URL = "clickk://onboarding-complete";
 
+const ALLOWED_REDIRECT_PREFIXES = [
+  "clickk://",
+  "https://ckrttngnwoslypyulwuf.supabase.co/functions/v1/stripe-redirect",
+];
+
+function isAllowedRedirect(url: string): boolean {
+  if (typeof url !== "string") return false;
+  return ALLOWED_REDIRECT_PREFIXES.some((prefix) => url.startsWith(prefix));
+}
+
 async function stripeRequest(path: string, key: string, body?: URLSearchParams) {
   const res = await fetch(`https://api.stripe.com/v1${path}`, {
     method: "POST",
@@ -71,8 +81,8 @@ Deno.serve(async (req: Request) => {
     let refreshUrl = DEFAULT_REFRESH_URL;
     try {
       const body = await req.json();
-      if (body?.return_url) returnUrl = body.return_url;
-      if (body?.refresh_url) refreshUrl = body.refresh_url;
+      if (body?.return_url && isAllowedRedirect(body.return_url)) returnUrl = body.return_url;
+      if (body?.refresh_url && isAllowedRedirect(body.refresh_url)) refreshUrl = body.refresh_url;
     } catch { /* no body — use defaults */ }
 
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");

@@ -4,6 +4,15 @@ import { sendPushNotification } from "../_shared/sendPushNotification.ts";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 async function verifyStripeSignature(
   body: string,
   signature: string,
@@ -14,6 +23,11 @@ async function verifyStripeSignature(
   const sig = parts.find((p) => p.startsWith("v1="))?.split("=")[1];
 
   if (!timestamp || !sig) return false;
+
+  const ts = parseInt(timestamp, 10);
+  if (isNaN(ts)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - ts) > 300) return false;
 
   const signedPayload = `${timestamp}.${body}`;
   const key = await crypto.subtle.importKey(
@@ -32,7 +46,7 @@ async function verifyStripeSignature(
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
-  return expectedSig === sig;
+  return timingSafeEqual(expectedSig, sig);
 }
 
 interface StripeEventMetadata {
