@@ -87,8 +87,8 @@ export default function BecomeSellerScreen() {
   }
 
   const fetchOnboardingUrl = async (): Promise<string | null> => {
-    const returnUrl = 'https://clickk.ch/onboarding-complete'
-    const refreshUrl = 'https://clickk.ch/onboarding-refresh'
+    const returnUrl = 'https://ckrttngnwoslypyulwuf.supabase.co/functions/v1/stripe-redirect?type=complete'
+    const refreshUrl = 'https://ckrttngnwoslypyulwuf.supabase.co/functions/v1/stripe-redirect?type=refresh'
 
     let data: { status?: string; onboarding_url?: string }
     try {
