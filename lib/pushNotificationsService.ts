@@ -1,5 +1,9 @@
 import { Platform } from 'react-native'
+import * as Device from 'expo-device'
+import * as Notifications from 'expo-notifications'
+import Constants from 'expo-constants'
 import { supabase } from './supabase'
+import { safeNavigate } from './navigate'
 
 let initialized = false
 let cachedToken: string | null = null
@@ -20,10 +24,7 @@ export function initializePushNotifications() {
 
   ;(async () => {
     try {
-      const Device = await import('expo-device')
       if (!Device.isDevice) return
-
-      const Notifications = await import('expo-notifications')
 
       Notifications.setNotificationHandler({
         handleNotification: async () => ({
@@ -45,8 +46,6 @@ export function initializePushNotifications() {
         })
       }
 
-      const { safeNavigate } = await import('./navigate')
-
       Notifications.addNotificationResponseReceivedListener(response => {
         const data = response.notification.request.content.data as Record<string, unknown>
         if (data.story_id) safeNavigate(`/story/${data.story_id}`)
@@ -63,10 +62,7 @@ export async function registerPushTokenForUser(userId: string): Promise<void> {
   if (Platform.OS === 'web') return
 
   try {
-    const Device = await import('expo-device')
     if (!Device.isDevice) return
-
-    const Notifications = await import('expo-notifications')
 
     const { status: existing } = await Notifications.getPermissionsAsync()
     let finalStatus = existing as typeof cachedPermission
@@ -80,10 +76,9 @@ export async function registerPushTokenForUser(userId: string): Promise<void> {
     if (finalStatus !== 'granted') return
 
     if (!cachedToken) {
-      const Constants = await import('expo-constants')
       const projectId =
-        Constants.default.expoConfig?.extra?.eas?.projectId ??
-        Constants.default.easConfig?.projectId
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId
 
       const tokenData = await Notifications.getExpoPushTokenAsync(
         projectId ? { projectId } : undefined
