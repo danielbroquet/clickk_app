@@ -83,7 +83,7 @@ function RootRedirector() {
   const [onboardingChecked, setOnboardingChecked] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(true)
   const redirectedRef = useRef(false)
-  const navigatingRef = useRef(false)
+  const lastRouteRef = useRef<string | null>(null)
 
   const { expoPushToken, notificationPermission } = usePushNotifications(session?.user?.id ?? null)
 
@@ -96,7 +96,6 @@ function RootRedirector() {
 
   useEffect(() => {
     if (loading || !onboardingChecked) return
-    if (navigatingRef.current) return
 
     const inOnboarding = segments[0] === 'onboarding'
     const inAuthGroup = segments[0] === '(auth)'
@@ -104,28 +103,23 @@ function RootRedirector() {
     // First launch: show onboarding (only redirect once)
     if (!onboardingDone && !inOnboarding && !redirectedRef.current) {
       redirectedRef.current = true
-      navigatingRef.current = true
+      if (lastRouteRef.current === '/onboarding') return
+      lastRouteRef.current = '/onboarding'
       router.replace('/onboarding')
-      setTimeout(() => { navigatingRef.current = false }, 400)
       return
     }
 
     const inProtectedRoute = !inAuthGroup && !inOnboarding
 
     if (!session && inProtectedRoute) {
-      navigatingRef.current = true
+      lastRouteRef.current = null
       router.replace('/(auth)/login')
-      setTimeout(() => { navigatingRef.current = false }, 400)
+    } else if (!session) {
+      lastRouteRef.current = null
     } else if (session && (inAuthGroup || inOnboarding)) {
-      navigatingRef.current = true
-      // Delay the redirect slightly so the auth screen can dismiss its
-      // keyboard / native inputs before navigation runs. On iOS, doing
-      // the replace synchronously while the keyboard is up + Stripe /
-      // push native modules initialize can crash the app.
-      const id = setTimeout(() => {
-        router.replace('/(tabs)')
-        navigatingRef.current = false
-      }, 250)
+      if (lastRouteRef.current === '/(tabs)') return
+      lastRouteRef.current = '/(tabs)'
+      const id = setTimeout(() => router.replace('/(tabs)'), 250)
       return () => clearTimeout(id)
     }
   }, [session, loading, segments, onboardingChecked, onboardingDone])
